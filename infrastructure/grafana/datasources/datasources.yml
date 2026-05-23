@@ -1,0 +1,19 @@
+apiVersion: 1
+
+datasources:
+  - name: Quickwit
+    type: quickwit-quickwit-datasource
+    access: proxy
+    url: http://quickwit:7280
+    isDefault: false
+
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+
+  - name: Jaeger
+    type: jaeger
+    access: proxy
+    url: http://jaeger:16686
