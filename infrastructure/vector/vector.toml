@@ -1,0 +1,31 @@
+[api]
+enabled = true
+address = "0.0.0.0:8686"
+
+[sources.docker_logs]
+type = "docker_logs"
+auto_partial_merge = true
+
+[transforms.parse_json]
+type = "remap"
+inputs = ["docker_logs"]
+source = '''
+. = parse_json!(string!(.message)) ?? .
+'''
+
+[sinks.quickwit_logs]
+type = "elasticsearch"
+inputs = ["parse_json"]
+endpoints = ["http://quickwit:7280/api/v1/logs/"]
+bulk = true
+bulk_action = "index"
+encoding.except_fields = ["timestamp"]
+
+[sinks.quickwit_logs.request]
+concurrency = 10
+timeout_secs = 30
+
+[sinks.prometheus_metrics]
+type = "prometheus_exporter"
+inputs = ["docker_logs"]
+address = "0.0.0.0:9598"

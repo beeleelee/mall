@@ -1,0 +1,19 @@
+version: 0.8
+
+metadata_uri: s3://quickwit/indexes
+
+rest_listen_addr: 0.0.0.0:7280
+grpc_listen_addr: 0.0.0.0:7281
+
+indexer:
+  enable_otlp_endpoint: true
+  otlp_listen_addr: 0.0.0.0:7282
+
+s3_config:
+  endpoint: http://minio:9000
+  region: us-east-1
+  access_key_id: minioadmin
+  secret_access_key: minioadmin
+
+default_index_max_docs_per_split: 1000000
+default_index_max_split_size: 5000000000

@@ -1,0 +1,200 @@
+services:
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: mall-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-mall}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mall_dev}
+      POSTGRES_DB: ${POSTGRES_DB:-mall}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mall} -d ${POSTGRES_DB:-mall}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: mall-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  nats:
+    image: nats:2.10-alpine
+    container_name: mall-nats
+    restart: unless-stopped
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    command:
+      - "--jetstream"
+      - "--http_port=8222"
+      - "--cluster_name=mall"
+      - "--cluster=nats://0.0.0.0:6222"
+    volumes:
+      - natsdata:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8222/healthz || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  etcd:
+    image: bitnami/etcd:3.5
+    container_name: mall-etcd
+    restart: unless-stopped
+    ports:
+      - "2379:2379"
+      - "2380:2380"
+    environment:
+      ETCD_NAME: mall-etcd
+      ETCD_DATA_DIR: /data/etcd
+      ALLOW_NONE_AUTHENTICATION: "yes"
+      ETCD_ADVERTISE_CLIENT_URLS: http://etcd:2379
+      ETCD_LISTEN_CLIENT_URLS: http://0.0.0.0:2379
+      ETCD_LISTEN_PEER_URLS: http://0.0.0.0:2380
+      ETCD_INITIAL_ADVERTISE_PEER_URLS: http://etcd:2380
+      ETCD_INITIAL_CLUSTER: mall-etcd=http://etcd:2380
+      ETCD_INITIAL_CLUSTER_STATE: new
+    volumes:
+      - etcddata:/data/etcd
+
+  dtm:
+    image: dtm/dtm:v1.17.2
+    container_name: mall-dtm
+    restart: unless-stopped
+    ports:
+      - "36789:36789"
+      - "36790:36790"
+    environment:
+      STORE_DRIVER: postgres
+      STORE_HOST: postgres
+      STORE_PORT: 5432
+      STORE_USER: ${POSTGRES_USER:-mall}
+      STORE_PASSWORD: ${POSTGRES_PASSWORD:-mall_dev}
+      STORE_DB: ${POSTGRES_DB:-mall}
+      HTTP_PORT: 36789
+      GRPC_PORT: 36790
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  minio:
+    image: minio/minio:latest
+    container_name: mall-minio
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    command: server /data --console-address ":9001"
+    volumes:
+      - miniodata:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  quickwit:
+    image: quickwit/quickwit:0.8
+    container_name: mall-quickwit
+    restart: unless-stopped
+    ports:
+      - "7280:7280"
+      - "7281:7281"
+      - "7282:7282"
+    volumes:
+      - ./infrastructure/quickwit/quickwit.yaml:/quickwit/quickwit.yaml:ro
+      - quickwitdata:/quickwit/data
+    command: ["run", "--config", "/quickwit/quickwit.yaml"]
+    depends_on:
+      minio:
+        condition: service_healthy
+
+  vector:
+    image: timberio/vector:0.40-alpine
+    container_name: mall-vector
+    restart: unless-stopped
+    ports:
+      - "8686:8686"
+      - "9598:9598"
+    volumes:
+      - ./infrastructure/vector/vector.toml:/etc/vector/vector.toml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      - quickwit
+
+  grafana:
+    image: grafana/grafana:11-ubuntu
+    container_name: mall-grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GF_SECURITY_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GF_SECURITY_ADMIN_PASSWORD:-admin}
+      GF_INSTALL_PLUGINS: quickwit-quickwit-datasource
+    volumes:
+      - ./infrastructure/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./infrastructure/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - grafanadata:/var/lib/grafana
+    depends_on:
+      - quickwit
+
+  prometheus:
+    image: prom/prometheus:v2.53
+    container_name: mall-prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - prometheusdata:/prometheus
+      - ./infrastructure/prometheus:/etc/prometheus:ro
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.console.libraries=/usr/share/prometheus/console_libraries"
+      - "--web.console.templates=/usr/share/prometheus/consoles"
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.60
+    container_name: mall-jaeger
+    restart: unless-stopped
+    ports:
+      - "16686:16686"
+      - "4317:4317"
+      - "4318:4318"
+      - "14268:14268"
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+
+volumes:
+  pgdata:
+  redisdata:
+  natsdata:
+  etcddata:
+  miniodata:
+  quickwitdata:
+  prometheusdata:
+  grafanadata:
+
+networks:
+  default:
+    name: mall
+    driver: bridge
