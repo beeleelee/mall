@@ -31,8 +31,13 @@ go.work.sum
 /build/
 /mall
 
+# Node.js dependencies (web UI)
+node_modules/
+
 # Editor/IDE
 # .idea/
 # .vscode/
 
 roadmap.md
+
+
