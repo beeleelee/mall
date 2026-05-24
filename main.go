@@ -22,17 +22,17 @@ import (
 	appIdentity "github.com/beeleelee/mall/application/identity"
 	appOAuth "github.com/beeleelee/mall/application/oauth"
 	appOrder "github.com/beeleelee/mall/application/order"
-	domainIdentity "github.com/beeleelee/mall/domain/identity"
-	domainOAuth "github.com/beeleelee/mall/domain/oauth"
 	domainCart "github.com/beeleelee/mall/domain/cart"
 	domainCheckout "github.com/beeleelee/mall/domain/checkout"
-	domainOrder "github.com/beeleelee/mall/domain/order"
+	domainIdentity "github.com/beeleelee/mall/domain/identity"
 	"github.com/beeleelee/mall/domain/kernel"
+	domainOAuth "github.com/beeleelee/mall/domain/oauth"
+	domainOrder "github.com/beeleelee/mall/domain/order"
+	infraCart "github.com/beeleelee/mall/infrastructure/cart"
+	infraCheckout "github.com/beeleelee/mall/infrastructure/checkout"
 	"github.com/beeleelee/mall/infrastructure/database"
 	infraIdentity "github.com/beeleelee/mall/infrastructure/identity"
 	infraOAuth "github.com/beeleelee/mall/infrastructure/oauth"
-	infraCart "github.com/beeleelee/mall/infrastructure/cart"
-	infraCheckout "github.com/beeleelee/mall/infrastructure/checkout"
 	infraOrder "github.com/beeleelee/mall/infrastructure/order"
 	"github.com/beeleelee/mall/interfaces/middleware"
 	"github.com/beeleelee/mall/interfaces/rest"
@@ -102,6 +102,15 @@ func main() {
 	}
 
 	if _, err := js.CreateOrUpdateStream(context.Background(), jetstream.StreamConfig{
+		Name:     "cart",
+		Subjects: []string{"cart.>"},
+		MaxAge:   72 * time.Hour,
+		Storage:  jetstream.FileStorage,
+	}); err != nil {
+		log.Fatalf("create cart jetstream: %v", err)
+	}
+
+	if _, err := js.CreateOrUpdateStream(context.Background(), jetstream.StreamConfig{
 		Name:     "checkout",
 		Subjects: []string{"checkout.>"},
 		MaxAge:   72 * time.Hour,
@@ -120,20 +129,21 @@ func main() {
 	}
 
 	cartRepo := infraCart.NewPostgresCartRepository(db, rdb)
-	cartPub := infraCart.NewNATSCartEventPublisher(nc)
+	cartPub := infraCart.NewNATSCartEventPublisher(js)
 	cartSvc := domainCart.NewCartService(cartRepo, cartPub, logger)
-	_ = cartSvc // ready for HTTP handlers
+	cartHandler := rest.NewCartHandler(cartSvc, sf)
 
 	defaultTaxSvc := domainCheckout.NewDefaultTaxService()
 	defaultPriceCalc := domainCheckout.NewDefaultPriceCalculator()
 	checkoutRepo := infraCheckout.NewPostgresCheckoutRepository(db, rdb)
 	checkoutPub := infraCheckout.NewNATSCheckoutEventPublisher(js)
 	checkoutSvc := domainCheckout.NewCheckoutService(checkoutRepo, defaultTaxSvc, defaultPriceCalc, checkoutPub, logger)
-	_ = checkoutSvc // ready for HTTP handlers
+	checkoutHandler := rest.NewCheckoutHandler(checkoutSvc, sf)
 
 	orderRepo := infraOrder.NewPostgresOrderRepository(db, rdb)
 	orderPub := infraOrder.NewNATSOrderEventPublisher(js)
 	orderSvc := domainOrder.NewOrderService(orderRepo, orderPub, logger)
+	orderHandler := rest.NewOrderHandler(orderSvc)
 
 	saga := appOrder.NewCheckoutCompletedSaga(orderSvc, sf, logger)
 
@@ -161,9 +171,11 @@ func main() {
 		Timeout: 30000,
 	})
 
-	supportedCaps := []string{"dev.ucp.shopping.catalog", "dev.ucp.shopping.cart", "dev.ucp.shopping.checkout"}
+	supportedCaps := []string{"dev.ucp.shopping.catalog", "dev.ucp.shopping.cart", "dev.ucp.shopping.checkout", "dev.ucp.shopping.order"}
 	srv.Use(gozerorest.ToMiddleware(middleware.UCPAgentMiddleware))
 	srv.Use(gozerorest.ToMiddleware(middleware.NegotiationMiddleware(supportedCaps)))
+
+	auth := middleware.AuthMiddleware(jwtSecret)
 
 	srv.AddRoute(gozerorest.Route{
 		Method:  http.MethodGet,
@@ -204,6 +216,89 @@ func main() {
 		Method:  http.MethodPost,
 		Path:    "/oauth/revoke",
 		Handler: oauthHandler.Revoke,
+	})
+
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPost,
+		Path:    "/api/v1/carts",
+		Handler: auth(http.HandlerFunc(cartHandler.CreateOrGet)).ServeHTTP,
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodGet,
+		Path:    "/api/v1/carts/:id",
+		Handler: auth(http.HandlerFunc(cartHandler.GetCart)).ServeHTTP,
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPost,
+		Path:    "/api/v1/carts/:id/items",
+		Handler: auth(http.HandlerFunc(cartHandler.AddItem)).ServeHTTP,
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPut,
+		Path:    "/api/v1/carts/:id/items/:productId",
+		Handler: auth(http.HandlerFunc(cartHandler.UpdateQuantity)).ServeHTTP,
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodDelete,
+		Path:    "/api/v1/carts/:id/items/:productId",
+		Handler: auth(http.HandlerFunc(cartHandler.RemoveItem)).ServeHTTP,
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodDelete,
+		Path:    "/api/v1/carts/:id",
+		Handler: auth(http.HandlerFunc(cartHandler.ClearCart)).ServeHTTP,
+	})
+
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPost,
+		Path:    "/api/v1/checkouts",
+		Handler: auth(http.HandlerFunc(checkoutHandler.Create)).ServeHTTP,
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodGet,
+		Path:    "/api/v1/checkouts/:id",
+		Handler: auth(http.HandlerFunc(checkoutHandler.GetCheckout)).ServeHTTP,
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPost,
+		Path:    "/api/v1/checkouts/:id/shipping-address",
+		Handler: auth(http.HandlerFunc(checkoutHandler.SetShippingAddress)).ServeHTTP,
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPost,
+		Path:    "/api/v1/checkouts/:id/billing-address",
+		Handler: auth(http.HandlerFunc(checkoutHandler.SetBillingAddress)).ServeHTTP,
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPost,
+		Path:    "/api/v1/checkouts/:id/shipping-option",
+		Handler: auth(http.HandlerFunc(checkoutHandler.SelectShippingOption)).ServeHTTP,
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPost,
+		Path:    "/api/v1/checkouts/:id/payment-handler",
+		Handler: auth(http.HandlerFunc(checkoutHandler.SelectPaymentHandler)).ServeHTTP,
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPost,
+		Path:    "/api/v1/checkouts/:id/complete",
+		Handler: auth(http.HandlerFunc(checkoutHandler.Complete)).ServeHTTP,
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPost,
+		Path:    "/api/v1/checkouts/:id/cancel",
+		Handler: auth(http.HandlerFunc(checkoutHandler.Cancel)).ServeHTTP,
+	})
+
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodGet,
+		Path:    "/api/v1/orders",
+		Handler: auth(http.HandlerFunc(orderHandler.ListByUser)).ServeHTTP,
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodGet,
+		Path:    "/api/v1/orders/:id",
+		Handler: auth(http.HandlerFunc(orderHandler.GetOrder)).ServeHTTP,
 	})
 
 	quit := make(chan os.Signal, 1)
@@ -295,5 +390,3 @@ func (stdLogger) Warn(_ context.Context, msg string, fields ...kernel.LogField) 
 func (stdLogger) Error(_ context.Context, msg string, err error, fields ...kernel.LogField) {
 	log.Println("ERROR", msg, err, fields)
 }
-
-

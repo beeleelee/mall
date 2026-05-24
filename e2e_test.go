@@ -1,9 +1,14 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"math/rand"
+	"net/http"
+	"os"
 	"testing"
 	"time"
 
@@ -18,11 +23,11 @@ import (
 	domainCart "github.com/beeleelee/mall/domain/cart"
 	domainCheckout "github.com/beeleelee/mall/domain/checkout"
 	domainIdentity "github.com/beeleelee/mall/domain/identity"
-	domainOrder "github.com/beeleelee/mall/domain/order"
 	"github.com/beeleelee/mall/domain/kernel"
-	"github.com/beeleelee/mall/infrastructure/database"
+	domainOrder "github.com/beeleelee/mall/domain/order"
 	infraCart "github.com/beeleelee/mall/infrastructure/cart"
 	infraCheckout "github.com/beeleelee/mall/infrastructure/checkout"
+	"github.com/beeleelee/mall/infrastructure/database"
 	infraIdentity "github.com/beeleelee/mall/infrastructure/identity"
 	infraOrder "github.com/beeleelee/mall/infrastructure/order"
 )
@@ -68,7 +73,7 @@ func TestE2E_FullPurchaseFlow(t *testing.T) {
 	t.Logf("registered user %d", user.ID.Int64())
 
 	cartRepo := infraCart.NewPostgresCartRepository(db, rdb)
-	cartPub := infraCart.NewNATSCartEventPublisher(nc)
+	cartPub := infraCart.NewNATSCartEventPublisher(js)
 	cartSvc := domainCart.NewCartService(cartRepo, cartPub, logger)
 
 	cartID, err := idSeq()
@@ -255,6 +260,7 @@ func setupJetStream(t *testing.T, nc *nats.Conn, _ string) jetstream.JetStream {
 		t.Fatalf("create jetstream: %v", err)
 	}
 	for _, cfg := range []jetstream.StreamConfig{
+		{Name: "cart", Subjects: []string{"cart.>"}, MaxAge: 30 * time.Minute, Storage: jetstream.MemoryStorage},
 		{Name: "checkout", Subjects: []string{"checkout.>"}, MaxAge: 30 * time.Minute, Storage: jetstream.MemoryStorage},
 		{Name: "orders", Subjects: []string{"order.>"}, MaxAge: 30 * time.Minute, Storage: jetstream.MemoryStorage},
 	} {
@@ -263,6 +269,244 @@ func setupJetStream(t *testing.T, nc *nats.Conn, _ string) jetstream.JetStream {
 		}
 	}
 	return js
+}
+
+func TestE2E_PurchaseFlowHTTP(t *testing.T) {
+	if !servicesUp() {
+		t.Skip("e2e: need 'docker compose up postgres redis nats' running")
+	}
+
+	port := freePort()
+	os.Setenv("PORT", port)
+	os.Setenv("DATABASE_URL", "postgres://mall:mall_dev@localhost:5432/mall?sslmode=disable")
+	os.Setenv("REDIS_ADDR", "localhost:6379")
+
+	done := make(chan struct{}, 1)
+	go func() {
+		main()
+		close(done)
+	}()
+
+	time.Sleep(1 * time.Second)
+
+	baseURL := fmt.Sprintf("http://localhost:%s", port)
+	email := fmt.Sprintf("e2e-http-%d@example.com", time.Now().UnixMilli())
+
+	var token string
+
+	t.Run("register", func(t *testing.T) {
+		body, _ := json.Marshal(map[string]string{
+			"email":    email,
+			"password": "testpass123",
+			"name":     "E2E HTTP User",
+		})
+		resp, err := http.Post(baseURL+"/api/v1/auth/register", "application/json", bytes.NewReader(body))
+		if err != nil {
+			t.Fatalf("register: %v", err)
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusCreated {
+			t.Fatalf("register: expected 201, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("login", func(t *testing.T) {
+		body, _ := json.Marshal(map[string]string{
+			"email":    email,
+			"password": "testpass123",
+		})
+		resp, err := http.Post(baseURL+"/api/v1/auth/login", "application/json", bytes.NewReader(body))
+		if err != nil {
+			t.Fatalf("login: %v", err)
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("login: expected 200, got %d", resp.StatusCode)
+		}
+		var result map[string]any
+		json.NewDecoder(resp.Body).Decode(&result)
+		tok, _ := result["token"].(string)
+		if tok == "" {
+			t.Fatal("login: no token in response")
+		}
+		token = tok
+	})
+
+	authReq := func(method, path string, body any) *http.Response {
+		var data io.Reader
+		if body != nil {
+			b, _ := json.Marshal(body)
+			data = bytes.NewReader(b)
+		}
+		req, _ := http.NewRequest(method, baseURL+path, data)
+		req.Header.Set("Authorization", "Bearer "+token)
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatalf("%s %s: %v", method, path, err)
+		}
+		return resp
+	}
+
+	var cartID float64
+	var checkoutID float64
+
+	t.Run("create cart", func(t *testing.T) {
+		resp := authReq("POST", "/api/v1/carts", nil)
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("create cart: expected 200, got %d", resp.StatusCode)
+		}
+		var result map[string]any
+		json.NewDecoder(resp.Body).Decode(&result)
+		cartID = result["id"].(float64)
+		if cartID == 0 {
+			t.Fatal("create cart: no id")
+		}
+		t.Logf("created cart %.0f", cartID)
+	})
+
+	t.Run("add item", func(t *testing.T) {
+		item := map[string]any{
+			"product_id": 100,
+			"sku":        "SKU-HTTP-001",
+			"name":       "HTTP Test Product",
+			"quantity":   2,
+			"unit_price": 1500,
+		}
+		resp := authReq("POST", fmt.Sprintf("/api/v1/carts/%.0f/items", cartID), item)
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			body, _ := io.ReadAll(resp.Body)
+			t.Fatalf("add item: expected 200, got %d: %s", resp.StatusCode, string(body))
+		}
+		t.Log("added item to cart")
+	})
+
+	t.Run("create checkout", func(t *testing.T) {
+		body := map[string]any{
+			"cart_id": cartID,
+			"items": []map[string]any{
+				{"product_id": 100, "sku": "SKU-HTTP-001", "name": "HTTP Test Product", "quantity": 2, "unit_price": 1500},
+			},
+		}
+		resp := authReq("POST", "/api/v1/checkouts", body)
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusCreated {
+			b, _ := io.ReadAll(resp.Body)
+			t.Fatalf("create checkout: expected 201, got %d: %s", resp.StatusCode, string(b))
+		}
+		var result map[string]any
+		json.NewDecoder(resp.Body).Decode(&result)
+		checkoutID = result["id"].(float64)
+		t.Logf("created checkout %.0f", checkoutID)
+	})
+
+	checkoutPath := func(p string) string {
+		return fmt.Sprintf("/api/v1/checkouts/%.0f%s", checkoutID, p)
+	}
+
+	t.Run("set shipping address", func(t *testing.T) {
+		addr := map[string]string{
+			"line1": "123 Main St", "city": "Seattle", "state": "WA",
+			"postal_code": "98101", "country": "US",
+		}
+		resp := authReq("POST", checkoutPath("/shipping-address"), addr)
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("shipping address: expected 200, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("set billing address", func(t *testing.T) {
+		addr := map[string]string{
+			"line1": "456 Oak St", "city": "Seattle", "state": "WA",
+			"postal_code": "98101", "country": "US",
+		}
+		resp := authReq("POST", checkoutPath("/billing-address"), addr)
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("billing address: expected 200, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("select shipping option", func(t *testing.T) {
+		opt := map[string]any{
+			"id": "std", "name": "Standard", "cost": 500,
+		}
+		resp := authReq("POST", checkoutPath("/shipping-option"), opt)
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("shipping option: expected 200, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("select payment handler", func(t *testing.T) {
+		resp := authReq("POST", checkoutPath("/payment-handler"), map[string]string{"handler": "stripe"})
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("payment handler: expected 200, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("complete checkout", func(t *testing.T) {
+		resp := authReq("POST", checkoutPath("/complete"), nil)
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			b, _ := io.ReadAll(resp.Body)
+			t.Fatalf("complete: expected 200, got %d: %s", resp.StatusCode, string(b))
+		}
+		t.Logf("checkout %.0f completed", checkoutID)
+	})
+
+	t.Run("get order by checkout", func(t *testing.T) {
+		var orderID float64
+		deadline := time.Now().Add(e2eTimeout)
+		for time.Now().Before(deadline) {
+			resp := authReq("GET", "/api/v1/orders", nil)
+			if resp.StatusCode != http.StatusOK {
+				resp.Body.Close()
+				continue
+			}
+			var orders []map[string]any
+			json.NewDecoder(resp.Body).Decode(&orders)
+			resp.Body.Close()
+			if len(orders) > 0 {
+				// find the order matching our checkout
+				for _, o := range orders {
+					if o["checkout_id"].(float64) == checkoutID {
+						orderID = o["id"].(float64)
+						break
+					}
+				}
+				if orderID > 0 {
+					break
+				}
+			}
+			time.Sleep(500 * time.Millisecond)
+		}
+		if orderID == 0 {
+			t.Fatalf("order not created within %v (saga may not have consumed the event)", e2eTimeout)
+		}
+		t.Logf("order %.0f created from checkout %.0f", orderID, checkoutID)
+
+		resp := authReq("GET", fmt.Sprintf("/api/v1/orders/%.0f", orderID), nil)
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("get order: expected 200, got %d", resp.StatusCode)
+		}
+		var order map[string]any
+		json.NewDecoder(resp.Body).Decode(&order)
+		if order["status"] != "confirmed" {
+			t.Errorf("expected confirmed, got %v", order["status"])
+		}
+	})
+
+	t.Cleanup(func() {
+		os.Unsetenv("PORT")
+		os.Unsetenv("DATABASE_URL")
+		os.Unsetenv("REDIS_ADDR")
+	})
 }
 
 func startSagaConsumer(t *testing.T, js jetstream.JetStream, saga *appOrder.CheckoutCompletedSaga) jetstream.ConsumeContext {

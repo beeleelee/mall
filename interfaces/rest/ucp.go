@@ -77,6 +77,52 @@ func DefaultProfile() *Profile {
 					},
 				},
 			},
+			"dev.ucp.shopping.cart": {
+				Version: "1.0.0",
+				Bindings: CapabilityBindings{
+					REST: &RESTBinding{
+						BaseURL: "/api/v1/carts",
+						Endpoints: map[string]string{
+							"create_or_get": "POST /",
+							"get":           "GET /{id}",
+							"add_item":      "POST /{id}/items",
+							"update_qty":    "PUT /{id}/items/{productId}",
+							"remove_item":   "DELETE /{id}/items/{productId}",
+							"clear":         "DELETE /{id}",
+						},
+					},
+				},
+			},
+			"dev.ucp.shopping.checkout": {
+				Version: "1.0.0",
+				Bindings: CapabilityBindings{
+					REST: &RESTBinding{
+						BaseURL: "/api/v1/checkouts",
+						Endpoints: map[string]string{
+							"create":               "POST /",
+							"get":                  "GET /{id}",
+							"set_shipping_address": "POST /{id}/shipping-address",
+							"set_billing_address":  "POST /{id}/billing-address",
+							"select_shipping":      "POST /{id}/shipping-option",
+							"select_payment":       "POST /{id}/payment-handler",
+							"complete":             "POST /{id}/complete",
+							"cancel":               "POST /{id}/cancel",
+						},
+					},
+				},
+			},
+			"dev.ucp.shopping.order": {
+				Version: "1.0.0",
+				Bindings: CapabilityBindings{
+					REST: &RESTBinding{
+						BaseURL: "/api/v1/orders",
+						Endpoints: map[string]string{
+							"get":       "GET /{id}",
+							"list_user": "GET /",
+						},
+					},
+				},
+			},
 		},
 		Authentication: AuthenticationInfo{
 			OAuth2: OAuth2Config{
