@@ -16,7 +16,7 @@ import (
 
 func TestSmoke_UCPProfile(t *testing.T) {
 	if !servicesUp() {
-		t.Skip("smoke: need 'docker compose up postgres redis' running")
+		t.Skip("smoke: need 'docker compose up postgres redis nats' running")
 	}
 
 	port := freePort()
@@ -93,6 +93,12 @@ func servicesUp() bool {
 		return false
 	}
 	rd.Close()
+
+	n, err := net.DialTimeout("tcp", "localhost:4222", 2*time.Second)
+	if err != nil {
+		return false
+	}
+	n.Close()
 
 	return true
 }
