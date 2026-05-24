@@ -89,8 +89,8 @@ The outcome is a **single integration point** that collapses N×N complexity —
 - [x] **2.8** Checkout domain: `CheckoutSession` aggregate, UCP state machine (`incomplete → ready_for_complete → completed | cancelled`), `CheckoutService`, `CheckoutRepository` interface, 30+ tests
 - [x] **2.9** Checkout domain: `TaxService` domain service (pluggable providers, default passthrough), `PriceCalculator` service with discount extension hook (default sum calculator)
 - [x] **2.10** Checkout infra: PostgreSQL schema + migration `000005` for checkout sessions (JSONB payload), `PostgresCheckoutRepository` with Redis cache-aside, `NATSCheckoutEventPublisher`, integration tests
-- [ ] **2.11** Order domain: `Order` aggregate (`Order`, `OrderLineItem`, `OrderStatus`), state machine (`confirmed → processing → shipped → delivered | returned`), `OrderRepository` interface, `OrderService`
-- [ ] **2.12** Order infra: PostgreSQL schema + migration for orders table, `PostgresOrderRepository`, integration tests
+- [x] **2.11** Order domain: `Order` aggregate (`Order`, `OrderLineItem`, `OrderStatus`), state machine (`confirmed → processing → shipped → delivered | returned | cancelled`), `OrderRepository` interface, `OrderService` with 6 domain events, 30+ tests
+- [x] **2.12** Order infra: PostgreSQL schema + migration `000006` for orders table, `PostgresOrderRepository` with Redis cache-aside, NATS JetStream publisher, integration tests
 - [ ] **2.13** Order webhooks: Signed webhook delivery via NATS JetStream (at-least-once), detached JWS signature verification per UCP spec
 - [ ] **2.14** Interservice: NATS JetStream subjects (`ucp.cart.*`, `ucp.checkout.*`, `ucp.order.*`), event schemas, `checkout.completed → order creation` saga
 - [ ] **2.15** Interservice: DTM saga for order placement (checkout completed → reserve inventory → capture payment → confirm order)

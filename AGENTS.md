@@ -2,16 +2,16 @@
 
 ## What this is
 
-A **UCP-native e-commerce platform** in Go. Phase 1 (skeleton + catalog) is done; Phase 2 (identity, cart, checkout) in progress. `main.go` now has a running go-zero server with identity routes wired.
+A **UCP-native e-commerce platform** in Go. Phase 2 (identity, OAuth, cart, checkout, order) in progress — order domain + infra just completed.
 
 ## Architecture
 
 DDD layering:
 | Layer | Path | Status |
 |-------|------|--------|
- | Domain | `domain/{catalog,identity,oauth,kernel}/` | Catalog + identity + OAuth done, cart/checkout planned |
+ | Domain | `domain/{catalog,identity,oauth,cart,checkout,order,kernel}/` | Catalog + identity + OAuth + cart + checkout + order done |
 | Application | `application/{identity,oauth}/` | Identity + OAuth app services done |
-| Infrastructure | `infrastructure/{catalog,identity,oauth,database,...}/` | Catalog + identity + OAuth repos, custom migrator done |
+| Infrastructure | `infrastructure/{catalog,identity,oauth,cart,checkout,order,database,...}/` | Catalog + identity + OAuth + cart + checkout + order repos, custom migrator done |
 | Interfaces | `interfaces/{middleware,rest}/` | UCP profile, middleware, identity + OAuth handlers done |
 
 Web framework: **go-zero** (`github.com/zeromicro/go-zero`). Do not import gin, chi, or similar.
@@ -47,6 +47,8 @@ Persistence: `pgx`/`sqlx` + `go-redis`. Identity uses bcrypt via `golang.org/x/c
 - **Migrations**: custom embed-based system in `infrastructure/database/migrator.go`. Files at `infrastructure/database/migrations/`. Run via code in `main.go`.
 - **Logging**: domain-layer `Logger` interface in `kernel`. `main.go` wires a std logger; zerolog planned for Phase 3.
 - **Cart**: `Cart` aggregate with `CartItem` value objects, JSONB persistence, domain events (`cart.created`, `cart.updated`, `cart.cleared`, `cart.merged`), `CartService` for mutations, NATS `cart.updated` events via `NATSCartEventPublisher`.
+- **Checkout**: `CheckoutSession` aggregate, UCP state machine (`incomplete → ready_for_complete → completed | cancelled`), `CheckoutService`, `TaxService`/`PriceCalculator` interfaces + defaults, JSONB persistence, NATS `checkout.updated` events via `NATSCheckoutEventPublisher`.
+- **Order**: `Order` aggregate with `OrderLineItem` value objects, state machine (`confirmed → processing → shipped → delivered | returned | cancelled`), `OrderService` with 6 domain events, JSONB persistence, NATS JetStream publisher (order.> subject). Address/ShippingOption imported from `domain/checkout`.
 - **Identity**: `Password` value object wraps bcrypt hashing. `User` aggregate has status (`active`/`suspended`), roles (`customer`/`admin`), and domain events.
 - **OAuth 2.0**: `OAuthClient` aggregate (bcrypt secret hash), `AuthorizationCode` entity (single-use, TTL), `RefreshToken` entity (opaque SHA-256 hash). JWT access tokens via `golang-jwt/jwt/v4`, signed with HS256. `OAuthService` handles authorize, exchange, refresh, revoke flows.
 - **Auth middleware**: `interfaces/middleware/auth.go` extracts Bearer JWT, validates signature, injects `UserInfo{UserID, ClientID, Scope}` into request context.
@@ -71,6 +73,7 @@ Persistence: `pgx`/`sqlx` + `go-redis`. Identity uses bcrypt via `golang.org/x/c
 - `main.go` — go-zero server, DI wiring, route registration
 - `domain/kernel/` — DDD base types
 - `infrastructure/database/migrator.go` — custom SQL migration runner
+- `infrastructure/cart/publisher.go` — reference for NATS publisher (core pub/sub — JetStream variant coming)
 - `roadmap.md` — detailed project plan
 
 ## Avoid
