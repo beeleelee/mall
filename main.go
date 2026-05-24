@@ -10,10 +10,12 @@ import (
 	"os/signal"
 	"strings"
 	"syscall"
+	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/jmoiron/sqlx"
 	"github.com/nats-io/nats.go"
+	"github.com/nats-io/nats.go/jetstream"
 	"github.com/redis/go-redis/v9"
 	gozerorest "github.com/zeromicro/go-zero/rest"
 
@@ -24,11 +26,13 @@ import (
 	domainOAuth "github.com/beeleelee/mall/domain/oauth"
 	domainCart "github.com/beeleelee/mall/domain/cart"
 	domainCheckout "github.com/beeleelee/mall/domain/checkout"
+	domainOrder "github.com/beeleelee/mall/domain/order"
 	"github.com/beeleelee/mall/infrastructure/database"
 	infraIdentity "github.com/beeleelee/mall/infrastructure/identity"
 	infraOAuth "github.com/beeleelee/mall/infrastructure/oauth"
 	infraCart "github.com/beeleelee/mall/infrastructure/cart"
 	infraCheckout "github.com/beeleelee/mall/infrastructure/checkout"
+	infraOrder "github.com/beeleelee/mall/infrastructure/order"
 	"github.com/beeleelee/mall/interfaces/middleware"
 	"github.com/beeleelee/mall/interfaces/rest"
 )
@@ -102,6 +106,24 @@ func main() {
 	checkoutPub := infraCheckout.NewNATSCheckoutEventPublisher(nc)
 	checkoutSvc := domainCheckout.NewCheckoutService(checkoutRepo, defaultTaxSvc, defaultPriceCalc, checkoutPub, logger)
 	_ = checkoutSvc // ready for HTTP handlers
+
+	js, err := jetstream.New(nc)
+	if err != nil {
+		log.Fatalf("create jetstream context: %v", err)
+	}
+	if _, err := js.CreateOrUpdateStream(context.Background(), jetstream.StreamConfig{
+		Name:     "orders",
+		Subjects: []string{"order.>"},
+		MaxAge:   72 * time.Hour,
+		Storage:  jetstream.FileStorage,
+	}); err != nil {
+		log.Fatalf("create orders jetstream: %v", err)
+	}
+
+	orderRepo := infraOrder.NewPostgresOrderRepository(db, rdb)
+	orderPub := infraOrder.NewNATSOrderEventPublisher(js)
+	orderSvc := domainOrder.NewOrderService(orderRepo, orderPub, logger)
+	_ = orderSvc // ready for HTTP handlers
 
 	srv := gozerorest.MustNewServer(gozerorest.RestConf{
 		Host:    "0.0.0.0",
