@@ -26,7 +26,9 @@ Persistence: `pgx`/`sqlx` + `go-redis`. Identity uses bcrypt via `golang.org/x/c
 | `make lint` | `golangci-lint run ./...` |
 | `make tidy` | `go mod tidy && go mod verify` |
 | `scripts/up-test-env.sh` | Start postgres+redis for integration tests |
-| `go run .` | Start server on `:8080` (set `PORT`, `DATABASE_URL`, `REDIS_ADDR` to override) |
+| `make run` | Start server on `:8080` (reads `.env` if present; override with `PORT`, `DATABASE_URL`, `REDIS_ADDR`) |
+| `go run .` | Equivalent to `make run` |
+| `make test -run TestSmoke` | Run end-to-end smoke test (needs postgres+redis) |
 
 ## Testing patterns
 
@@ -34,6 +36,7 @@ Persistence: `pgx`/`sqlx` + `go-redis`. Identity uses bcrypt via `golang.org/x/c
 - **App tests**: in-memory fakes in same package (`application/identity/fake_repository_test.go`).
 - **Integration tests**: in `infrastructure/identity/`, need postgres+redis. Use `scripts/up-test-env.sh` first, then `go test -count=1 -race ./infrastructure/identity/...`.
 - **Interface tests**: `httptest.NewRecorder()`, wire up app service with fakes.
+- **Smoke test**: `main_test.go` starts the full server, tests UCP profile + register flow. Needs postgres+redis. Use `go test -count=1 -race -run TestSmoke ./...` or `make test -run TestSmoke`.
 - Always use `-count=1` to disable test caching.
 
 ## Project conventions
