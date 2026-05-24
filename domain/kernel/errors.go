@@ -8,10 +8,10 @@ import (
 type ErrorCode string
 
 const (
-	ErrNotFound        ErrorCode = "NOT_FOUND"
-	ErrAlreadyExists   ErrorCode = "ALREADY_EXISTS"
-	ErrInvalidArgument ErrorCode = "INVALID_ARGUMENT"
-	ErrUnauthenticated ErrorCode = "UNAUTHENTICATED"
+	ErrNotFound         ErrorCode = "NOT_FOUND"
+	ErrAlreadyExists    ErrorCode = "ALREADY_EXISTS"
+	ErrInvalidArgument  ErrorCode = "INVALID_ARGUMENT"
+	ErrUnauthenticated  ErrorCode = "UNAUTHENTICATED"
 	ErrPermissionDenied ErrorCode = "PERMISSION_DENIED"
 	ErrInternal         ErrorCode = "INTERNAL"
 	ErrUnavailable      ErrorCode = "UNAVAILABLE"
