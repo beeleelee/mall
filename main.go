@@ -1,12 +1,14 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -24,6 +26,8 @@ import (
 )
 
 func main() {
+	loadDotEnv()
+
 	port := envOrDefault("PORT", "8080")
 	pgDSN := envOrDefault("DATABASE_URL", "postgres://mall:mall_dev@localhost:5432/mall?sslmode=disable")
 	redisAddr := envOrDefault("REDIS_ADDR", "localhost:6379")
@@ -115,6 +119,34 @@ func envOrDefault(key, def string) string {
 		return v
 	}
 	return def
+}
+
+func loadDotEnv() {
+	f, err := os.Open(".env")
+	if err != nil {
+		return
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		k, v, ok := strings.Cut(line, "=")
+		if !ok {
+			continue
+		}
+		k = strings.TrimSpace(k)
+		v = strings.TrimSpace(v)
+		if k == "" {
+			continue
+		}
+		if os.Getenv(k) == "" {
+			os.Setenv(k, v)
+		}
+	}
 }
 
 func mustParsePort(port string) int {
