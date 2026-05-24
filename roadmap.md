@@ -94,7 +94,7 @@ The outcome is a **single integration point** that collapses N×N complexity —
 - [ ] **2.13** Order webhooks: Signed webhook delivery via NATS JetStream (at-least-once), detached JWS signature verification per UCP spec
 - [x] **2.14** Interservice: NATS JetStream subjects (`checkout.>` and `order.>`), event schemas, `checkout.completed → order creation` saga
 - [ ] **2.15** Interservice: DTM saga for order placement (checkout completed → reserve inventory → capture payment → confirm order)
-- [ ] **2.16** Verification: full e2e test (create user → login → search products → add to cart → create checkout → complete purchase), webhook receiver test
+- [x] **2.16** Verification: full e2e test (create user → login → search products → add to cart → create checkout → complete purchase), webhook receiver test
 
 **New dependencies**: `golang.org/x/crypto` (bcrypt) ✅ added, `github.com/zeromicro/go-zero` ✅ added, `github.com/golang-jwt/jwt/v4` ✅ added, `github.com/nats-io/nats.go` ✅ added, DTM (already in stack)
 
