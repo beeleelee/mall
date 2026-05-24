@@ -79,8 +79,8 @@ The outcome is a **single integration point** that collapses N×N complexity —
 
 #### Todo
 
-- [ ] **2.1** Identity domain: `User` aggregate (ID, Email, Password bcrypt hash, Name, Status, Roles), `Password` value object, `IdentityService` (Register, Login, GetUser, SuspendUser), `UserRepository` interface
-- [ ] **2.2** Identity infra: PostgreSQL schema + migration for `users` table, `PostgresUserRepository` with cache-aside, integration tests
+- [x] **2.1** Identity domain: `User` aggregate (ID, Email, Password bcrypt hash, Name, Status, Roles), `Password` value object, `IdentityService` (Register, Login, GetUser, SuspendUser), `UserRepository` interface
+- [x] **2.2** Identity infra: PostgreSQL schema + migration for `users` table, `PostgresUserRepository` with cache-aside, integration tests
 - [ ] **2.3** OAuth 2.0 domain: `OAuthClient`, `AuthorizationCode`, `AccessToken` aggregates, OAuth service (authorize, token exchange, refresh, revoke)
 - [ ] **2.4** OAuth 2.0 infra: PostgreSQL migrations for OAuth tables, token storage, authorization + token endpoints, integration tests
 - [ ] **2.5** Cart domain: `Cart` aggregate (`Cart`, `CartItem`, `CartTotal`), `CartRepository` interface, `CartService` (create, add item, update quantity, remove item, get cart)
@@ -96,7 +96,7 @@ The outcome is a **single integration point** that collapses N×N complexity —
 - [ ] **2.15** Interservice: DTM saga for order placement (checkout completed → reserve inventory → capture payment → confirm order)
 - [ ] **2.16** Verification: full e2e test (create user → login → search products → add to cart → create checkout → complete purchase), webhook receiver test
 
-**New dependencies**: `golang.org/x/crypto` (bcrypt), OAuth 2.0 library, DTM (already in stack), NATS client (already in stack)
+**New dependencies**: `golang.org/x/crypto` (bcrypt) ✅ added, `github.com/zeromicro/go-zero` ✅ added, OAuth 2.0 library, DTM (already in stack), NATS client (already in stack)
 
 ---
 
