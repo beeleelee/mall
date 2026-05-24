@@ -23,10 +23,12 @@ import (
 	domainIdentity "github.com/beeleelee/mall/domain/identity"
 	domainOAuth "github.com/beeleelee/mall/domain/oauth"
 	domainCart "github.com/beeleelee/mall/domain/cart"
+	domainCheckout "github.com/beeleelee/mall/domain/checkout"
 	"github.com/beeleelee/mall/infrastructure/database"
 	infraIdentity "github.com/beeleelee/mall/infrastructure/identity"
 	infraOAuth "github.com/beeleelee/mall/infrastructure/oauth"
 	infraCart "github.com/beeleelee/mall/infrastructure/cart"
+	infraCheckout "github.com/beeleelee/mall/infrastructure/checkout"
 	"github.com/beeleelee/mall/interfaces/middleware"
 	"github.com/beeleelee/mall/interfaces/rest"
 )
@@ -93,6 +95,13 @@ func main() {
 	cartPub := infraCart.NewNATSCartEventPublisher(nc)
 	cartSvc := domainCart.NewCartService(cartRepo, cartPub, logger)
 	_ = cartSvc // ready for HTTP handlers
+
+	defaultTaxSvc := domainCheckout.NewDefaultTaxService()
+	defaultPriceCalc := domainCheckout.NewDefaultPriceCalculator()
+	checkoutRepo := infraCheckout.NewPostgresCheckoutRepository(db, rdb)
+	checkoutPub := infraCheckout.NewNATSCheckoutEventPublisher(nc)
+	checkoutSvc := domainCheckout.NewCheckoutService(checkoutRepo, defaultTaxSvc, defaultPriceCalc, checkoutPub, logger)
+	_ = checkoutSvc // ready for HTTP handlers
 
 	srv := gozerorest.MustNewServer(gozerorest.RestConf{
 		Host:    "0.0.0.0",

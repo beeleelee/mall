@@ -86,9 +86,9 @@ The outcome is a **single integration point** that collapses N×N complexity —
 - [x] **2.5** Cart domain: `Cart` aggregate (`Cart`, `CartItem`, `CartTotal`), `CartRepository` interface, `CartService` (create, add item, update quantity, remove item, get cart, merge), domain events, 30+ tests
 - [x] **2.6** Cart infra: PostgreSQL schema + migration `000004` for carts table (JSONB items), `PostgresCartRepository` with Redis cache-aside, integration tests
 - [x] **2.7** Cart NATS event: `cart.updated` event publishing on mutations, `CartEventPublisher` interface + NATS implementation via `NATSCartEventPublisher`
-- [ ] **2.8** Checkout domain: `CheckoutSession` aggregate, UCP state machine (`incomplete → ready_for_complete → completed | cancelled`), `CheckoutService`, `CheckoutRepository` interface
-- [ ] **2.9** Checkout domain: `TaxService` domain service (pluggable providers), `PriceCalculator` service with discount extension hook
-- [ ] **2.10** Checkout infra: PostgreSQL schema + migration for checkout sessions (JSONB payload), `PostgresCheckoutRepository`, integration tests
+- [x] **2.8** Checkout domain: `CheckoutSession` aggregate, UCP state machine (`incomplete → ready_for_complete → completed | cancelled`), `CheckoutService`, `CheckoutRepository` interface, 30+ tests
+- [x] **2.9** Checkout domain: `TaxService` domain service (pluggable providers, default passthrough), `PriceCalculator` service with discount extension hook (default sum calculator)
+- [x] **2.10** Checkout infra: PostgreSQL schema + migration `000005` for checkout sessions (JSONB payload), `PostgresCheckoutRepository` with Redis cache-aside, `NATSCheckoutEventPublisher`, integration tests
 - [ ] **2.11** Order domain: `Order` aggregate (`Order`, `OrderLineItem`, `OrderStatus`), state machine (`confirmed → processing → shipped → delivered | returned`), `OrderRepository` interface, `OrderService`
 - [ ] **2.12** Order infra: PostgreSQL schema + migration for orders table, `PostgresOrderRepository`, integration tests
 - [ ] **2.13** Order webhooks: Signed webhook delivery via NATS JetStream (at-least-once), detached JWS signature verification per UCP spec
