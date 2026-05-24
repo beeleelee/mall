@@ -1,3 +1,146 @@
 package main
 
-func main() {}
+import (
+	"context"
+	"fmt"
+	"log"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+
+	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/jmoiron/sqlx"
+	"github.com/redis/go-redis/v9"
+	gozerorest "github.com/zeromicro/go-zero/rest"
+
+	appIdentity "github.com/beeleelee/mall/application/identity"
+	"github.com/beeleelee/mall/domain/kernel"
+	domainIdentity "github.com/beeleelee/mall/domain/identity"
+	"github.com/beeleelee/mall/infrastructure/database"
+	infraIdentity "github.com/beeleelee/mall/infrastructure/identity"
+	"github.com/beeleelee/mall/interfaces/middleware"
+	"github.com/beeleelee/mall/interfaces/rest"
+)
+
+func main() {
+	port := envOrDefault("PORT", "8080")
+	pgDSN := envOrDefault("DATABASE_URL", "postgres://mall:mall_dev@localhost:5432/mall?sslmode=disable")
+	redisAddr := envOrDefault("REDIS_ADDR", "localhost:6379")
+
+	db, err := sqlx.Connect("pgx", pgDSN)
+	if err != nil {
+		log.Fatalf("connect postgres: %v", err)
+	}
+	defer db.Close()
+	db.SetMaxOpenConns(10)
+
+	rdb := redis.NewClient(&redis.Options{
+		Addr: redisAddr,
+		DB:   0,
+	})
+	if err := rdb.Ping(context.Background()).Err(); err != nil {
+		log.Fatalf("connect redis: %v", err)
+	}
+	defer rdb.Close()
+
+	if err := database.NewMigrator(db).Up(); err != nil {
+		log.Fatalf("run migrations: %v", err)
+	}
+
+	userRepo := infraIdentity.NewPostgresUserRepository(db, rdb)
+	sf, err := kernel.NewSnowflake(1)
+	if err != nil {
+		log.Fatalf("new snowflake: %v", err)
+	}
+
+	logger := stdLogger{}
+	domainSvc := domainIdentity.NewIdentityService(userRepo, logger)
+	appSvc := appIdentity.NewIdentityAppService(domainSvc, userRepo, logger, sf)
+
+	identityHandler := rest.NewIdentityHandler(appSvc)
+	ucpHandler := rest.NewUCPHandler(nil)
+
+	srv := gozerorest.MustNewServer(gozerorest.RestConf{
+		Host:    "0.0.0.0",
+		Port:    mustParsePort(port),
+		Timeout: 30000,
+	})
+
+	supportedCaps := []string{"dev.ucp.shopping.catalog", "dev.ucp.shopping.cart", "dev.ucp.shopping.checkout"}
+	srv.Use(gozerorest.ToMiddleware(middleware.UCPAgentMiddleware))
+	srv.Use(gozerorest.ToMiddleware(middleware.NegotiationMiddleware(supportedCaps)))
+
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodGet,
+		Path:    "/.well-known/ucp",
+		Handler: ucpHandler.ServeHTTP,
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPost,
+		Path:    "/api/v1/auth/register",
+		Handler: identityHandler.Register,
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPost,
+		Path:    "/api/v1/auth/login",
+		Handler: identityHandler.Login,
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodGet,
+		Path:    "/api/v1/users/:id",
+		Handler: identityHandler.GetUser,
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPost,
+		Path:    "/api/v1/users/:id/suspend",
+		Handler: identityHandler.SuspendUser,
+	})
+
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		fmt.Printf("Starting server on :%s\n", port)
+		srv.Start()
+	}()
+
+	<-quit
+	fmt.Println("\nShutting down...")
+	srv.Stop()
+}
+
+func envOrDefault(key, def string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return def
+}
+
+func mustParsePort(port string) int {
+	var p int
+	if _, err := fmt.Sscanf(port, "%d", &p); err != nil || p <= 0 || p > 65535 {
+		log.Fatalf("invalid port: %s", port)
+	}
+	return p
+}
+
+type stdLogger struct{}
+
+func (stdLogger) Debug(_ context.Context, msg string, fields ...kernel.LogField) {
+	log.Println("DEBUG", msg, fields)
+}
+
+func (stdLogger) Info(_ context.Context, msg string, fields ...kernel.LogField) {
+	log.Println("INFO", msg, fields)
+}
+
+func (stdLogger) Warn(_ context.Context, msg string, fields ...kernel.LogField) {
+	log.Println("WARN", msg, fields)
+}
+
+func (stdLogger) Error(_ context.Context, msg string, err error, fields ...kernel.LogField) {
+	log.Println("ERROR", msg, err, fields)
+}
+
+
