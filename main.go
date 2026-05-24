@@ -13,6 +13,7 @@ import (
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/jmoiron/sqlx"
+	"github.com/nats-io/nats.go"
 	"github.com/redis/go-redis/v9"
 	gozerorest "github.com/zeromicro/go-zero/rest"
 
@@ -21,9 +22,11 @@ import (
 	"github.com/beeleelee/mall/domain/kernel"
 	domainIdentity "github.com/beeleelee/mall/domain/identity"
 	domainOAuth "github.com/beeleelee/mall/domain/oauth"
+	domainCart "github.com/beeleelee/mall/domain/cart"
 	"github.com/beeleelee/mall/infrastructure/database"
 	infraIdentity "github.com/beeleelee/mall/infrastructure/identity"
 	infraOAuth "github.com/beeleelee/mall/infrastructure/oauth"
+	infraCart "github.com/beeleelee/mall/infrastructure/cart"
 	"github.com/beeleelee/mall/interfaces/middleware"
 	"github.com/beeleelee/mall/interfaces/rest"
 )
@@ -78,6 +81,18 @@ func main() {
 	oauthHandler := rest.NewOAuthHandler(oauthAppSvc)
 
 	seedOAuthClient(oauthClientRepo, logger)
+
+	natsURL := envOrDefault("NATS_URL", "nats://localhost:4222")
+	nc, err := nats.Connect(natsURL)
+	if err != nil {
+		log.Fatalf("connect nats: %v", err)
+	}
+	defer nc.Close()
+
+	cartRepo := infraCart.NewPostgresCartRepository(db, rdb)
+	cartPub := infraCart.NewNATSCartEventPublisher(nc)
+	cartSvc := domainCart.NewCartService(cartRepo, cartPub, logger)
+	_ = cartSvc // ready for HTTP handlers
 
 	srv := gozerorest.MustNewServer(gozerorest.RestConf{
 		Host:    "0.0.0.0",

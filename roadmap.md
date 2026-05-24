@@ -83,9 +83,9 @@ The outcome is a **single integration point** that collapses N×N complexity —
 - [x] **2.2** Identity infra: PostgreSQL schema + migration for `users` table, `PostgresUserRepository` with cache-aside, integration tests
 - [x] **2.3** OAuth 2.0 domain: `OAuthClient`, `AuthorizationCode`, `RefreshToken` aggregates, OAuth service (authorize, token exchange, refresh, revoke), auth middleware, app service, 30+ tests
 - [x] **2.4** OAuth 2.0 infra: PostgreSQL migrations for OAuth tables (`oauth_clients`, `oauth_authorization_codes`, `oauth_refresh_tokens`), `Postgres` repos with JSON arrays, JWT signing (HS256), integration tests
-- [ ] **2.5** Cart domain: `Cart` aggregate (`Cart`, `CartItem`, `CartTotal`), `CartRepository` interface, `CartService` (create, add item, update quantity, remove item, get cart)
-- [ ] **2.6** Cart infra: PostgreSQL schema + migration for carts table (JSONB items), `PostgresCartRepository` with Redis cache for active sessions, integration tests
-- [ ] **2.7** Cart NATS event: `cart.updated` event publishing on mutations, `CartEventPublisher` interface + NATS implementation
+- [x] **2.5** Cart domain: `Cart` aggregate (`Cart`, `CartItem`, `CartTotal`), `CartRepository` interface, `CartService` (create, add item, update quantity, remove item, get cart, merge), domain events, 30+ tests
+- [x] **2.6** Cart infra: PostgreSQL schema + migration `000004` for carts table (JSONB items), `PostgresCartRepository` with Redis cache-aside, integration tests
+- [x] **2.7** Cart NATS event: `cart.updated` event publishing on mutations, `CartEventPublisher` interface + NATS implementation via `NATSCartEventPublisher`
 - [ ] **2.8** Checkout domain: `CheckoutSession` aggregate, UCP state machine (`incomplete → ready_for_complete → completed | cancelled`), `CheckoutService`, `CheckoutRepository` interface
 - [ ] **2.9** Checkout domain: `TaxService` domain service (pluggable providers), `PriceCalculator` service with discount extension hook
 - [ ] **2.10** Checkout infra: PostgreSQL schema + migration for checkout sessions (JSONB payload), `PostgresCheckoutRepository`, integration tests
@@ -96,7 +96,7 @@ The outcome is a **single integration point** that collapses N×N complexity —
 - [ ] **2.15** Interservice: DTM saga for order placement (checkout completed → reserve inventory → capture payment → confirm order)
 - [ ] **2.16** Verification: full e2e test (create user → login → search products → add to cart → create checkout → complete purchase), webhook receiver test
 
-**New dependencies**: `golang.org/x/crypto` (bcrypt) ✅ added, `github.com/zeromicro/go-zero` ✅ added, `github.com/golang-jwt/jwt/v4` ✅ added, DTM (already in stack), NATS client (already in stack)
+**New dependencies**: `golang.org/x/crypto` (bcrypt) ✅ added, `github.com/zeromicro/go-zero` ✅ added, `github.com/golang-jwt/jwt/v4` ✅ added, `github.com/nats-io/nats.go` ✅ added, DTM (already in stack)
 
 ---
 

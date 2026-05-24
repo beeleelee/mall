@@ -46,6 +46,7 @@ Persistence: `pgx`/`sqlx` + `go-redis`. Identity uses bcrypt via `golang.org/x/c
 - **Events**: aggregates emit domain events via `AddEvent()` / `Events()` / `ClearEvents()`.
 - **Migrations**: custom embed-based system in `infrastructure/database/migrator.go`. Files at `infrastructure/database/migrations/`. Run via code in `main.go`.
 - **Logging**: domain-layer `Logger` interface in `kernel`. `main.go` wires a std logger; zerolog planned for Phase 3.
+- **Cart**: `Cart` aggregate with `CartItem` value objects, JSONB persistence, domain events (`cart.created`, `cart.updated`, `cart.cleared`, `cart.merged`), `CartService` for mutations, NATS `cart.updated` events via `NATSCartEventPublisher`.
 - **Identity**: `Password` value object wraps bcrypt hashing. `User` aggregate has status (`active`/`suspended`), roles (`customer`/`admin`), and domain events.
 - **OAuth 2.0**: `OAuthClient` aggregate (bcrypt secret hash), `AuthorizationCode` entity (single-use, TTL), `RefreshToken` entity (opaque SHA-256 hash). JWT access tokens via `golang-jwt/jwt/v4`, signed with HS256. `OAuthService` handles authorize, exchange, refresh, revoke flows.
 - **Auth middleware**: `interfaces/middleware/auth.go` extracts Bearer JWT, validates signature, injects `UserInfo{UserID, ClientID, Scope}` into request context.
