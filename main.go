@@ -17,10 +17,13 @@ import (
 	gozerorest "github.com/zeromicro/go-zero/rest"
 
 	appIdentity "github.com/beeleelee/mall/application/identity"
+	appOAuth "github.com/beeleelee/mall/application/oauth"
 	"github.com/beeleelee/mall/domain/kernel"
 	domainIdentity "github.com/beeleelee/mall/domain/identity"
+	domainOAuth "github.com/beeleelee/mall/domain/oauth"
 	"github.com/beeleelee/mall/infrastructure/database"
 	infraIdentity "github.com/beeleelee/mall/infrastructure/identity"
+	infraOAuth "github.com/beeleelee/mall/infrastructure/oauth"
 	"github.com/beeleelee/mall/interfaces/middleware"
 	"github.com/beeleelee/mall/interfaces/rest"
 )
@@ -58,12 +61,23 @@ func main() {
 		log.Fatalf("new snowflake: %v", err)
 	}
 
+	jwtSecret := []byte(envOrDefault("JWT_SECRET", "dev-jwt-secret-change-in-production"))
+
 	logger := stdLogger{}
 	domainSvc := domainIdentity.NewIdentityService(userRepo, logger)
 	appSvc := appIdentity.NewIdentityAppService(domainSvc, userRepo, logger, sf)
 
 	identityHandler := rest.NewIdentityHandler(appSvc)
 	ucpHandler := rest.NewUCPHandler(nil)
+
+	oauthClientRepo := infraOAuth.NewPostgresOAuthClientRepository(db)
+	oauthCodeRepo := infraOAuth.NewPostgresAuthorizationCodeRepository(db)
+	oauthTokenRepo := infraOAuth.NewPostgresRefreshTokenRepository(db)
+	oauthDomainSvc := domainOAuth.NewOAuthService(oauthClientRepo, oauthCodeRepo, oauthTokenRepo, logger, jwtSecret)
+	oauthAppSvc := appOAuth.NewOAuthAppService(oauthDomainSvc, logger)
+	oauthHandler := rest.NewOAuthHandler(oauthAppSvc)
+
+	seedOAuthClient(oauthClientRepo, logger)
 
 	srv := gozerorest.MustNewServer(gozerorest.RestConf{
 		Host:    "0.0.0.0",
@@ -100,6 +114,21 @@ func main() {
 		Path:    "/api/v1/users/:id/suspend",
 		Handler: identityHandler.SuspendUser,
 	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPost,
+		Path:    "/oauth/authorize",
+		Handler: oauthHandler.Authorize,
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPost,
+		Path:    "/oauth/token",
+		Handler: oauthHandler.Token,
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPost,
+		Path:    "/oauth/revoke",
+		Handler: oauthHandler.Revoke,
+	})
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
@@ -112,6 +141,22 @@ func main() {
 	<-quit
 	fmt.Println("\nShutting down...")
 	srv.Stop()
+}
+
+func seedOAuthClient(repo domainOAuth.OAuthClientRepository, logger kernel.Logger) {
+	ctx := context.Background()
+	if _, err := repo.FindByClientID(ctx, "web"); err == nil {
+		return
+	}
+
+	client, err := domainOAuth.NewClient(1, "web", "web-secret", []string{"/oauth/callback"}, []string{"openid", "profile", "email", "read", "write"})
+	if err != nil {
+		logger.Error(ctx, "failed to create default OAuth client", err)
+		return
+	}
+	if err := repo.Save(ctx, client); err != nil {
+		logger.Error(ctx, "failed to save default OAuth client", err)
+	}
 }
 
 func envOrDefault(key, def string) string {
