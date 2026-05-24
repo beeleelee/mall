@@ -35,7 +35,9 @@ type CapabilityBindings struct {
 }
 
 type MCPBinding struct {
-	Tools []string `json:"tools"`
+	Tools         []string `json:"tools"`
+	TransportType string   `json:"transport_type,omitempty"`
+	Endpoint      string   `json:"endpoint,omitempty"`
 }
 
 type RESTBinding struct {
@@ -65,14 +67,16 @@ func DefaultProfile() *Profile {
 				Version: "1.0.0",
 				Bindings: CapabilityBindings{
 					MCP: &MCPBinding{
-						Tools: []string{"search_catalog", "lookup_catalog", "get_product"},
+						Tools:         []string{"search_catalog", "lookup_catalog", "get_product"},
+						TransportType: "json-rpc-2.0",
+						Endpoint:      "/mcp",
 					},
 					REST: &RESTBinding{
 						BaseURL: "/api/v1/catalog",
 						Endpoints: map[string]string{
-							"search": "GET /search",
-							"lookup": "GET /lookup",
-							"detail": "GET /products/{id}",
+							"search":      "GET /search",
+							"lookup":      "GET /lookup",
+							"get_product": "GET /products/{id}",
 						},
 					},
 				},

@@ -23,17 +23,20 @@ import (
 	appOAuth "github.com/beeleelee/mall/application/oauth"
 	appOrder "github.com/beeleelee/mall/application/order"
 	domainCart "github.com/beeleelee/mall/domain/cart"
+	domainCatalog "github.com/beeleelee/mall/domain/catalog"
 	domainCheckout "github.com/beeleelee/mall/domain/checkout"
 	domainIdentity "github.com/beeleelee/mall/domain/identity"
 	"github.com/beeleelee/mall/domain/kernel"
 	domainOAuth "github.com/beeleelee/mall/domain/oauth"
 	domainOrder "github.com/beeleelee/mall/domain/order"
 	infraCart "github.com/beeleelee/mall/infrastructure/cart"
+	infraCatalog "github.com/beeleelee/mall/infrastructure/catalog"
 	infraCheckout "github.com/beeleelee/mall/infrastructure/checkout"
 	"github.com/beeleelee/mall/infrastructure/database"
 	infraIdentity "github.com/beeleelee/mall/infrastructure/identity"
 	infraOAuth "github.com/beeleelee/mall/infrastructure/oauth"
 	infraOrder "github.com/beeleelee/mall/infrastructure/order"
+	"github.com/beeleelee/mall/interfaces/mcp"
 	"github.com/beeleelee/mall/interfaces/middleware"
 	"github.com/beeleelee/mall/interfaces/rest"
 )
@@ -128,6 +131,11 @@ func main() {
 		log.Fatalf("create orders jetstream: %v", err)
 	}
 
+	catalogRepo := infraCatalog.NewPostgresProductRepository(db, rdb)
+	catalogSvc := domainCatalog.NewCatalogService(catalogRepo, logger)
+	catalogHandler := rest.NewCatalogHandler(catalogSvc)
+	catalogMCPHandler := mcp.NewCatalogMCPHandler(catalogSvc)
+
 	cartRepo := infraCart.NewPostgresCartRepository(db, rdb)
 	cartPub := infraCart.NewNATSCartEventPublisher(js)
 	cartSvc := domainCart.NewCartService(cartRepo, cartPub, logger)
@@ -145,6 +153,10 @@ func main() {
 	orderSvc := domainOrder.NewOrderService(orderRepo, orderPub, logger)
 	orderHandler := rest.NewOrderHandler(orderSvc)
 
+	webhookRepo := infraOrder.NewPostgresWebhookRepository(db)
+	webhookSvc := domainOrder.NewWebhookService(webhookRepo, sf)
+	webhookHandler := rest.NewWebhookHandler(webhookSvc)
+
 	saga := appOrder.NewCheckoutCompletedSaga(orderSvc, sf, logger)
 
 	go func() {
@@ -161,6 +173,38 @@ func main() {
 			msg.Ack()
 			if err := saga.Handle(context.Background(), msg.Data()); err != nil {
 				log.Printf("saga: handle failed: %v", err)
+			}
+		})
+	}()
+
+	webhookDeliverer := infraOrder.NewWebhookDeliverer()
+
+	go func() {
+		cons, err := js.CreateOrUpdateConsumer(context.Background(), "orders", jetstream.ConsumerConfig{
+			Name:          "webhook-delivery",
+			FilterSubject: "order.>",
+			AckPolicy:     jetstream.AckExplicitPolicy,
+		})
+		if err != nil {
+			log.Fatalf("create webhook consumer: %v", err)
+		}
+
+		cons.Consume(func(msg jetstream.Msg) {
+			msg.Ack()
+
+			subject := msg.Subject()
+			webhooks, err := webhookRepo.FindByEvent(context.Background(), subject)
+			if err != nil || len(webhooks) == 0 {
+				return
+			}
+
+			for _, wh := range webhooks {
+				if !wh.Active {
+					continue
+				}
+				if err := webhookDeliverer.Deliver(context.Background(), wh, subject, msg.Data()); err != nil {
+					log.Printf("webhook delivery failed for %s (url=%s): %v", subject, wh.URL, err)
+				}
 			}
 		})
 	}()
@@ -216,6 +260,28 @@ func main() {
 		Method:  http.MethodPost,
 		Path:    "/oauth/revoke",
 		Handler: oauthHandler.Revoke,
+	})
+
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodGet,
+		Path:    "/api/v1/catalog/search",
+		Handler: catalogHandler.Search,
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodGet,
+		Path:    "/api/v1/catalog/lookup",
+		Handler: catalogHandler.Lookup,
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodGet,
+		Path:    "/api/v1/catalog/products/:id",
+		Handler: catalogHandler.GetProduct,
+	})
+
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPost,
+		Path:    "/mcp",
+		Handler: catalogMCPHandler.ServeHTTP,
 	})
 
 	srv.AddRoute(gozerorest.Route{
@@ -299,6 +365,22 @@ func main() {
 		Method:  http.MethodGet,
 		Path:    "/api/v1/orders/:id",
 		Handler: auth(http.HandlerFunc(orderHandler.GetOrder)).ServeHTTP,
+	})
+
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPost,
+		Path:    "/api/v1/webhooks",
+		Handler: auth(http.HandlerFunc(webhookHandler.Register)).ServeHTTP,
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodGet,
+		Path:    "/api/v1/webhooks",
+		Handler: auth(http.HandlerFunc(webhookHandler.ListByUser)).ServeHTTP,
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodDelete,
+		Path:    "/api/v1/webhooks/:id",
+		Handler: auth(http.HandlerFunc(webhookHandler.Delete)).ServeHTTP,
 	})
 
 	quit := make(chan os.Signal, 1)
