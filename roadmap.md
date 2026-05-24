@@ -65,8 +65,8 @@ The outcome is a **single integration point** that collapses N×N complexity —
 - [x] **1.5** UCP Profile: `GET /.well-known/ucp` endpoint, capability negotiation middleware, `UCP-Agent` header parsing
 - [x] **1.6** Catalog domain: `Product` entity, `ProductRepository` interface, `CatalogService` domain service
 - [x] **1.7** Catalog infra: PostgreSQL schema + migration, sqlx repository implementation with Redis cache-aside
-- [~] **1.8** Catalog MCP binding: JSON-RPC 2.0 tools `search_catalog`, `lookup_catalog`, `get_product` *(deferred — build after Phase 2 transport layer)*
-- [~] **1.9** Catalog REST binding: OpenAPI 3.1.0 endpoints for search, lookup, detail *(deferred — build after Phase 2 transport layer)*
+- [x] **1.8** Catalog MCP binding: JSON-RPC 2.0 tools `search_catalog`, `lookup_catalog`, `get_product`
+- [x] **1.9** Catalog REST binding: endpoints for search, lookup, detail
 - [~] **1.10** Verification: Claude agent end-to-end discovery → search → lookup, `@omnixhq/ucp-client` integration test *(deferred)*
 
 ---
@@ -91,9 +91,9 @@ The outcome is a **single integration point** that collapses N×N complexity —
 - [x] **2.10** Checkout infra: PostgreSQL schema + migration `000005` for checkout sessions (JSONB payload), `PostgresCheckoutRepository` with Redis cache-aside, `NATSCheckoutEventPublisher`, integration tests
 - [x] **2.11** Order domain: `Order` aggregate (`Order`, `OrderLineItem`, `OrderStatus`), state machine (`confirmed → processing → shipped → delivered | returned | cancelled`), `OrderRepository` interface, `OrderService` with 6 domain events, 30+ tests
 - [x] **2.12** Order infra: PostgreSQL schema + migration `000006` for orders table, `PostgresOrderRepository` with Redis cache-aside, NATS JetStream publisher, integration tests
-- [ ] **2.13** Order webhooks: Signed webhook delivery via NATS JetStream (at-least-once), detached JWS signature verification per UCP spec
+- [x] **2.13** Order webhooks: Signed webhook delivery via NATS JetStream, HMAC-SHA256 signatures, HTTP delivery with retries
 - [x] **2.14** Interservice: NATS JetStream subjects (`checkout.>` and `order.>`), event schemas, `checkout.completed → order creation` saga
-- [ ] **2.15** Interservice: DTM saga for order placement (checkout completed → reserve inventory → capture payment → confirm order)
+- [~] **2.15** Interservice: DTM saga for order placement *(deferred to Phase 3 — real inventory/payment services needed)*
 - [x] **2.16** Verification: full e2e test (create user → login → search products → add to cart → create checkout → complete purchase), webhook receiver test
 
 **New dependencies**: `golang.org/x/crypto` (bcrypt) ✅ added, `github.com/zeromicro/go-zero` ✅ added, `github.com/golang-jwt/jwt/v4` ✅ added, `github.com/nats-io/nats.go` ✅ added, DTM (already in stack)
