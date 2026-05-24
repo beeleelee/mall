@@ -17,8 +17,7 @@ func NewOrderService(repo OrderRepository, publisher OrderEventPublisher, logger
 	return &OrderService{repo: repo, publisher: publisher, logger: logger}
 }
 
-func (s *OrderService) CreateOrder(ctx context.Context, session *checkout.CheckoutSession) (*Order, error) {
-	id := session.ID
+func (s *OrderService) CreateOrder(ctx context.Context, id kernel.ID, session *checkout.CheckoutSession) (*Order, error) {
 	order, err := NewOrderFromCheckout(id, session)
 	if err != nil {
 		return nil, err
@@ -39,6 +38,10 @@ func (s *OrderService) GetOrder(ctx context.Context, id kernel.ID) (*Order, erro
 
 func (s *OrderService) GetOrdersByUser(ctx context.Context, userID kernel.ID) ([]*Order, error) {
 	return s.repo.FindByUserID(ctx, userID)
+}
+
+func (s *OrderService) FindByCheckoutID(ctx context.Context, checkoutID kernel.ID) (*Order, error) {
+	return s.repo.FindByCheckoutID(ctx, checkoutID)
 }
 
 func (s *OrderService) StartProcessing(ctx context.Context, id kernel.ID) (*Order, error) {

@@ -121,6 +121,8 @@ CREATE TABLE IF NOT EXISTS orders (
     created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at       TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_checkout_id ON orders (checkout_id);
 `
 
 func completedCheckout() *checkout.CheckoutSession {

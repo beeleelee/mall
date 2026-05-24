@@ -54,6 +54,17 @@ func (f *fakeOrderRepo) FindByUserID(_ context.Context, userID kernel.ID) ([]*Or
 	return result, nil
 }
 
+func (f *fakeOrderRepo) FindByCheckoutID(_ context.Context, checkoutID kernel.ID) (*Order, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for _, o := range f.orders {
+		if o.CheckoutID == checkoutID {
+			return o, nil
+		}
+	}
+	return nil, kernel.NewDomainError(kernel.ErrNotFound, "order not found for checkout")
+}
+
 func (f *fakeOrderRepo) Delete(_ context.Context, id kernel.ID) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()

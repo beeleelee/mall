@@ -21,12 +21,13 @@ import (
 
 	appIdentity "github.com/beeleelee/mall/application/identity"
 	appOAuth "github.com/beeleelee/mall/application/oauth"
-	"github.com/beeleelee/mall/domain/kernel"
+	appOrder "github.com/beeleelee/mall/application/order"
 	domainIdentity "github.com/beeleelee/mall/domain/identity"
 	domainOAuth "github.com/beeleelee/mall/domain/oauth"
 	domainCart "github.com/beeleelee/mall/domain/cart"
 	domainCheckout "github.com/beeleelee/mall/domain/checkout"
 	domainOrder "github.com/beeleelee/mall/domain/order"
+	"github.com/beeleelee/mall/domain/kernel"
 	"github.com/beeleelee/mall/infrastructure/database"
 	infraIdentity "github.com/beeleelee/mall/infrastructure/identity"
 	infraOAuth "github.com/beeleelee/mall/infrastructure/oauth"
@@ -95,22 +96,20 @@ func main() {
 	}
 	defer nc.Close()
 
-	cartRepo := infraCart.NewPostgresCartRepository(db, rdb)
-	cartPub := infraCart.NewNATSCartEventPublisher(nc)
-	cartSvc := domainCart.NewCartService(cartRepo, cartPub, logger)
-	_ = cartSvc // ready for HTTP handlers
-
-	defaultTaxSvc := domainCheckout.NewDefaultTaxService()
-	defaultPriceCalc := domainCheckout.NewDefaultPriceCalculator()
-	checkoutRepo := infraCheckout.NewPostgresCheckoutRepository(db, rdb)
-	checkoutPub := infraCheckout.NewNATSCheckoutEventPublisher(nc)
-	checkoutSvc := domainCheckout.NewCheckoutService(checkoutRepo, defaultTaxSvc, defaultPriceCalc, checkoutPub, logger)
-	_ = checkoutSvc // ready for HTTP handlers
-
 	js, err := jetstream.New(nc)
 	if err != nil {
 		log.Fatalf("create jetstream context: %v", err)
 	}
+
+	if _, err := js.CreateOrUpdateStream(context.Background(), jetstream.StreamConfig{
+		Name:     "checkout",
+		Subjects: []string{"checkout.>"},
+		MaxAge:   72 * time.Hour,
+		Storage:  jetstream.FileStorage,
+	}); err != nil {
+		log.Fatalf("create checkout jetstream: %v", err)
+	}
+
 	if _, err := js.CreateOrUpdateStream(context.Background(), jetstream.StreamConfig{
 		Name:     "orders",
 		Subjects: []string{"order.>"},
@@ -120,10 +119,41 @@ func main() {
 		log.Fatalf("create orders jetstream: %v", err)
 	}
 
+	cartRepo := infraCart.NewPostgresCartRepository(db, rdb)
+	cartPub := infraCart.NewNATSCartEventPublisher(nc)
+	cartSvc := domainCart.NewCartService(cartRepo, cartPub, logger)
+	_ = cartSvc // ready for HTTP handlers
+
+	defaultTaxSvc := domainCheckout.NewDefaultTaxService()
+	defaultPriceCalc := domainCheckout.NewDefaultPriceCalculator()
+	checkoutRepo := infraCheckout.NewPostgresCheckoutRepository(db, rdb)
+	checkoutPub := infraCheckout.NewNATSCheckoutEventPublisher(js)
+	checkoutSvc := domainCheckout.NewCheckoutService(checkoutRepo, defaultTaxSvc, defaultPriceCalc, checkoutPub, logger)
+	_ = checkoutSvc // ready for HTTP handlers
+
 	orderRepo := infraOrder.NewPostgresOrderRepository(db, rdb)
 	orderPub := infraOrder.NewNATSOrderEventPublisher(js)
 	orderSvc := domainOrder.NewOrderService(orderRepo, orderPub, logger)
-	_ = orderSvc // ready for HTTP handlers
+
+	saga := appOrder.NewCheckoutCompletedSaga(orderSvc, sf, logger)
+
+	go func() {
+		cons, err := js.CreateOrUpdateConsumer(context.Background(), "checkout", jetstream.ConsumerConfig{
+			Name:          "order-saga",
+			FilterSubject: "checkout.updated",
+			AckPolicy:     jetstream.AckExplicitPolicy,
+		})
+		if err != nil {
+			log.Fatalf("create checkout consumer: %v", err)
+		}
+
+		cons.Consume(func(msg jetstream.Msg) {
+			msg.Ack()
+			if err := saga.Handle(context.Background(), msg.Data()); err != nil {
+				log.Printf("saga: handle failed: %v", err)
+			}
+		})
+	}()
 
 	srv := gozerorest.MustNewServer(gozerorest.RestConf{
 		Host:    "0.0.0.0",

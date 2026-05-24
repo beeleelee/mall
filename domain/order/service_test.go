@@ -16,7 +16,7 @@ func TestOrderService_CreateOrder_Success(t *testing.T) {
 	session := completedCheckout(t, 1)
 	ctx := context.Background()
 
-	order, err := svc.CreateOrder(ctx, session)
+	order, err := svc.CreateOrder(ctx, 1, session)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -29,7 +29,7 @@ func TestOrderService_GetOrder(t *testing.T) {
 	svc := newTestService()
 	ctx := context.Background()
 	session := completedCheckout(t, 1)
-	svc.CreateOrder(ctx, session)
+	svc.CreateOrder(ctx, 1, session)
 
 	found, err := svc.GetOrder(ctx, 1)
 	if err != nil {
@@ -54,8 +54,8 @@ func TestOrderService_GetOrdersByUser(t *testing.T) {
 
 	s1 := completedCheckout(t, 1)
 	s2 := completedCheckout(t, 2)
-	svc.CreateOrder(ctx, s1)
-	svc.CreateOrder(ctx, s2)
+	svc.CreateOrder(ctx, 1, s1)
+	svc.CreateOrder(ctx, 2, s2)
 
 	orders, err := svc.GetOrdersByUser(ctx, 42)
 	if err != nil {
@@ -70,7 +70,7 @@ func TestOrderService_FullLifecycle(t *testing.T) {
 	svc := newTestService()
 	ctx := context.Background()
 	session := completedCheckout(t, 1)
-	order, _ := svc.CreateOrder(ctx, session)
+	order, _ := svc.CreateOrder(ctx, 1, session)
 
 	order, _ = svc.StartProcessing(ctx, order.ID)
 	if order.Status != OrderStatusProcessing { t.Fatal("expected processing") }
@@ -89,7 +89,7 @@ func TestOrderService_Ship_InvalidArgs(t *testing.T) {
 	svc := newTestService()
 	ctx := context.Background()
 	session := completedCheckout(t, 1)
-	order, _ := svc.CreateOrder(ctx, session)
+	order, _ := svc.CreateOrder(ctx, 1, session)
 	svc.StartProcessing(ctx, order.ID)
 
 	_, err := svc.Ship(ctx, order.ID, "", "UPS")
@@ -102,7 +102,7 @@ func TestOrderService_Cancel(t *testing.T) {
 	svc := newTestService()
 	ctx := context.Background()
 	session := completedCheckout(t, 1)
-	order, _ := svc.CreateOrder(ctx, session)
+	order, _ := svc.CreateOrder(ctx, 1, session)
 
 	order, err := svc.Cancel(ctx, order.ID)
 	if err != nil {

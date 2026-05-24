@@ -232,6 +232,18 @@ func (r *PostgresOrderRepository) FindByUserID(ctx context.Context, userID kerne
 	return result, nil
 }
 
+func (r *PostgresOrderRepository) FindByCheckoutID(ctx context.Context, checkoutID kernel.ID) (*domain.Order, error) {
+	var row orderRow
+	err := r.db.GetContext(ctx, &row, `SELECT * FROM orders WHERE checkout_id = $1`, checkoutID.Int64())
+	if err == sql.ErrNoRows {
+		return nil, kernel.NewDomainError(kernel.ErrNotFound, "order not found for checkout")
+	}
+	if err != nil {
+		return nil, kernel.NewDomainErrorWithCause(kernel.ErrInternal, "find order by checkout id", err)
+	}
+	return row.toDomain()
+}
+
 func (r *PostgresOrderRepository) Delete(ctx context.Context, id kernel.ID) error {
 	var userID int64
 	err := r.db.GetContext(ctx, &userID, `SELECT user_id FROM orders WHERE id = $1`, id.Int64())
