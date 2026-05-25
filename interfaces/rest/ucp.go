@@ -35,7 +35,9 @@ type CapabilityBindings struct {
 }
 
 type MCPBinding struct {
-	Tools []string `json:"tools"`
+	Tools         []string `json:"tools"`
+	TransportType string   `json:"transport_type,omitempty"`
+	Endpoint      string   `json:"endpoint,omitempty"`
 }
 
 type RESTBinding struct {
@@ -65,14 +67,62 @@ func DefaultProfile() *Profile {
 				Version: "1.0.0",
 				Bindings: CapabilityBindings{
 					MCP: &MCPBinding{
-						Tools: []string{"search_catalog", "lookup_catalog", "get_product"},
+						Tools:         []string{"search_catalog", "lookup_catalog", "get_product"},
+						TransportType: "json-rpc-2.0",
+						Endpoint:      "/mcp",
 					},
 					REST: &RESTBinding{
 						BaseURL: "/api/v1/catalog",
 						Endpoints: map[string]string{
-							"search": "GET /search",
-							"lookup": "GET /lookup",
-							"detail": "GET /products/{id}",
+							"search":      "GET /search",
+							"lookup":      "GET /lookup",
+							"get_product": "GET /products/{id}",
+						},
+					},
+				},
+			},
+			"dev.ucp.shopping.cart": {
+				Version: "1.0.0",
+				Bindings: CapabilityBindings{
+					REST: &RESTBinding{
+						BaseURL: "/api/v1/carts",
+						Endpoints: map[string]string{
+							"create_or_get": "POST /",
+							"get":           "GET /{id}",
+							"add_item":      "POST /{id}/items",
+							"update_qty":    "PUT /{id}/items/{productId}",
+							"remove_item":   "DELETE /{id}/items/{productId}",
+							"clear":         "DELETE /{id}",
+						},
+					},
+				},
+			},
+			"dev.ucp.shopping.checkout": {
+				Version: "1.0.0",
+				Bindings: CapabilityBindings{
+					REST: &RESTBinding{
+						BaseURL: "/api/v1/checkouts",
+						Endpoints: map[string]string{
+							"create":               "POST /",
+							"get":                  "GET /{id}",
+							"set_shipping_address": "POST /{id}/shipping-address",
+							"set_billing_address":  "POST /{id}/billing-address",
+							"select_shipping":      "POST /{id}/shipping-option",
+							"select_payment":       "POST /{id}/payment-handler",
+							"complete":             "POST /{id}/complete",
+							"cancel":               "POST /{id}/cancel",
+						},
+					},
+				},
+			},
+			"dev.ucp.shopping.order": {
+				Version: "1.0.0",
+				Bindings: CapabilityBindings{
+					REST: &RESTBinding{
+						BaseURL: "/api/v1/orders",
+						Endpoints: map[string]string{
+							"get":       "GET /{id}",
+							"list_user": "GET /",
 						},
 					},
 				},

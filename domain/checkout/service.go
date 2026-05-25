@@ -1,0 +1,250 @@
+package checkout
+
+import (
+	"context"
+
+	"github.com/beeleelee/mall/domain/kernel"
+)
+
+type CheckoutService struct {
+	repo        CheckoutRepository
+	taxSvc      TaxService
+	priceCalc   PriceCalculator
+	publisher   CheckoutEventPublisher
+	logger      kernel.Logger
+}
+
+func NewCheckoutService(
+	repo CheckoutRepository,
+	taxSvc TaxService,
+	priceCalc PriceCalculator,
+	publisher CheckoutEventPublisher,
+	logger kernel.Logger,
+) *CheckoutService {
+	return &CheckoutService{
+		repo:      repo,
+		taxSvc:    taxSvc,
+		priceCalc: priceCalc,
+		publisher: publisher,
+		logger:    logger,
+	}
+}
+
+type CreateCheckoutInput struct {
+	CheckoutID kernel.ID
+	UserID     kernel.ID
+	CartID     kernel.ID
+	CartItems  []CartSnapshotItem
+}
+
+func (s *CheckoutService) CreateCheckout(ctx context.Context, input CreateCheckoutInput) (*CheckoutSession, error) {
+	if input.UserID <= 0 {
+		return nil, kernel.NewDomainError(kernel.ErrInvalidArgument, "user_id must be positive")
+	}
+	if len(input.CartItems) == 0 {
+		return nil, kernel.NewDomainError(kernel.ErrInvalidArgument, "cart must not be empty")
+	}
+
+	snapshot := NewCartSnapshot(input.CartItems)
+	session, err := NewCheckoutSession(input.CheckoutID, input.UserID, input.CartID, snapshot)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.repo.Save(ctx, session); err != nil {
+		return nil, err
+	}
+
+	s.publishEvents(ctx, session)
+	s.logger.Info(ctx, "checkout.created", kernel.Field("checkout_id", session.ID.String()), kernel.Field("user_id", input.UserID.String()))
+	return session, nil
+}
+
+func (s *CheckoutService) GetCheckout(ctx context.Context, id kernel.ID) (*CheckoutSession, error) {
+	return s.repo.FindByID(ctx, id)
+}
+
+func (s *CheckoutService) GetCheckoutByUser(ctx context.Context, userID kernel.ID) (*CheckoutSession, error) {
+	return s.repo.FindByUserID(ctx, userID)
+}
+
+func (s *CheckoutService) SetShippingAddress(ctx context.Context, id kernel.ID, address Address) (*CheckoutSession, error) {
+	session, err := s.repo.FindByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := session.SetShippingAddress(address); err != nil {
+		return nil, err
+	}
+
+	if err := s.repo.Save(ctx, session); err != nil {
+		return nil, err
+	}
+
+	s.publishEvents(ctx, session)
+	return session, nil
+}
+
+func (s *CheckoutService) SetBillingAddress(ctx context.Context, id kernel.ID, address Address) (*CheckoutSession, error) {
+	session, err := s.repo.FindByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := session.SetBillingAddress(address); err != nil {
+		return nil, err
+	}
+
+	if err := s.repo.Save(ctx, session); err != nil {
+		return nil, err
+	}
+
+	s.publishEvents(ctx, session)
+	return session, nil
+}
+
+func (s *CheckoutService) SelectShippingOption(ctx context.Context, id kernel.ID, option ShippingOption) (*CheckoutSession, error) {
+	session, err := s.repo.FindByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := session.SelectShippingOption(option); err != nil {
+		return nil, err
+	}
+
+	if err := s.repo.Save(ctx, session); err != nil {
+		return nil, err
+	}
+
+	s.publishEvents(ctx, session)
+	return session, nil
+}
+
+func (s *CheckoutService) SelectPaymentHandler(ctx context.Context, id kernel.ID, handler string) (*CheckoutSession, error) {
+	session, err := s.repo.FindByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := session.SelectPaymentHandler(handler); err != nil {
+		return nil, err
+	}
+
+	if err := s.repo.Save(ctx, session); err != nil {
+		return nil, err
+	}
+
+	s.publishEvents(ctx, session)
+	return session, nil
+}
+
+func (s *CheckoutService) CalculateTax(ctx context.Context, id kernel.ID) (*CheckoutSession, error) {
+	session, err := s.repo.FindByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	result, err := s.taxSvc.CalculateTax(ctx, TaxInput{
+		Items:    session.CartSnapshot.Items,
+		Subtotal: session.Subtotal,
+		Cost:     session.ShippingCost,
+		Address:  session.ShippingAddress,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	session.SetTaxAmount(result.TaxAmount)
+
+	if err := s.repo.Save(ctx, session); err != nil {
+		return nil, err
+	}
+
+	s.publishEvents(ctx, session)
+	return session, nil
+}
+
+func (s *CheckoutService) MarkReady(ctx context.Context, id kernel.ID) (*CheckoutSession, error) {
+	session, err := s.repo.FindByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := session.MarkReady(); err != nil {
+		return nil, err
+	}
+
+	result, err := s.priceCalc.Calculate(ctx, PriceInput{
+		Items:        session.CartSnapshot.Items,
+		ShippingCost: session.ShippingCost,
+		TaxAmount:    session.TaxAmount,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	session.Subtotal = result.Subtotal
+	session.ShippingCost = result.Shipping
+	session.TaxAmount = result.Tax
+	session.GrandTotal = result.GrandTotal
+
+	if err := s.repo.Save(ctx, session); err != nil {
+		return nil, err
+	}
+
+	s.publishEvents(ctx, session)
+	return session, nil
+}
+
+func (s *CheckoutService) Complete(ctx context.Context, id kernel.ID) (*CheckoutSession, error) {
+	session, err := s.repo.FindByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := session.Complete(); err != nil {
+		return nil, err
+	}
+
+	if err := s.repo.Save(ctx, session); err != nil {
+		return nil, err
+	}
+
+	s.publishEvents(ctx, session)
+	s.logger.Info(ctx, "checkout.completed", kernel.Field("checkout_id", session.ID.String()), kernel.Field("user_id", session.UserID.String()))
+	return session, nil
+}
+
+func (s *CheckoutService) Cancel(ctx context.Context, id kernel.ID) (*CheckoutSession, error) {
+	session, err := s.repo.FindByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := session.Cancel(); err != nil {
+		return nil, err
+	}
+
+	if err := s.repo.Save(ctx, session); err != nil {
+		return nil, err
+	}
+
+	s.publishEvents(ctx, session)
+	return session, nil
+}
+
+func (s *CheckoutService) publishEvents(ctx context.Context, session *CheckoutSession) {
+	for _, event := range session.Events() {
+		s.logger.Info(ctx, "checkout.event", kernel.Field("event", event.EventName()), kernel.Field("checkout_id", session.ID.String()))
+
+		name := event.EventName()
+		if name == "checkout.ready_for_complete" || name == "checkout.completed" || name == "checkout.cancelled" {
+			if err := s.publisher.PublishCheckoutUpdated(ctx, session); err != nil {
+				s.logger.Error(ctx, "checkout.publish failed", err, kernel.Field("checkout_id", session.ID.String()))
+			}
+		}
+	}
+	session.ClearEvents()
+}

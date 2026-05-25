@@ -11,7 +11,7 @@ type testEvent struct {
 	aggregate ID
 }
 
-func (e testEvent) EventName() string    { return e.name }
+func (e testEvent) EventName() string     { return e.name }
 func (e testEvent) OccurredAt() time.Time { return e.occurred }
 func (e testEvent) AggregateID() ID       { return e.aggregate }
 

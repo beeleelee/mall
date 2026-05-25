@@ -151,7 +151,7 @@ func decodeCursor(c Cursor) (int64, error) {
 
 type fakeLogger struct{}
 
-func (fakeLogger) Debug(_ context.Context, _ string, _ ...kernel.LogField) {}
-func (fakeLogger) Info(_ context.Context, _ string, _ ...kernel.LogField)  {}
-func (fakeLogger) Warn(_ context.Context, _ string, _ ...kernel.LogField)  {}
+func (fakeLogger) Debug(_ context.Context, _ string, _ ...kernel.LogField)          {}
+func (fakeLogger) Info(_ context.Context, _ string, _ ...kernel.LogField)           {}
+func (fakeLogger) Warn(_ context.Context, _ string, _ ...kernel.LogField)           {}
 func (fakeLogger) Error(_ context.Context, _ string, _ error, _ ...kernel.LogField) {}

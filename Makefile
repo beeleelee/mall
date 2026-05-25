@@ -1,4 +1,4 @@
-.PHONY: all build test lint fmt vet clean help tidy
+.PHONY: all build test lint fmt vet clean help tidy run
 
 APP_NAME := mall
 BUILD_DIR := build
@@ -26,6 +26,9 @@ tidy:
 	go mod tidy
 	go mod verify
 
+run:
+	go run .
+
 clean:
 	rm -rf $(BUILD_DIR)
 
@@ -39,5 +42,6 @@ help:
 	@echo "  fmt     Format Go source code"
 	@echo "  vet     Run go vet"
 	@echo "  tidy    Tidy and verify go.mod"
+	@echo "  run     Start the server (requires postgres+redis)"
 	@echo "  clean   Remove build artifacts"
 	@echo "  all     Run lint, vet, build, test"
