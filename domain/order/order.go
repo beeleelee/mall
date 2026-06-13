@@ -105,6 +105,7 @@ func NewOrderFromCheckout(id kernel.ID, session *checkout.CheckoutSession) (*Ord
 	}
 	o.CreatedAt = now
 	o.UpdatedAt = now
+	o.AddEvent(OrderConfirmedEvent{OrderID: o.ID, UserID: o.UserID})
 	return o, nil
 }
 

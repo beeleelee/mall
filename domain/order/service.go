@@ -135,9 +135,15 @@ func (s *OrderService) Cancel(ctx context.Context, id kernel.ID) (*Order, error)
 }
 
 func (s *OrderService) publishEvents(ctx context.Context, order *Order) {
-	for range order.Events() {
-		if err := s.publisher.PublishOrderEvent(ctx, order); err != nil {
-			s.logger.Error(ctx, "order.publish failed", err, kernel.Field("order_id", order.ID.String()))
+	for _, event := range order.Events() {
+		s.logger.Info(ctx, "order.event", kernel.Field("event", event.EventName()), kernel.Field("order_id", order.ID.String()))
+
+		name := event.EventName()
+		if name == "order.confirmed" || name == "order.processing" || name == "order.shipped" ||
+			name == "order.delivered" || name == "order.returned" || name == "order.cancelled" {
+			if err := s.publisher.PublishOrderEvent(ctx, order); err != nil {
+				s.logger.Error(ctx, "order.publish failed", err, kernel.Field("order_id", order.ID.String()))
+			}
 		}
 	}
 	order.ClearEvents()
