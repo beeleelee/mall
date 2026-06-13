@@ -338,6 +338,12 @@ func (h *CheckoutHandler) Complete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	session, err = h.svc.MarkReady(r.Context(), kernel.ID(id))
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+
 	session, err = h.svc.Complete(r.Context(), kernel.ID(id))
 	if err != nil {
 		writeDomainError(w, err)
