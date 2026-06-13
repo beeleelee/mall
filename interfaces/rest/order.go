@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/zeromicro/go-zero/rest/httpx"
 	"github.com/zeromicro/go-zero/rest/pathvar"
 
 	"github.com/beeleelee/mall/domain/kernel"
@@ -70,6 +71,162 @@ func (h *OrderHandler) ListByUser(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(resp)
+}
+
+type shipOrderRequest struct {
+	TrackingNumber string `json:"tracking_number"`
+	Carrier        string `json:"carrier"`
+}
+
+func (h *OrderHandler) StartProcessing(w http.ResponseWriter, r *http.Request) {
+	userID, err := userIDFromContext(r)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+
+	vars := pathvar.Vars(r)
+	idStr := vars["id"]
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		writeDomainError(w, kernel.NewDomainError(kernel.ErrInvalidArgument, "invalid order id"))
+		return
+	}
+
+	order, err := h.svc.StartProcessing(r.Context(), kernel.ID(id))
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+
+	if order.UserID != userID {
+		writeDomainError(w, kernel.NewDomainError(kernel.ErrPermissionDenied, "order does not belong to user"))
+		return
+	}
+
+	writeOrderResponse(w, http.StatusOK, order)
+}
+
+func (h *OrderHandler) Ship(w http.ResponseWriter, r *http.Request) {
+	userID, err := userIDFromContext(r)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+
+	vars := pathvar.Vars(r)
+	idStr := vars["id"]
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		writeDomainError(w, kernel.NewDomainError(kernel.ErrInvalidArgument, "invalid order id"))
+		return
+	}
+
+	var req shipOrderRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpx.Error(w, err)
+		return
+	}
+
+	order, err := h.svc.Ship(r.Context(), kernel.ID(id), req.TrackingNumber, req.Carrier)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+
+	if order.UserID != userID {
+		writeDomainError(w, kernel.NewDomainError(kernel.ErrPermissionDenied, "order does not belong to user"))
+		return
+	}
+
+	writeOrderResponse(w, http.StatusOK, order)
+}
+
+func (h *OrderHandler) MarkDelivered(w http.ResponseWriter, r *http.Request) {
+	userID, err := userIDFromContext(r)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+
+	vars := pathvar.Vars(r)
+	idStr := vars["id"]
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		writeDomainError(w, kernel.NewDomainError(kernel.ErrInvalidArgument, "invalid order id"))
+		return
+	}
+
+	order, err := h.svc.MarkDelivered(r.Context(), kernel.ID(id))
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+
+	if order.UserID != userID {
+		writeDomainError(w, kernel.NewDomainError(kernel.ErrPermissionDenied, "order does not belong to user"))
+		return
+	}
+
+	writeOrderResponse(w, http.StatusOK, order)
+}
+
+func (h *OrderHandler) ReturnOrder(w http.ResponseWriter, r *http.Request) {
+	userID, err := userIDFromContext(r)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+
+	vars := pathvar.Vars(r)
+	idStr := vars["id"]
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		writeDomainError(w, kernel.NewDomainError(kernel.ErrInvalidArgument, "invalid order id"))
+		return
+	}
+
+	order, err := h.svc.ReturnOrder(r.Context(), kernel.ID(id))
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+
+	if order.UserID != userID {
+		writeDomainError(w, kernel.NewDomainError(kernel.ErrPermissionDenied, "order does not belong to user"))
+		return
+	}
+
+	writeOrderResponse(w, http.StatusOK, order)
+}
+
+func (h *OrderHandler) CancelOrder(w http.ResponseWriter, r *http.Request) {
+	userID, err := userIDFromContext(r)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+
+	vars := pathvar.Vars(r)
+	idStr := vars["id"]
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		writeDomainError(w, kernel.NewDomainError(kernel.ErrInvalidArgument, "invalid order id"))
+		return
+	}
+
+	order, err := h.svc.Cancel(r.Context(), kernel.ID(id))
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+
+	if order.UserID != userID {
+		writeDomainError(w, kernel.NewDomainError(kernel.ErrPermissionDenied, "order does not belong to user"))
+		return
+	}
+
+	writeOrderResponse(w, http.StatusOK, order)
 }
 
 type orderLineItemResponse struct {
