@@ -21,6 +21,12 @@ func NewOrderHandler(svc *domain.OrderService) *OrderHandler {
 }
 
 func (h *OrderHandler) GetOrder(w http.ResponseWriter, r *http.Request) {
+	userID, err := userIDFromContext(r)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+
 	vars := pathvar.Vars(r)
 	idStr := vars["id"]
 	id, err := strconv.ParseInt(idStr, 10, 64)
@@ -32,6 +38,11 @@ func (h *OrderHandler) GetOrder(w http.ResponseWriter, r *http.Request) {
 	order, err := h.svc.GetOrder(r.Context(), kernel.ID(id))
 	if err != nil {
 		writeDomainError(w, err)
+		return
+	}
+
+	if order.UserID != userID {
+		writeDomainError(w, kernel.NewDomainError(kernel.ErrPermissionDenied, "order does not belong to user"))
 		return
 	}
 
