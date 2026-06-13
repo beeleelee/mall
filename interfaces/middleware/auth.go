@@ -22,6 +22,10 @@ func UserFromContext(ctx context.Context) (UserInfo, bool) {
 	return u, ok
 }
 
+func ContextWithUser(ctx context.Context, info UserInfo) context.Context {
+	return context.WithValue(ctx, userContextKey{}, info)
+}
+
 func AuthMiddleware(jwtSecret []byte) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
