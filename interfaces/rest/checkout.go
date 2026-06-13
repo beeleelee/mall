@@ -106,6 +106,12 @@ func (h *CheckoutHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *CheckoutHandler) GetCheckout(w http.ResponseWriter, r *http.Request) {
+	userID, err := userIDFromContext(r)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+
 	vars := pathvar.Vars(r)
 	idStr := vars["id"]
 	id, err := strconv.ParseInt(idStr, 10, 64)
@@ -120,15 +126,36 @@ func (h *CheckoutHandler) GetCheckout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if session.UserID != userID {
+		writeDomainError(w, kernel.NewDomainError(kernel.ErrPermissionDenied, "checkout does not belong to user"))
+		return
+	}
+
 	writeCheckoutResponse(w, http.StatusOK, session)
 }
 
 func (h *CheckoutHandler) SetShippingAddress(w http.ResponseWriter, r *http.Request) {
+	userID, err := userIDFromContext(r)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+
 	vars := pathvar.Vars(r)
 	idStr := vars["id"]
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
 		writeDomainError(w, kernel.NewDomainError(kernel.ErrInvalidArgument, "invalid checkout id"))
+		return
+	}
+
+	session, err := h.svc.GetCheckout(r.Context(), kernel.ID(id))
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+	if session.UserID != userID {
+		writeDomainError(w, kernel.NewDomainError(kernel.ErrPermissionDenied, "checkout does not belong to user"))
 		return
 	}
 
@@ -138,7 +165,7 @@ func (h *CheckoutHandler) SetShippingAddress(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	session, err := h.svc.SetShippingAddress(r.Context(), kernel.ID(id), domain.Address{
+	session, err = h.svc.SetShippingAddress(r.Context(), kernel.ID(id), domain.Address{
 		Line1:      req.Line1,
 		Line2:      req.Line2,
 		City:       req.City,
@@ -155,11 +182,27 @@ func (h *CheckoutHandler) SetShippingAddress(w http.ResponseWriter, r *http.Requ
 }
 
 func (h *CheckoutHandler) SetBillingAddress(w http.ResponseWriter, r *http.Request) {
+	userID, err := userIDFromContext(r)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+
 	vars := pathvar.Vars(r)
 	idStr := vars["id"]
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
 		writeDomainError(w, kernel.NewDomainError(kernel.ErrInvalidArgument, "invalid checkout id"))
+		return
+	}
+
+	session, err := h.svc.GetCheckout(r.Context(), kernel.ID(id))
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+	if session.UserID != userID {
+		writeDomainError(w, kernel.NewDomainError(kernel.ErrPermissionDenied, "checkout does not belong to user"))
 		return
 	}
 
@@ -169,7 +212,7 @@ func (h *CheckoutHandler) SetBillingAddress(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	session, err := h.svc.SetBillingAddress(r.Context(), kernel.ID(id), domain.Address{
+	session, err = h.svc.SetBillingAddress(r.Context(), kernel.ID(id), domain.Address{
 		Line1:      req.Line1,
 		Line2:      req.Line2,
 		City:       req.City,
@@ -186,11 +229,27 @@ func (h *CheckoutHandler) SetBillingAddress(w http.ResponseWriter, r *http.Reque
 }
 
 func (h *CheckoutHandler) SelectShippingOption(w http.ResponseWriter, r *http.Request) {
+	userID, err := userIDFromContext(r)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+
 	vars := pathvar.Vars(r)
 	idStr := vars["id"]
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
 		writeDomainError(w, kernel.NewDomainError(kernel.ErrInvalidArgument, "invalid checkout id"))
+		return
+	}
+
+	session, err := h.svc.GetCheckout(r.Context(), kernel.ID(id))
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+	if session.UserID != userID {
+		writeDomainError(w, kernel.NewDomainError(kernel.ErrPermissionDenied, "checkout does not belong to user"))
 		return
 	}
 
@@ -200,7 +259,7 @@ func (h *CheckoutHandler) SelectShippingOption(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	session, err := h.svc.SelectShippingOption(r.Context(), kernel.ID(id), domain.ShippingOption{
+	session, err = h.svc.SelectShippingOption(r.Context(), kernel.ID(id), domain.ShippingOption{
 		ID:        req.ID,
 		Name:      req.Name,
 		Cost:      req.Cost,
@@ -215,11 +274,27 @@ func (h *CheckoutHandler) SelectShippingOption(w http.ResponseWriter, r *http.Re
 }
 
 func (h *CheckoutHandler) SelectPaymentHandler(w http.ResponseWriter, r *http.Request) {
+	userID, err := userIDFromContext(r)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+
 	vars := pathvar.Vars(r)
 	idStr := vars["id"]
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
 		writeDomainError(w, kernel.NewDomainError(kernel.ErrInvalidArgument, "invalid checkout id"))
+		return
+	}
+
+	session, err := h.svc.GetCheckout(r.Context(), kernel.ID(id))
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+	if session.UserID != userID {
+		writeDomainError(w, kernel.NewDomainError(kernel.ErrPermissionDenied, "checkout does not belong to user"))
 		return
 	}
 
@@ -229,7 +304,7 @@ func (h *CheckoutHandler) SelectPaymentHandler(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	session, err := h.svc.SelectPaymentHandler(r.Context(), kernel.ID(id), req.Handler)
+	session, err = h.svc.SelectPaymentHandler(r.Context(), kernel.ID(id), req.Handler)
 	if err != nil {
 		writeDomainError(w, err)
 		return
@@ -239,6 +314,12 @@ func (h *CheckoutHandler) SelectPaymentHandler(w http.ResponseWriter, r *http.Re
 }
 
 func (h *CheckoutHandler) Complete(w http.ResponseWriter, r *http.Request) {
+	userID, err := userIDFromContext(r)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+
 	vars := pathvar.Vars(r)
 	idStr := vars["id"]
 	id, err := strconv.ParseInt(idStr, 10, 64)
@@ -247,7 +328,17 @@ func (h *CheckoutHandler) Complete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	session, err := h.svc.Complete(r.Context(), kernel.ID(id))
+	session, err := h.svc.GetCheckout(r.Context(), kernel.ID(id))
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+	if session.UserID != userID {
+		writeDomainError(w, kernel.NewDomainError(kernel.ErrPermissionDenied, "checkout does not belong to user"))
+		return
+	}
+
+	session, err = h.svc.Complete(r.Context(), kernel.ID(id))
 	if err != nil {
 		writeDomainError(w, err)
 		return
@@ -257,6 +348,12 @@ func (h *CheckoutHandler) Complete(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *CheckoutHandler) Cancel(w http.ResponseWriter, r *http.Request) {
+	userID, err := userIDFromContext(r)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+
 	vars := pathvar.Vars(r)
 	idStr := vars["id"]
 	id, err := strconv.ParseInt(idStr, 10, 64)
@@ -265,7 +362,17 @@ func (h *CheckoutHandler) Cancel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	session, err := h.svc.Cancel(r.Context(), kernel.ID(id))
+	session, err := h.svc.GetCheckout(r.Context(), kernel.ID(id))
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+	if session.UserID != userID {
+		writeDomainError(w, kernel.NewDomainError(kernel.ErrPermissionDenied, "checkout does not belong to user"))
+		return
+	}
+
+	session, err = h.svc.Cancel(r.Context(), kernel.ID(id))
 	if err != nil {
 		writeDomainError(w, err)
 		return
