@@ -19,23 +19,30 @@ import (
 )
 
 type webhookRow struct {
-	ID        int64     `db:"id"`
-	UserID    int64     `db:"user_id"`
-	URL       string    `db:"url"`
-	Secret    string    `db:"secret"`
-	Events    []string  `db:"events"`
-	Active    bool      `db:"active"`
-	CreatedAt time.Time `db:"created_at"`
-	UpdatedAt time.Time `db:"updated_at"`
+	ID        int64              `db:"id"`
+	UserID    int64              `db:"user_id"`
+	URL       string             `db:"url"`
+	Secret    string             `db:"secret"`
+	Events    json.RawMessage    `db:"events"`
+	Active    bool               `db:"active"`
+	CreatedAt time.Time          `db:"created_at"`
+	UpdatedAt time.Time          `db:"updated_at"`
 }
 
 func (r webhookRow) toDomain() *domain.Webhook {
+	var events []string
+	if len(r.Events) > 0 {
+		json.Unmarshal(r.Events, &events)
+	}
+	if events == nil {
+		events = []string{}
+	}
 	w := &domain.Webhook{
 		AggregateRoot: kernel.NewAggregateRoot(kernel.ID(r.ID)),
 		UserID:        kernel.ID(r.UserID),
 		URL:           r.URL,
 		Secret:        r.Secret,
-		Events:        r.Events,
+		Events:        events,
 		Active:        r.Active,
 	}
 	w.CreatedAt = r.CreatedAt
@@ -44,12 +51,13 @@ func (r webhookRow) toDomain() *domain.Webhook {
 }
 
 func fromDomainWebhook(w *domain.Webhook) webhookRow {
+	events, _ := json.Marshal(w.Events)
 	return webhookRow{
 		ID:        w.ID.Int64(),
 		UserID:    w.UserID.Int64(),
 		URL:       w.URL,
 		Secret:    w.Secret,
-		Events:    w.Events,
+		Events:    events,
 		Active:    w.Active,
 		CreatedAt: w.CreatedAt,
 		UpdatedAt: w.UpdatedAt,
@@ -111,7 +119,7 @@ func (r *PostgresWebhookRepository) FindByUserID(ctx context.Context, userID ker
 
 func (r *PostgresWebhookRepository) FindByEvent(ctx context.Context, event string) ([]*domain.Webhook, error) {
 	var rows []webhookRow
-	err := r.db.SelectContext(ctx, &rows, `SELECT * FROM webhooks WHERE active = true AND $1 = ANY(events)`, event)
+	err := r.db.SelectContext(ctx, &rows, `SELECT * FROM webhooks WHERE active = true AND EXISTS (SELECT 1 FROM jsonb_array_elements_text(events) AS e WHERE e = $1)`, event)
 	if err != nil {
 		return nil, kernel.NewDomainErrorWithCause(kernel.ErrInternal, "find webhooks by event", err)
 	}

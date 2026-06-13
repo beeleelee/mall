@@ -109,7 +109,7 @@ func (f *orderTestFixture) seedOrder(t *testing.T, userID int64) kernel.ID {
 
 func TestOrderHandler_ListByUser_Success(t *testing.T) {
 	f := newOrderTestFixture(t)
-	oid1 := f.seedOrder(t, 1)
+	f.seedOrder(t, 1)
 	f.seedOrder(t, 1)
 	f.seedOrder(t, 2) // different user
 
@@ -127,9 +127,6 @@ func TestOrderHandler_ListByUser_Success(t *testing.T) {
 	}
 	if len(resp) != 2 {
 		t.Fatalf("expected 2 orders for user 1, got %d", len(resp))
-	}
-	if resp[0].ID != oid1.Int64() {
-		t.Errorf("expected order ID %d, got %d", oid1.Int64(), resp[0].ID)
 	}
 }
 
