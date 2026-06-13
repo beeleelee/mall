@@ -366,6 +366,31 @@ func main() {
 		Path:    "/api/v1/orders/:id",
 		Handler: auth(http.HandlerFunc(orderHandler.GetOrder)).ServeHTTP,
 	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPost,
+		Path:    "/api/v1/orders/:id/process",
+		Handler: auth(http.HandlerFunc(orderHandler.StartProcessing)).ServeHTTP,
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPost,
+		Path:    "/api/v1/orders/:id/ship",
+		Handler: auth(http.HandlerFunc(orderHandler.Ship)).ServeHTTP,
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPost,
+		Path:    "/api/v1/orders/:id/deliver",
+		Handler: auth(http.HandlerFunc(orderHandler.MarkDelivered)).ServeHTTP,
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPost,
+		Path:    "/api/v1/orders/:id/return",
+		Handler: auth(http.HandlerFunc(orderHandler.ReturnOrder)).ServeHTTP,
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPost,
+		Path:    "/api/v1/orders/:id/cancel",
+		Handler: auth(http.HandlerFunc(orderHandler.CancelOrder)).ServeHTTP,
+	})
 
 	srv.AddRoute(gozerorest.Route{
 		Method:  http.MethodPost,
