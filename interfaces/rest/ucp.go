@@ -138,6 +138,47 @@ func DefaultProfile() *Profile {
 					},
 				},
 			},
+			"dev.ucp.shopping.ap2_mandate": {
+				Version: "1.0.0",
+				Bindings: CapabilityBindings{
+					REST: &RESTBinding{
+						BaseURL: "/api/v1/payments",
+						Endpoints: map[string]string{
+							"request":  "POST /mandates",
+							"approve":  "POST /mandates/{id}/approve",
+							"execute":  "POST /mandates/{id}/execute",
+							"settle":   "POST /mandates/{id}/settle",
+							"cancel":   "POST /mandates/{id}/cancel",
+							"get":      "GET /mandates/{id}",
+							"list":     "GET /mandates",
+						},
+					},
+				},
+			},
+			"dev.ucp.shopping.fulfillment": {
+				Version: "1.0.0",
+				Bindings: CapabilityBindings{
+					REST: &RESTBinding{
+						BaseURL: "/api/v1/fulfillment",
+						Endpoints: map[string]string{
+							"rates": "POST /rates",
+						},
+					},
+				},
+			},
+			"dev.ucp.shopping.discount": {
+				Version: "1.0.0",
+				Bindings: CapabilityBindings{
+					REST: &RESTBinding{
+						BaseURL: "/api/v1/discounts",
+						Endpoints: map[string]string{
+							"create":   "POST /codes",
+							"validate": "POST /codes/validate",
+							"apply":    "POST /codes/apply",
+						},
+					},
+				},
+			},
 		},
 		Authentication: AuthenticationInfo{
 			OAuth2: OAuth2Config{
