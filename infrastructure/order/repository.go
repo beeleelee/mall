@@ -11,35 +11,35 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	checkout "github.com/beeleelee/mall/domain/checkout"
-	domain "github.com/beeleelee/mall/domain/order"
 	"github.com/beeleelee/mall/domain/kernel"
+	domain "github.com/beeleelee/mall/domain/order"
 )
 
 type orderRow struct {
-	ID              int64            `db:"id"`
-	UserID          int64            `db:"user_id"`
-	CheckoutID      int64            `db:"checkout_id"`
-	CartID          int64            `db:"cart_id"`
-	Items           json.RawMessage  `db:"items"`
-	ShippingAddress json.RawMessage  `db:"shipping_address"`
-	BillingAddress  json.RawMessage  `db:"billing_address"`
-	ShippingOption  json.RawMessage  `db:"shipping_option"`
-	PaymentHandler  string           `db:"payment_handler"`
-	Subtotal        int64            `db:"subtotal"`
-	ShippingCost    int64            `db:"shipping_cost"`
-	TaxAmount       int64            `db:"tax_amount"`
-	GrandTotal      int64            `db:"grand_total"`
-	Status          string           `db:"status"`
-	TrackingNumber  string           `db:"tracking_number"`
-	Carrier         string           `db:"carrier"`
-	ConfirmedAt     time.Time        `db:"confirmed_at"`
-	ProcessingAt    *time.Time       `db:"processing_at"`
-	ShippedAt       *time.Time       `db:"shipped_at"`
-	DeliveredAt     *time.Time       `db:"delivered_at"`
-	ReturnedAt      *time.Time       `db:"returned_at"`
-	CancelledAt     *time.Time       `db:"cancelled_at"`
-	CreatedAt       time.Time        `db:"created_at"`
-	UpdatedAt       time.Time        `db:"updated_at"`
+	ID              int64           `db:"id"`
+	UserID          int64           `db:"user_id"`
+	CheckoutID      int64           `db:"checkout_id"`
+	CartID          int64           `db:"cart_id"`
+	Items           json.RawMessage `db:"items"`
+	ShippingAddress json.RawMessage `db:"shipping_address"`
+	BillingAddress  json.RawMessage `db:"billing_address"`
+	ShippingOption  json.RawMessage `db:"shipping_option"`
+	PaymentHandler  string          `db:"payment_handler"`
+	Subtotal        int64           `db:"subtotal"`
+	ShippingCost    int64           `db:"shipping_cost"`
+	TaxAmount       int64           `db:"tax_amount"`
+	GrandTotal      int64           `db:"grand_total"`
+	Status          string          `db:"status"`
+	TrackingNumber  string          `db:"tracking_number"`
+	Carrier         string          `db:"carrier"`
+	ConfirmedAt     time.Time       `db:"confirmed_at"`
+	ProcessingAt    *time.Time      `db:"processing_at"`
+	ShippedAt       *time.Time      `db:"shipped_at"`
+	DeliveredAt     *time.Time      `db:"delivered_at"`
+	ReturnedAt      *time.Time      `db:"returned_at"`
+	CancelledAt     *time.Time      `db:"cancelled_at"`
+	CreatedAt       time.Time       `db:"created_at"`
+	UpdatedAt       time.Time       `db:"updated_at"`
 }
 
 func (r orderRow) toDomain() (*domain.Order, error) {

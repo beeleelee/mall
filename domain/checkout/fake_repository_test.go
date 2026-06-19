@@ -102,7 +102,7 @@ func (f *fakePublisher) PublishCheckoutUpdated(_ context.Context, _ *CheckoutSes
 
 type fakeLoggerCheckout struct{}
 
-func (fakeLoggerCheckout) Debug(_ context.Context, _ string, _ ...kernel.LogField)           {}
-func (fakeLoggerCheckout) Info(_ context.Context, _ string, _ ...kernel.LogField)            {}
-func (fakeLoggerCheckout) Warn(_ context.Context, _ string, _ ...kernel.LogField)            {}
-func (fakeLoggerCheckout) Error(_ context.Context, _ string, _ error, _ ...kernel.LogField)  {}
+func (fakeLoggerCheckout) Debug(_ context.Context, _ string, _ ...kernel.LogField)          {}
+func (fakeLoggerCheckout) Info(_ context.Context, _ string, _ ...kernel.LogField)           {}
+func (fakeLoggerCheckout) Warn(_ context.Context, _ string, _ ...kernel.LogField)           {}
+func (fakeLoggerCheckout) Error(_ context.Context, _ string, _ error, _ ...kernel.LogField) {}

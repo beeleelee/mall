@@ -29,8 +29,8 @@ import (
 	infraCheckout "github.com/beeleelee/mall/infrastructure/checkout"
 	"github.com/beeleelee/mall/infrastructure/database"
 	infraIdentity "github.com/beeleelee/mall/infrastructure/identity"
-	infraOrder "github.com/beeleelee/mall/infrastructure/order"
 	"github.com/beeleelee/mall/infrastructure/logging"
+	infraOrder "github.com/beeleelee/mall/infrastructure/order"
 )
 
 const e2eTimeout = 10 * time.Second

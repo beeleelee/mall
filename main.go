@@ -17,8 +17,8 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 	"github.com/redis/go-redis/v9"
-	gozerorest "github.com/zeromicro/go-zero/rest"
 	"github.com/zeromicro/go-zero/core/trace"
+	gozerorest "github.com/zeromicro/go-zero/rest"
 
 	appIdentity "github.com/beeleelee/mall/application/identity"
 	appOAuth "github.com/beeleelee/mall/application/oauth"
@@ -35,9 +35,9 @@ import (
 	infraCheckout "github.com/beeleelee/mall/infrastructure/checkout"
 	"github.com/beeleelee/mall/infrastructure/database"
 	infraIdentity "github.com/beeleelee/mall/infrastructure/identity"
+	"github.com/beeleelee/mall/infrastructure/logging"
 	infraOAuth "github.com/beeleelee/mall/infrastructure/oauth"
 	infraOrder "github.com/beeleelee/mall/infrastructure/order"
-	"github.com/beeleelee/mall/infrastructure/logging"
 	"github.com/beeleelee/mall/interfaces/mcp"
 	"github.com/beeleelee/mall/interfaces/middleware"
 	"github.com/beeleelee/mall/interfaces/rest"
@@ -523,5 +523,3 @@ func mustParsePort(port string) int {
 	}
 	return p
 }
-
-

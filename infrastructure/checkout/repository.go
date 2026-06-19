@@ -42,22 +42,22 @@ func (m *nullRawMessage) UnmarshalJSON(data []byte) error {
 }
 
 type sessionRow struct {
-	ID              int64           `db:"id"`
-	UserID          int64           `db:"user_id"`
-	CartID          int64           `db:"cart_id"`
-	CartSnapshot    nullRawMessage  `db:"cart_snapshot"`
-	ShippingAddress nullRawMessage  `db:"shipping_address"`
-	BillingAddress  nullRawMessage  `db:"billing_address"`
-	ShippingOption  nullRawMessage  `db:"shipping_option"`
-	PaymentHandler  string          `db:"payment_handler"`
-	Subtotal        int64           `db:"subtotal"`
-	ShippingCost    int64           `db:"shipping_cost"`
-	TaxAmount       int64           `db:"tax_amount"`
-	GrandTotal      int64           `db:"grand_total"`
-	Status          string          `db:"status"`
-	CompletedAt     *time.Time      `db:"completed_at"`
-	CreatedAt       time.Time       `db:"created_at"`
-	UpdatedAt       time.Time       `db:"updated_at"`
+	ID              int64          `db:"id"`
+	UserID          int64          `db:"user_id"`
+	CartID          int64          `db:"cart_id"`
+	CartSnapshot    nullRawMessage `db:"cart_snapshot"`
+	ShippingAddress nullRawMessage `db:"shipping_address"`
+	BillingAddress  nullRawMessage `db:"billing_address"`
+	ShippingOption  nullRawMessage `db:"shipping_option"`
+	PaymentHandler  string         `db:"payment_handler"`
+	Subtotal        int64          `db:"subtotal"`
+	ShippingCost    int64          `db:"shipping_cost"`
+	TaxAmount       int64          `db:"tax_amount"`
+	GrandTotal      int64          `db:"grand_total"`
+	Status          string         `db:"status"`
+	CompletedAt     *time.Time     `db:"completed_at"`
+	CreatedAt       time.Time      `db:"created_at"`
+	UpdatedAt       time.Time      `db:"updated_at"`
 }
 
 func (r sessionRow) toDomain() (*domain.CheckoutSession, error) {

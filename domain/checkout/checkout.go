@@ -35,12 +35,12 @@ func NewCheckoutSession(id, userID, cartID kernel.ID, snapshot CartSnapshot) (*C
 	}
 
 	s := &CheckoutSession{
-		AggregateRoot:  kernel.NewAggregateRoot(id),
-		UserID:         userID,
-		CartID:         cartID,
-		CartSnapshot:   snapshot,
-		Status:         CheckoutStatusIncomplete,
-		Subtotal:       snapshot.Total,
+		AggregateRoot: kernel.NewAggregateRoot(id),
+		UserID:        userID,
+		CartID:        cartID,
+		CartSnapshot:  snapshot,
+		Status:        CheckoutStatusIncomplete,
+		Subtotal:      snapshot.Total,
 	}
 	s.AddEvent(CheckoutCreatedEvent{CheckoutID: id, UserID: userID})
 	return s, nil

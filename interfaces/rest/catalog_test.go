@@ -147,9 +147,9 @@ func decodeCursorREST(c domain.Cursor) (int64, error) {
 
 type fakeLoggerCatalog struct{}
 
-func (fakeLoggerCatalog) Debug(_ context.Context, _ string, _ ...kernel.LogField) {}
-func (fakeLoggerCatalog) Info(_ context.Context, _ string, _ ...kernel.LogField)  {}
-func (fakeLoggerCatalog) Warn(_ context.Context, _ string, _ ...kernel.LogField)  {}
+func (fakeLoggerCatalog) Debug(_ context.Context, _ string, _ ...kernel.LogField)          {}
+func (fakeLoggerCatalog) Info(_ context.Context, _ string, _ ...kernel.LogField)           {}
+func (fakeLoggerCatalog) Warn(_ context.Context, _ string, _ ...kernel.LogField)           {}
 func (fakeLoggerCatalog) Error(_ context.Context, _ string, _ error, _ ...kernel.LogField) {}
 
 func seedProduct(t *testing.T, repo *fakeCatalogRepo, sf *kernel.Snowflake, sku string, name string, amount int64) kernel.ID {

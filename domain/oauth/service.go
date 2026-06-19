@@ -8,14 +8,14 @@ import (
 )
 
 type OAuthService struct {
-	clients     OAuthClientRepository
-	codes       AuthorizationCodeRepository
-	tokens      RefreshTokenRepository
-	logger      kernel.Logger
-	jwtSecret   []byte
-	codeTTL     time.Duration
-	accessTTL   time.Duration
-	refreshTTL  time.Duration
+	clients    OAuthClientRepository
+	codes      AuthorizationCodeRepository
+	tokens     RefreshTokenRepository
+	logger     kernel.Logger
+	jwtSecret  []byte
+	codeTTL    time.Duration
+	accessTTL  time.Duration
+	refreshTTL time.Duration
 }
 
 func NewOAuthService(

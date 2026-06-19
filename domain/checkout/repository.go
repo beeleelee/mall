@@ -14,10 +14,10 @@ type CheckoutRepository interface {
 }
 
 type TaxInput struct {
-	Items     []CartSnapshotItem
-	Subtotal  int64
-	Cost      int64
-	Address   *Address
+	Items    []CartSnapshotItem
+	Subtotal int64
+	Cost     int64
+	Address  *Address
 }
 
 type TaxResult struct {

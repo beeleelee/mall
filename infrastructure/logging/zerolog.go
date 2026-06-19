@@ -13,7 +13,7 @@ import (
 )
 
 type ZerologLogger struct {
-	log    zerolog.Logger
+	log     zerolog.Logger
 	svcName string
 }
 

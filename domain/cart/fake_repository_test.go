@@ -65,7 +65,7 @@ func (f *fakeCartRepo) Delete(_ context.Context, id kernel.ID) error {
 }
 
 type fakeCartPublisher struct {
-	mu       sync.Mutex
+	mu        sync.Mutex
 	published []*Cart
 }
 
@@ -82,7 +82,7 @@ func (f *fakeCartPublisher) PublishCartUpdated(_ context.Context, cart *Cart) er
 
 type fakeLoggerCart struct{}
 
-func (fakeLoggerCart) Debug(_ context.Context, _ string, _ ...kernel.LogField)         {}
-func (fakeLoggerCart) Info(_ context.Context, _ string, _ ...kernel.LogField)          {}
-func (fakeLoggerCart) Warn(_ context.Context, _ string, _ ...kernel.LogField)          {}
+func (fakeLoggerCart) Debug(_ context.Context, _ string, _ ...kernel.LogField)          {}
+func (fakeLoggerCart) Info(_ context.Context, _ string, _ ...kernel.LogField)           {}
+func (fakeLoggerCart) Warn(_ context.Context, _ string, _ ...kernel.LogField)           {}
 func (fakeLoggerCart) Error(_ context.Context, _ string, _ error, _ ...kernel.LogField) {}

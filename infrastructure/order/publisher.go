@@ -6,8 +6,8 @@ import (
 
 	"github.com/nats-io/nats.go/jetstream"
 
-	domain "github.com/beeleelee/mall/domain/order"
 	"github.com/beeleelee/mall/domain/kernel"
+	domain "github.com/beeleelee/mall/domain/order"
 )
 
 type NATSOrderEventPublisher struct {

@@ -8,14 +8,14 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	domain "github.com/beeleelee/mall/domain/oauth"
 	"github.com/beeleelee/mall/domain/kernel"
+	domain "github.com/beeleelee/mall/domain/oauth"
 
 	app "github.com/beeleelee/mall/application/oauth"
 )
 
 type fakeClientRepoOAuth struct {
-	mu     map[string]*domain.OAuthClient
+	mu map[string]*domain.OAuthClient
 }
 
 func newFakeClientRepoOAuth() *fakeClientRepoOAuth {
@@ -102,9 +102,9 @@ func (f *fakeTokenRepoOAuth) Revoke(_ context.Context, id string) error {
 
 type fakeLoggerOAuth struct{}
 
-func (fakeLoggerOAuth) Debug(_ context.Context, _ string, _ ...kernel.LogField) {}
-func (fakeLoggerOAuth) Info(_ context.Context, _ string, _ ...kernel.LogField)  {}
-func (fakeLoggerOAuth) Warn(_ context.Context, _ string, _ ...kernel.LogField)  {}
+func (fakeLoggerOAuth) Debug(_ context.Context, _ string, _ ...kernel.LogField)          {}
+func (fakeLoggerOAuth) Info(_ context.Context, _ string, _ ...kernel.LogField)           {}
+func (fakeLoggerOAuth) Warn(_ context.Context, _ string, _ ...kernel.LogField)           {}
 func (fakeLoggerOAuth) Error(_ context.Context, _ string, _ error, _ ...kernel.LogField) {}
 
 func newTestOAuthHandler(t *testing.T) *OAuthHandler {

@@ -85,10 +85,10 @@ func newIntegrationFixture(t *testing.T) *integrationFixture {
 	}
 
 	return &integrationFixture{
-		repo:   repo,
-		db:     db,
-		rdb:    rdb,
-		schema: schema,
+		repo:    repo,
+		db:      db,
+		rdb:     rdb,
+		schema:  schema,
 		cleanup: cleanup,
 	}
 }

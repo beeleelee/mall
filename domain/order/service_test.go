@@ -73,16 +73,24 @@ func TestOrderService_FullLifecycle(t *testing.T) {
 	order, _ := svc.CreateOrder(ctx, 1, session)
 
 	order, _ = svc.StartProcessing(ctx, order.ID)
-	if order.Status != OrderStatusProcessing { t.Fatal("expected processing") }
+	if order.Status != OrderStatusProcessing {
+		t.Fatal("expected processing")
+	}
 
 	order, _ = svc.Ship(ctx, order.ID, "TRK123", "UPS")
-	if order.Status != OrderStatusShipped { t.Fatal("expected shipped") }
+	if order.Status != OrderStatusShipped {
+		t.Fatal("expected shipped")
+	}
 
 	order, _ = svc.MarkDelivered(ctx, order.ID)
-	if order.Status != OrderStatusDelivered { t.Fatal("expected delivered") }
+	if order.Status != OrderStatusDelivered {
+		t.Fatal("expected delivered")
+	}
 
 	order, _ = svc.ReturnOrder(ctx, order.ID)
-	if order.Status != OrderStatusReturned { t.Fatal("expected returned") }
+	if order.Status != OrderStatusReturned {
+		t.Fatal("expected returned")
+	}
 }
 
 func TestOrderService_Ship_InvalidArgs(t *testing.T) {

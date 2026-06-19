@@ -6,8 +6,8 @@ import (
 	"time"
 
 	checkout "github.com/beeleelee/mall/domain/checkout"
-	domain "github.com/beeleelee/mall/domain/order"
 	"github.com/beeleelee/mall/domain/kernel"
+	domain "github.com/beeleelee/mall/domain/order"
 )
 
 type checkoutCompletedPayload struct {

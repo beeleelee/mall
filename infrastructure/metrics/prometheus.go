@@ -63,18 +63,15 @@ func (r *PrometheusRecorder) SetGauge(name string, value float64, labels ...Labe
 }
 
 func (r *PrometheusRecorder) getCounter(name string) *prometheus.CounterVec {
-	v, _ := r.counters[name]
-	return v
+	return r.counters[name]
 }
 
 func (r *PrometheusRecorder) getHistogram(name string) *prometheus.HistogramVec {
-	v, _ := r.histograms[name]
-	return v
+	return r.histograms[name]
 }
 
 func (r *PrometheusRecorder) getGauge(name string) *prometheus.GaugeVec {
-	v, _ := r.gauges[name]
-	return v
+	return r.gauges[name]
 }
 
 func extractLabelNames(labels []Label) []string {

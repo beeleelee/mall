@@ -235,15 +235,25 @@ func TestOrder_FullLifecycle(t *testing.T) {
 	session := completedCheckout(t, 1)
 	order, _ := NewOrderFromCheckout(1, session)
 
-	if order.Status != OrderStatusConfirmed { t.Fatal("expected confirmed") }
+	if order.Status != OrderStatusConfirmed {
+		t.Fatal("expected confirmed")
+	}
 	order.StartProcessing()
-	if order.Status != OrderStatusProcessing { t.Fatal("expected processing") }
+	if order.Status != OrderStatusProcessing {
+		t.Fatal("expected processing")
+	}
 	order.Ship("1Z999AA10123456784", "UPS")
-	if order.Status != OrderStatusShipped { t.Fatal("expected shipped") }
+	if order.Status != OrderStatusShipped {
+		t.Fatal("expected shipped")
+	}
 	order.MarkDelivered()
-	if order.Status != OrderStatusDelivered { t.Fatal("expected delivered") }
+	if order.Status != OrderStatusDelivered {
+		t.Fatal("expected delivered")
+	}
 	order.Return()
-	if order.Status != OrderStatusReturned { t.Fatal("expected returned") }
+	if order.Status != OrderStatusReturned {
+		t.Fatal("expected returned")
+	}
 }
 
 func TestNewOrderFromSnapshot(t *testing.T) {

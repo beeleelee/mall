@@ -9,8 +9,8 @@ import (
 type CartStatus string
 
 const (
-	CartStatusActive   CartStatus = "active"
-	CartStatusMerged   CartStatus = "merged"
+	CartStatusActive    CartStatus = "active"
+	CartStatusMerged    CartStatus = "merged"
 	CartStatusAbandoned CartStatus = "abandoned"
 )
 

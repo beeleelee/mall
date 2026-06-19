@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	domain "github.com/beeleelee/mall/domain/oauth"
 	"github.com/beeleelee/mall/domain/kernel"
+	domain "github.com/beeleelee/mall/domain/oauth"
 )
 
 func newTestAppService(t *testing.T) *OAuthAppService {

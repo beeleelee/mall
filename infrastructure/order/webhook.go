@@ -19,14 +19,14 @@ import (
 )
 
 type webhookRow struct {
-	ID        int64              `db:"id"`
-	UserID    int64              `db:"user_id"`
-	URL       string             `db:"url"`
-	Secret    string             `db:"secret"`
-	Events    json.RawMessage    `db:"events"`
-	Active    bool               `db:"active"`
-	CreatedAt time.Time          `db:"created_at"`
-	UpdatedAt time.Time          `db:"updated_at"`
+	ID        int64           `db:"id"`
+	UserID    int64           `db:"user_id"`
+	URL       string          `db:"url"`
+	Secret    string          `db:"secret"`
+	Events    json.RawMessage `db:"events"`
+	Active    bool            `db:"active"`
+	CreatedAt time.Time       `db:"created_at"`
+	UpdatedAt time.Time       `db:"updated_at"`
 }
 
 func (r webhookRow) toDomain() *domain.Webhook {

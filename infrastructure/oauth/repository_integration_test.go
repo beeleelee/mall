@@ -11,8 +11,8 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/jmoiron/sqlx"
 
-	domain "github.com/beeleelee/mall/domain/oauth"
 	"github.com/beeleelee/mall/domain/kernel"
+	domain "github.com/beeleelee/mall/domain/oauth"
 )
 
 type integrationFixture struct {

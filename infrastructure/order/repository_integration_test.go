@@ -13,8 +13,8 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	checkout "github.com/beeleelee/mall/domain/checkout"
-	domain "github.com/beeleelee/mall/domain/order"
 	"github.com/beeleelee/mall/domain/kernel"
+	domain "github.com/beeleelee/mall/domain/order"
 )
 
 type integrationFixture struct {
@@ -86,10 +86,10 @@ func newIntegrationFixture(t *testing.T) *integrationFixture {
 	}
 
 	return &integrationFixture{
-		repo:   repo,
-		db:     db,
-		rdb:    rdb,
-		schema: schema,
+		repo:    repo,
+		db:      db,
+		rdb:     rdb,
+		schema:  schema,
 		cleanup: cleanup,
 	}
 }

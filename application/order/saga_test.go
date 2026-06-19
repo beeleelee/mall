@@ -6,8 +6,8 @@ import (
 	"testing"
 
 	checkout "github.com/beeleelee/mall/domain/checkout"
-	domain "github.com/beeleelee/mall/domain/order"
 	"github.com/beeleelee/mall/domain/kernel"
+	domain "github.com/beeleelee/mall/domain/order"
 )
 
 type fakeOrderRepo struct {
@@ -66,9 +66,9 @@ func (p *fakeOrderPublisher) PublishOrderEvent(_ context.Context, _ *domain.Orde
 
 type fakeLogger struct{}
 
-func (fakeLogger) Debug(_ context.Context, _ string, _ ...kernel.LogField) {}
-func (fakeLogger) Info(_ context.Context, _ string, _ ...kernel.LogField)  {}
-func (fakeLogger) Warn(_ context.Context, _ string, _ ...kernel.LogField)  {}
+func (fakeLogger) Debug(_ context.Context, _ string, _ ...kernel.LogField)          {}
+func (fakeLogger) Info(_ context.Context, _ string, _ ...kernel.LogField)           {}
+func (fakeLogger) Warn(_ context.Context, _ string, _ ...kernel.LogField)           {}
 func (fakeLogger) Error(_ context.Context, _ string, _ error, _ ...kernel.LogField) {}
 
 func newSaga() *CheckoutCompletedSaga {
