@@ -3,8 +3,14 @@ package checkout
 import (
 	"context"
 
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
+
 	"github.com/beeleelee/mall/domain/kernel"
 )
+
+var tracer = otel.Tracer("mall.domain.checkout")
 
 type CheckoutService struct {
 	repo        CheckoutRepository
@@ -38,6 +44,15 @@ type CreateCheckoutInput struct {
 }
 
 func (s *CheckoutService) CreateCheckout(ctx context.Context, input CreateCheckoutInput) (*CheckoutSession, error) {
+	ctx, span := tracer.Start(ctx, "checkout.create",
+		trace.WithAttributes(
+			attribute.Int64("user_id", input.UserID.Int64()),
+			attribute.Int64("cart_id", input.CartID.Int64()),
+			attribute.Int("items", len(input.CartItems)),
+		),
+	)
+	defer span.End()
+
 	if input.UserID <= 0 {
 		return nil, kernel.NewDomainError(kernel.ErrInvalidArgument, "user_id must be positive")
 	}
@@ -199,6 +214,11 @@ func (s *CheckoutService) MarkReady(ctx context.Context, id kernel.ID) (*Checkou
 }
 
 func (s *CheckoutService) Complete(ctx context.Context, id kernel.ID) (*CheckoutSession, error) {
+	ctx, span := tracer.Start(ctx, "checkout.complete",
+		trace.WithAttributes(attribute.Int64("checkout_id", id.Int64())),
+	)
+	defer span.End()
+
 	session, err := s.repo.FindByID(ctx, id)
 	if err != nil {
 		return nil, err
@@ -218,6 +238,11 @@ func (s *CheckoutService) Complete(ctx context.Context, id kernel.ID) (*Checkout
 }
 
 func (s *CheckoutService) Cancel(ctx context.Context, id kernel.ID) (*CheckoutSession, error) {
+	ctx, span := tracer.Start(ctx, "checkout.cancel",
+		trace.WithAttributes(attribute.Int64("checkout_id", id.Int64())),
+	)
+	defer span.End()
+
 	session, err := s.repo.FindByID(ctx, id)
 	if err != nil {
 		return nil, err

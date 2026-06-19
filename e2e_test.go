@@ -30,6 +30,7 @@ import (
 	"github.com/beeleelee/mall/infrastructure/database"
 	infraIdentity "github.com/beeleelee/mall/infrastructure/identity"
 	infraOrder "github.com/beeleelee/mall/infrastructure/order"
+	"github.com/beeleelee/mall/infrastructure/logging"
 )
 
 const e2eTimeout = 10 * time.Second
@@ -54,7 +55,7 @@ func TestE2E_FullPurchaseFlow(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	logger := stdLogger{}
+	logger := logging.NewZerologLogger("mall-test")
 	ctx := context.Background()
 
 	idSeq := sf.NextID

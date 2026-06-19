@@ -3,8 +3,14 @@ package cart
 import (
 	"context"
 
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
+
 	"github.com/beeleelee/mall/domain/kernel"
 )
+
+var cartTracer = otel.Tracer("mall.domain.cart")
 
 type CartService struct {
 	repo      CartRepository
@@ -64,6 +70,15 @@ func (s *CartService) GetCart(ctx context.Context, userID kernel.ID) (*Cart, err
 }
 
 func (s *CartService) AddItem(ctx context.Context, input AddItemInput) (*Cart, error) {
+	ctx, span := cartTracer.Start(ctx, "cart.add_item",
+		trace.WithAttributes(
+			attribute.Int64("user_id", input.UserID.Int64()),
+			attribute.Int64("product_id", input.ProductID.Int64()),
+			attribute.Int("quantity", input.Quantity),
+		),
+	)
+	defer span.End()
+
 	cart, err := s.GetOrCreateCart(ctx, input.CartID, input.UserID)
 	if err != nil {
 		return nil, err
@@ -147,6 +162,14 @@ func (s *CartService) ClearCart(ctx context.Context, userID kernel.ID) (*Cart, e
 }
 
 func (s *CartService) MergeCarts(ctx context.Context, targetID, sourceID kernel.ID) (*Cart, error) {
+	ctx, span := cartTracer.Start(ctx, "cart.merge",
+		trace.WithAttributes(
+			attribute.Int64("target_id", targetID.Int64()),
+			attribute.Int64("source_id", sourceID.Int64()),
+		),
+	)
+	defer span.End()
+
 	target, err := s.repo.FindByID(ctx, targetID)
 	if err != nil {
 		return nil, err

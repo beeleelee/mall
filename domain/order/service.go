@@ -3,9 +3,15 @@ package order
 import (
 	"context"
 
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
+
 	checkout "github.com/beeleelee/mall/domain/checkout"
 	"github.com/beeleelee/mall/domain/kernel"
 )
+
+var orderTracer = otel.Tracer("mall.domain.order")
 
 type OrderService struct {
 	repo      OrderRepository
@@ -18,6 +24,15 @@ func NewOrderService(repo OrderRepository, publisher OrderEventPublisher, logger
 }
 
 func (s *OrderService) CreateOrder(ctx context.Context, id kernel.ID, session *checkout.CheckoutSession) (*Order, error) {
+	ctx, span := orderTracer.Start(ctx, "order.create",
+		trace.WithAttributes(
+			attribute.Int64("order_id", id.Int64()),
+			attribute.Int64("checkout_id", session.ID.Int64()),
+			attribute.Int64("user_id", session.UserID.Int64()),
+		),
+	)
+	defer span.End()
+
 	order, err := NewOrderFromCheckout(id, session)
 	if err != nil {
 		return nil, err

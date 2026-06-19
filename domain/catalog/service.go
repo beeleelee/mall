@@ -3,8 +3,14 @@ package catalog
 import (
 	"context"
 
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
+
 	"github.com/beeleelee/mall/domain/kernel"
 )
+
+var catalogTracer = otel.Tracer("mall.domain.catalog")
 
 type CatalogService struct {
 	repo   ProductRepository
@@ -19,6 +25,14 @@ func NewCatalogService(repo ProductRepository, logger kernel.Logger) *CatalogSer
 }
 
 func (s *CatalogService) Search(ctx context.Context, query string, opts SearchOptions) (*SearchResult, error) {
+	ctx, span := catalogTracer.Start(ctx, "catalog.search",
+		trace.WithAttributes(
+			attribute.String("query", query),
+			attribute.Int("limit", opts.Limit),
+		),
+	)
+	defer span.End()
+
 	if opts.Limit <= 0 || opts.Limit > 100 {
 		opts.Limit = 20
 	}
@@ -34,11 +48,17 @@ func (s *CatalogService) Search(ctx context.Context, query string, opts SearchOp
 		return nil, err
 	}
 
+	span.SetAttributes(attribute.Int("results.count", len(result.Products)))
 	s.logger.Debug(ctx, "catalog.search completed", kernel.Field("hits", len(result.Products)))
 	return result, nil
 }
 
 func (s *CatalogService) Lookup(ctx context.Context, sku SKU) (*Product, error) {
+	ctx, span := catalogTracer.Start(ctx, "catalog.lookup",
+		trace.WithAttributes(attribute.String("sku", string(sku))),
+	)
+	defer span.End()
+
 	if sku == "" {
 		return nil, kernel.NewDomainError(kernel.ErrInvalidArgument, "sku must not be empty")
 	}
@@ -51,6 +71,11 @@ func (s *CatalogService) Lookup(ctx context.Context, sku SKU) (*Product, error) 
 }
 
 func (s *CatalogService) GetProduct(ctx context.Context, id kernel.ID) (*Product, error) {
+	ctx, span := catalogTracer.Start(ctx, "catalog.get_product",
+		trace.WithAttributes(attribute.Int64("product_id", id.Int64())),
+	)
+	defer span.End()
+
 	if id <= 0 {
 		return nil, kernel.NewDomainError(kernel.ErrInvalidArgument, "product id must be positive")
 	}

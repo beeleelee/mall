@@ -18,6 +18,7 @@ import (
 	"github.com/nats-io/nats.go/jetstream"
 	"github.com/redis/go-redis/v9"
 	gozerorest "github.com/zeromicro/go-zero/rest"
+	"github.com/zeromicro/go-zero/core/trace"
 
 	appIdentity "github.com/beeleelee/mall/application/identity"
 	appOAuth "github.com/beeleelee/mall/application/oauth"
@@ -211,6 +212,16 @@ func main() {
 			}
 		})
 	}()
+
+	if otelEndpoint := envOrDefault("OTEL_ENDPOINT", ""); otelEndpoint != "" {
+		trace.StartAgent(trace.Config{
+			Name:     "mall",
+			Endpoint: otelEndpoint,
+			Sampler:  1.0,
+			Batcher:  envOrDefault("OTEL_BATCHER", "otlpgrpc"),
+		})
+		logger.Info(context.Background(), "telemetry started", kernel.Field("endpoint", otelEndpoint))
+	}
 
 	srv := gozerorest.MustNewServer(gozerorest.RestConf{
 		Host:    "0.0.0.0",
