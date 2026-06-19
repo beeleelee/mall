@@ -36,6 +36,7 @@ import (
 	infraIdentity "github.com/beeleelee/mall/infrastructure/identity"
 	infraOAuth "github.com/beeleelee/mall/infrastructure/oauth"
 	infraOrder "github.com/beeleelee/mall/infrastructure/order"
+	"github.com/beeleelee/mall/infrastructure/logging"
 	"github.com/beeleelee/mall/interfaces/mcp"
 	"github.com/beeleelee/mall/interfaces/middleware"
 	"github.com/beeleelee/mall/interfaces/rest"
@@ -76,7 +77,7 @@ func main() {
 
 	jwtSecret := []byte(envOrDefault("JWT_SECRET", "dev-jwt-secret-change-in-production"))
 
-	logger := stdLogger{}
+	logger := logging.NewZerologLogger("mall")
 	domainSvc := domainIdentity.NewIdentityService(userRepo, logger)
 	appSvc := appIdentity.NewIdentityAppService(domainSvc, userRepo, logger, sf)
 
@@ -130,6 +131,8 @@ func main() {
 	}); err != nil {
 		log.Fatalf("create orders jetstream: %v", err)
 	}
+
+	healthHandler := rest.NewHealthHandler(db, rdb, nc)
 
 	catalogRepo := infraCatalog.NewPostgresProductRepository(db, rdb)
 	catalogSvc := domainCatalog.NewCatalogService(catalogRepo, logger)
@@ -221,6 +224,16 @@ func main() {
 
 	auth := middleware.AuthMiddleware(jwtSecret)
 
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodGet,
+		Path:    "/healthz",
+		Handler: healthHandler.Livez,
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodGet,
+		Path:    "/readyz",
+		Handler: healthHandler.Readyz,
+	})
 	srv.AddRoute(gozerorest.Route{
 		Method:  http.MethodGet,
 		Path:    "/.well-known/ucp",
@@ -480,20 +493,4 @@ func mustParsePort(port string) int {
 	return p
 }
 
-type stdLogger struct{}
 
-func (stdLogger) Debug(_ context.Context, msg string, fields ...kernel.LogField) {
-	log.Println("DEBUG", msg, fields)
-}
-
-func (stdLogger) Info(_ context.Context, msg string, fields ...kernel.LogField) {
-	log.Println("INFO", msg, fields)
-}
-
-func (stdLogger) Warn(_ context.Context, msg string, fields ...kernel.LogField) {
-	log.Println("WARN", msg, fields)
-}
-
-func (stdLogger) Error(_ context.Context, msg string, err error, fields ...kernel.LogField) {
-	log.Println("ERROR", msg, err, fields)
-}
