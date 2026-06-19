@@ -20,6 +20,7 @@ type CheckoutSession struct {
 	TaxAmount       int64
 	GrandTotal      int64
 	Status          CheckoutStatus
+	ContinueURL     string
 	CompletedAt     *time.Time
 }
 
@@ -54,6 +55,7 @@ func NewCheckoutSessionFromSnapshot(
 	paymentHandler string,
 	subtotal, shippingCost, taxAmount, grandTotal int64,
 	status CheckoutStatus,
+	continueURL string,
 	completedAt *time.Time,
 	createdAt, updatedAt time.Time,
 ) *CheckoutSession {
@@ -71,6 +73,7 @@ func NewCheckoutSessionFromSnapshot(
 		TaxAmount:       taxAmount,
 		GrandTotal:      grandTotal,
 		Status:          status,
+		ContinueURL:     continueURL,
 		CompletedAt:     completedAt,
 	}
 	s.CreatedAt = createdAt
@@ -161,8 +164,22 @@ func (s *CheckoutSession) MarkReady() error {
 	return nil
 }
 
+func (s *CheckoutSession) Escalate(continueURL string) error {
+	if s.Status != CheckoutStatusIncomplete {
+		return kernel.NewDomainError(kernel.ErrInvalidArgument, "cannot escalate in current state: "+string(s.Status))
+	}
+	if continueURL == "" {
+		return kernel.NewDomainError(kernel.ErrInvalidArgument, "continue_url must not be empty")
+	}
+	s.Status = CheckoutStatusRequiresEscalation
+	s.ContinueURL = continueURL
+	s.touch()
+	s.AddEvent(CheckoutRequiresEscalationEvent{CheckoutID: s.ID, UserID: s.UserID, ContinueURL: continueURL})
+	return nil
+}
+
 func (s *CheckoutSession) Complete() error {
-	if s.Status != CheckoutStatusReadyForComplete {
+	if s.Status != CheckoutStatusReadyForComplete && s.Status != CheckoutStatusRequiresEscalation {
 		return kernel.NewDomainError(kernel.ErrInvalidArgument, "cannot complete checkout in current state: "+string(s.Status))
 	}
 	now := time.Now()
@@ -184,6 +201,10 @@ func (s *CheckoutSession) Cancel() error {
 	s.touch()
 	s.AddEvent(CheckoutCancelledEvent{CheckoutID: s.ID, UserID: s.UserID})
 	return nil
+}
+
+func (s *CheckoutSession) IsEscalationRequired() bool {
+	return s.Status == CheckoutStatusRequiresEscalation
 }
 
 func (s *CheckoutSession) recalculateTotal() {

@@ -127,6 +127,17 @@ func DefaultProfile() *Profile {
 					},
 				},
 			},
+			"dev.ucp.shopping.ecp": {
+				Version: "1.0.0",
+				Bindings: CapabilityBindings{
+					REST: &RESTBinding{
+						BaseURL: "/api/v1/checkouts",
+						Endpoints: map[string]string{
+							"complete": "POST /{id}/complete",
+						},
+					},
+				},
+			},
 		},
 		Authentication: AuthenticationInfo{
 			OAuth2: OAuth2Config{

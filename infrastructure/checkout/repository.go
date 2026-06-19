@@ -55,6 +55,7 @@ type sessionRow struct {
 	TaxAmount       int64          `db:"tax_amount"`
 	GrandTotal      int64          `db:"grand_total"`
 	Status          string         `db:"status"`
+	ContinueURL     string         `db:"continue_url"`
 	CompletedAt     *time.Time     `db:"completed_at"`
 	CreatedAt       time.Time      `db:"created_at"`
 	UpdatedAt       time.Time      `db:"updated_at"`
@@ -109,6 +110,7 @@ func (r sessionRow) toDomain() (*domain.CheckoutSession, error) {
 		r.TaxAmount,
 		r.GrandTotal,
 		domain.CheckoutStatus(r.Status),
+		r.ContinueURL,
 		r.CompletedAt,
 		r.CreatedAt,
 		r.UpdatedAt,
@@ -160,6 +162,7 @@ func fromDomain(s *domain.CheckoutSession) (sessionRow, error) {
 		TaxAmount:       s.TaxAmount,
 		GrandTotal:      s.GrandTotal,
 		Status:          string(s.Status),
+		ContinueURL:     s.ContinueURL,
 		CompletedAt:     s.CompletedAt,
 		CreatedAt:       s.CreatedAt,
 		UpdatedAt:       s.UpdatedAt,
@@ -187,8 +190,8 @@ func (r *PostgresCheckoutRepository) Save(ctx context.Context, session *domain.C
 	}
 
 	_, err = r.db.ExecContext(ctx, `
-		INSERT INTO checkout_sessions (id, user_id, cart_id, cart_snapshot, shipping_address, billing_address, shipping_option, payment_handler, subtotal, shipping_cost, tax_amount, grand_total, status, completed_at, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+		INSERT INTO checkout_sessions (id, user_id, cart_id, cart_snapshot, shipping_address, billing_address, shipping_option, payment_handler, subtotal, shipping_cost, tax_amount, grand_total, status, continue_url, completed_at, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
 		ON CONFLICT (id) DO UPDATE SET
 			user_id = EXCLUDED.user_id,
 			cart_id = EXCLUDED.cart_id,
@@ -202,9 +205,10 @@ func (r *PostgresCheckoutRepository) Save(ctx context.Context, session *domain.C
 			tax_amount = EXCLUDED.tax_amount,
 			grand_total = EXCLUDED.grand_total,
 			status = EXCLUDED.status,
+			continue_url = EXCLUDED.continue_url,
 			completed_at = EXCLUDED.completed_at,
 			updated_at = EXCLUDED.updated_at
-	`, row.ID, row.UserID, row.CartID, row.CartSnapshot, row.ShippingAddress, row.BillingAddress, row.ShippingOption, row.PaymentHandler, row.Subtotal, row.ShippingCost, row.TaxAmount, row.GrandTotal, row.Status, row.CompletedAt, row.CreatedAt, row.UpdatedAt)
+	`, row.ID, row.UserID, row.CartID, row.CartSnapshot, row.ShippingAddress, row.BillingAddress, row.ShippingOption, row.PaymentHandler, row.Subtotal, row.ShippingCost, row.TaxAmount, row.GrandTotal, row.Status, row.ContinueURL, row.CompletedAt, row.CreatedAt, row.UpdatedAt)
 	if err != nil {
 		return kernel.NewDomainErrorWithCause(kernel.ErrInternal, "save checkout session", err)
 	}

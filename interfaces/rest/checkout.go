@@ -313,6 +313,10 @@ func (h *CheckoutHandler) SelectPaymentHandler(w http.ResponseWriter, r *http.Re
 	writeCheckoutResponse(w, http.StatusOK, session)
 }
 
+type completeCheckoutRequest struct {
+	ContinueURL string `json:"continue_url,omitempty"`
+}
+
 func (h *CheckoutHandler) Complete(w http.ResponseWriter, r *http.Request) {
 	userID, err := userIDFromContext(r)
 	if err != nil {
@@ -328,7 +332,10 @@ func (h *CheckoutHandler) Complete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	session, err := h.svc.GetCheckout(r.Context(), kernel.ID(id))
+	var req completeCheckoutRequest
+	json.NewDecoder(r.Body).Decode(&req)
+
+	session, escalated, err := h.svc.StartComplete(r.Context(), kernel.ID(id), req.ContinueURL)
 	if err != nil {
 		writeDomainError(w, err)
 		return
@@ -338,15 +345,15 @@ func (h *CheckoutHandler) Complete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	session, err = h.svc.MarkReady(r.Context(), kernel.ID(id))
-	if err != nil {
-		writeDomainError(w, err)
-		return
-	}
-
-	session, err = h.svc.Complete(r.Context(), kernel.ID(id))
-	if err != nil {
-		writeDomainError(w, err)
+	if escalated {
+		resp := map[string]any{
+			"checkout_id":  session.ID.Int64(),
+			"status":       string(session.Status),
+			"continue_url": session.ContinueURL,
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusAccepted)
+		json.NewEncoder(w).Encode(resp)
 		return
 	}
 

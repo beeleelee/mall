@@ -4,6 +4,7 @@ go 1.26.2
 
 require (
 	github.com/golang-jwt/jwt/v4 v4.5.2
+	github.com/gorilla/websocket v1.5.3
 	github.com/jackc/pgx/v5 v5.9.2
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/nats-io/nats.go v1.52.0

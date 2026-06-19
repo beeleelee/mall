@@ -1,0 +1,1 @@
+ALTER TABLE checkout_sessions ADD COLUMN IF NOT EXISTS continue_url TEXT NOT NULL DEFAULT '';

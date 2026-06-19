@@ -213,6 +213,52 @@ func (s *CheckoutService) MarkReady(ctx context.Context, id kernel.ID) (*Checkou
 	return session, nil
 }
 
+func (s *CheckoutService) StartComplete(ctx context.Context, id kernel.ID, continueURL string) (*CheckoutSession, bool, error) {
+	ctx, span := tracer.Start(ctx, "checkout.start_complete",
+		trace.WithAttributes(attribute.Int64("checkout_id", id.Int64())),
+	)
+	defer span.End()
+
+	session, err := s.repo.FindByID(ctx, id)
+	if err != nil {
+		return nil, false, err
+	}
+
+	if session.Status != CheckoutStatusIncomplete {
+		return nil, false, kernel.NewDomainError(kernel.ErrInvalidArgument, "cannot start complete in current state: "+string(session.Status))
+	}
+
+	if session.ShippingAddress == nil || session.BillingAddress == nil ||
+		session.ShippingOption == nil || session.PaymentHandler == "" {
+		return nil, false, kernel.NewDomainError(kernel.ErrInvalidArgument, "shipping address, billing address, shipping option, and payment handler required")
+	}
+
+	if continueURL != "" {
+		if err := session.Escalate(continueURL); err != nil {
+			return nil, false, err
+		}
+		if err := s.repo.Save(ctx, session); err != nil {
+			return nil, false, err
+		}
+		s.publishEvents(ctx, session)
+		return session, true, nil
+	}
+
+	if err := session.MarkReady(); err != nil {
+		return nil, false, err
+	}
+	if err := session.Complete(); err != nil {
+		return nil, false, err
+	}
+
+	if err := s.repo.Save(ctx, session); err != nil {
+		return nil, false, err
+	}
+	s.publishEvents(ctx, session)
+	s.logger.Info(ctx, "checkout.completed", kernel.Field("checkout_id", session.ID.String()), kernel.Field("user_id", session.UserID.String()))
+	return session, false, nil
+}
+
 func (s *CheckoutService) Complete(ctx context.Context, id kernel.ID) (*CheckoutSession, error) {
 	ctx, span := tracer.Start(ctx, "checkout.complete",
 		trace.WithAttributes(attribute.Int64("checkout_id", id.Int64())),
@@ -265,7 +311,7 @@ func (s *CheckoutService) publishEvents(ctx context.Context, session *CheckoutSe
 		s.logger.Info(ctx, "checkout.event", kernel.Field("event", event.EventName()), kernel.Field("checkout_id", session.ID.String()))
 
 		name := event.EventName()
-		if name == "checkout.ready_for_complete" || name == "checkout.completed" || name == "checkout.cancelled" {
+		if name == "checkout.ready_for_complete" || name == "checkout.requires_escalation" || name == "checkout.completed" || name == "checkout.cancelled" {
 			if err := s.publisher.PublishCheckoutUpdated(ctx, session); err != nil {
 				s.logger.Error(ctx, "checkout.publish failed", err, kernel.Field("checkout_id", session.ID.String()))
 			}

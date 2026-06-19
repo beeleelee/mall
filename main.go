@@ -151,6 +151,7 @@ func main() {
 	checkoutPub := infraCheckout.NewNATSCheckoutEventPublisher(js)
 	checkoutSvc := domainCheckout.NewCheckoutService(checkoutRepo, defaultTaxSvc, defaultPriceCalc, checkoutPub, logger)
 	checkoutHandler := rest.NewCheckoutHandler(checkoutSvc, sf)
+	checkoutWSHandler := rest.NewCheckoutWSHandler(checkoutSvc, logger)
 
 	orderRepo := infraOrder.NewPostgresOrderRepository(db, rdb)
 	orderPub := infraOrder.NewNATSOrderEventPublisher(js)
@@ -229,7 +230,7 @@ func main() {
 		Timeout: 30000,
 	})
 
-	supportedCaps := []string{"dev.ucp.shopping.catalog", "dev.ucp.shopping.cart", "dev.ucp.shopping.checkout", "dev.ucp.shopping.order"}
+	supportedCaps := []string{"dev.ucp.shopping.catalog", "dev.ucp.shopping.cart", "dev.ucp.shopping.checkout", "dev.ucp.shopping.order", "dev.ucp.shopping.ecp"}
 	srv.Use(gozerorest.ToMiddleware(middleware.UCPAgentMiddleware))
 	srv.Use(gozerorest.ToMiddleware(middleware.NegotiationMiddleware(supportedCaps)))
 
@@ -378,6 +379,12 @@ func main() {
 		Method:  http.MethodPost,
 		Path:    "/api/v1/checkouts/:id/cancel",
 		Handler: auth(http.HandlerFunc(checkoutHandler.Cancel)).ServeHTTP,
+	})
+
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodGet,
+		Path:    "/ws/checkout/:id",
+		Handler: auth(http.HandlerFunc(checkoutWSHandler.ServeWS)).ServeHTTP,
 	})
 
 	srv.AddRoute(gozerorest.Route{
