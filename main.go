@@ -442,7 +442,27 @@ func main() {
 
 	<-quit
 	fmt.Println("\nShutting down...")
-	srv.Stop()
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	done := make(chan struct{}, 1)
+	go func() {
+		if err := nc.Drain(); err != nil {
+			logger.Error(shutdownCtx, "nats drain failed", err)
+		}
+		srv.Stop()
+		rdb.Close()
+		db.Close()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		fmt.Println("Shutdown complete")
+	case <-shutdownCtx.Done():
+		fmt.Println("Shutdown timed out, forcing exit")
+	}
 }
 
 func seedOAuthClient(repo domainOAuth.OAuthClientRepository, logger kernel.Logger) {
