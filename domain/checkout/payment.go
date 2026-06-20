@@ -39,6 +39,30 @@ func NewPaymentHandlerRegistry() *PaymentHandlerRegistry {
 				SupportedRegions: []string{"*"},
 				RequiresAP2:      true,
 			},
+			{
+				Name:             "shop_pay",
+				Provider:         "shopify",
+				Capabilities:     []string{"payment", "wallet", "express"},
+				SupportedRegions: []string{"US", "CA", "GB", "AU"},
+				RequiresAP2:      false,
+				MaxAmount:        99999900,
+			},
+			{
+				Name:             "google_pay",
+				Provider:         "google",
+				Capabilities:     []string{"payment", "wallet", "tokenization"},
+				SupportedRegions: []string{"US", "CA", "GB", "DE", "FR", "JP", "AU"},
+				RequiresAP2:      false,
+				MaxAmount:        99999900,
+			},
+			{
+				Name:             "apple_pay",
+				Provider:         "apple",
+				Capabilities:     []string{"payment", "wallet", "tokenization"},
+				SupportedRegions: []string{"US", "CA", "GB", "FR", "DE", "AU", "JP", "SG"},
+				RequiresAP2:      false,
+				MaxAmount:        99999900,
+			},
 		},
 	}
 }
@@ -65,11 +89,18 @@ func (r *PaymentHandlerRegistry) Negotiate(amount int64, region string, requeste
 	}
 
 	for _, h := range r.handlers {
-		if !h.RequiresAP2 && h.MaxAmount > 0 && amount <= h.MaxAmount {
-			for _, reg := range h.SupportedRegions {
-				if reg == "*" || reg == region {
-					return &h
-				}
+		if h.RequiresAP2 {
+			continue
+		}
+		if h.MaxAmount > 0 && amount > h.MaxAmount {
+			continue
+		}
+		if h.MinAmount > 0 && amount < h.MinAmount {
+			continue
+		}
+		for _, reg := range h.SupportedRegions {
+			if reg == "*" || reg == region {
+				return &h
 			}
 		}
 	}
