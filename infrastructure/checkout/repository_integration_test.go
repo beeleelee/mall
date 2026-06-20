@@ -108,6 +108,8 @@ CREATE TABLE IF NOT EXISTS checkout_sessions (
     tax_amount       BIGINT NOT NULL DEFAULT 0,
     grand_total      BIGINT NOT NULL DEFAULT 0,
     status           TEXT NOT NULL DEFAULT 'incomplete',
+    continue_url     TEXT NOT NULL DEFAULT '',
+    mandate_id       BIGINT NOT NULL DEFAULT 0,
     completed_at     TIMESTAMPTZ,
     created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at       TIMESTAMPTZ NOT NULL DEFAULT now()
