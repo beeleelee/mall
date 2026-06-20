@@ -40,6 +40,8 @@ import (
 	infraOAuth "github.com/beeleelee/mall/infrastructure/oauth"
 	"github.com/beeleelee/mall/infrastructure/tracing"
 	infraOrder "github.com/beeleelee/mall/infrastructure/order"
+	infraPayment "github.com/beeleelee/mall/infrastructure/payment"
+	domainPayment "github.com/beeleelee/mall/domain/payment"
 	"github.com/beeleelee/mall/interfaces/mcp"
 	"github.com/beeleelee/mall/interfaces/middleware"
 	"github.com/beeleelee/mall/interfaces/rest"
@@ -167,6 +169,10 @@ func main() {
 	webhookRepo := infraOrder.NewPostgresWebhookRepository(db)
 	webhookSvc := domainOrder.NewWebhookService(webhookRepo, sf)
 	webhookHandler := rest.NewWebhookHandler(webhookSvc)
+
+	mandateRepo := infraPayment.NewPostgresMandateRepository(db)
+	paymentSvc := domainPayment.NewPaymentService(mandateRepo, logger)
+	paymentHandler := rest.NewPaymentHandler(paymentSvc, sf)
 
 	saga := appOrder.NewCheckoutCompletedSaga(orderSvc, sf, logger)
 
@@ -455,6 +461,42 @@ func main() {
 		Method:  http.MethodDelete,
 		Path:    "/api/v1/webhooks/:id",
 		Handler: auth(http.HandlerFunc(webhookHandler.Delete)).ServeHTTP,
+	})
+
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPost,
+		Path:    "/api/v1/payments/mandates",
+		Handler: auth(http.HandlerFunc(paymentHandler.CreateMandate)).ServeHTTP,
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodGet,
+		Path:    "/api/v1/payments/mandates",
+		Handler: auth(http.HandlerFunc(paymentHandler.ListMandates)).ServeHTTP,
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodGet,
+		Path:    "/api/v1/payments/mandates/:id",
+		Handler: auth(http.HandlerFunc(paymentHandler.GetMandate)).ServeHTTP,
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPost,
+		Path:    "/api/v1/payments/mandates/:id/approve",
+		Handler: auth(http.HandlerFunc(paymentHandler.ApproveMandate)).ServeHTTP,
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPost,
+		Path:    "/api/v1/payments/mandates/:id/execute",
+		Handler: auth(http.HandlerFunc(paymentHandler.ExecuteMandate)).ServeHTTP,
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPost,
+		Path:    "/api/v1/payments/mandates/:id/settle",
+		Handler: auth(http.HandlerFunc(paymentHandler.SettleMandate)).ServeHTTP,
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPost,
+		Path:    "/api/v1/payments/mandates/:id/cancel",
+		Handler: auth(http.HandlerFunc(paymentHandler.CancelMandate)).ServeHTTP,
 	})
 
 	quit := make(chan os.Signal, 1)
