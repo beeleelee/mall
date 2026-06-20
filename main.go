@@ -41,7 +41,9 @@ import (
 	"github.com/beeleelee/mall/infrastructure/tracing"
 	infraOrder "github.com/beeleelee/mall/infrastructure/order"
 	infraPayment "github.com/beeleelee/mall/infrastructure/payment"
+	infraDiscount "github.com/beeleelee/mall/infrastructure/discount"
 	domainPayment "github.com/beeleelee/mall/domain/payment"
+	domainDiscount "github.com/beeleelee/mall/domain/discount"
 	"github.com/beeleelee/mall/interfaces/mcp"
 	"github.com/beeleelee/mall/interfaces/middleware"
 	"github.com/beeleelee/mall/interfaces/rest"
@@ -173,6 +175,10 @@ func main() {
 	mandateRepo := infraPayment.NewPostgresMandateRepository(db)
 	paymentSvc := domainPayment.NewPaymentService(mandateRepo, logger)
 	paymentHandler := rest.NewPaymentHandler(paymentSvc, sf)
+
+	discountRepo := infraDiscount.NewPostgresDiscountRepository(db)
+	discountSvc := domainDiscount.NewDiscountService(discountRepo, logger)
+	discountHandler := rest.NewDiscountHandler(discountSvc, sf)
 
 	saga := appOrder.NewCheckoutCompletedSaga(orderSvc, sf, logger)
 
@@ -497,6 +503,27 @@ func main() {
 		Method:  http.MethodPost,
 		Path:    "/api/v1/payments/mandates/:id/cancel",
 		Handler: auth(http.HandlerFunc(paymentHandler.CancelMandate)).ServeHTTP,
+	})
+
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPost,
+		Path:    "/api/v1/discounts",
+		Handler: auth(http.HandlerFunc(discountHandler.Create)).ServeHTTP,
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPost,
+		Path:    "/api/v1/discounts/validate",
+		Handler: auth(http.HandlerFunc(discountHandler.Validate)).ServeHTTP,
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPost,
+		Path:    "/api/v1/discounts/apply",
+		Handler: auth(http.HandlerFunc(discountHandler.Apply)).ServeHTTP,
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPost,
+		Path:    "/api/v1/discounts/deactivate",
+		Handler: auth(http.HandlerFunc(discountHandler.Deactivate)).ServeHTTP,
 	})
 
 	quit := make(chan os.Signal, 1)
