@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mall-postgres
+  namespace: mall
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mall-postgres
+  template:
+    metadata:
+      labels:
+        app: mall-postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              value: mall
+            - name: POSTGRES_PASSWORD
+              value: mall_dev
+            - name: POSTGRES_DB
+              value: mall
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+          resources:
+            requests:
+              cpu: 200m
+              memory: 256Mi
+            limits:
+              cpu: 1
+              memory: 1Gi
+      volumes:
+        - name: data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mall-postgres
+  namespace: mall
+spec:
+  selector:
+    app: mall-postgres
+  ports:
+    - protocol: TCP
+      port: 5432
+      targetPort: 5432

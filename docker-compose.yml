@@ -172,6 +172,84 @@ services:
       - "--web.console.libraries=/usr/share/prometheus/console_libraries"
       - "--web.console.templates=/usr/share/prometheus/consoles"
 
+  pgbouncer:
+    image: bitnami/pgbouncer:1.23
+    container_name: mall-pgbouncer
+    restart: unless-stopped
+    ports:
+      - "6432:6432"
+    environment:
+      POSTGRESQL_HOST: postgres
+      POSTGRESQL_PORT: 5432
+      POSTGRESQL_USERNAME: ${POSTGRES_USER:-mall}
+      POSTGRESQL_PASSWORD: ${POSTGRES_PASSWORD:-mall_dev}
+      POSTGRESQL_DATABASE: ${POSTGRES_DB:-mall}
+      PGBOUNCER_POOL_MODE: transaction
+      PGBOUNCER_DEFAULT_POOL_SIZE: "25"
+      PGBOUNCER_MAX_CLIENT_CONN: "100"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  nats-1:
+    image: nats:2.10-alpine
+    container_name: mall-nats-1
+    restart: unless-stopped
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    command:
+      - "--jetstream"
+      - "--http_port=8222"
+      - "--cluster_name=mall"
+      - "--cluster=nats://0.0.0.0:6222"
+      - "--routes=nats://mall-nats-1:6222,nats://mall-nats-2:6222,nats://mall-nats-3:6222"
+    volumes:
+      - nats1data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8222/healthz || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  nats-2:
+    image: nats:2.10-alpine
+    container_name: mall-nats-2
+    restart: unless-stopped
+    ports:
+      - "4223:4222"
+      - "8223:8222"
+    command:
+      - "--jetstream"
+      - "--http_port=8222"
+      - "--cluster_name=mall"
+      - "--cluster=nats://0.0.0.0:6222"
+      - "--routes=nats://mall-nats-1:6222,nats://mall-nats-2:6222,nats://mall-nats-3:6222"
+    volumes:
+      - nats2data:/data
+    depends_on:
+      nats-1:
+        condition: service_started
+
+  nats-3:
+    image: nats:2.10-alpine
+    container_name: mall-nats-3
+    restart: unless-stopped
+    ports:
+      - "4224:4222"
+      - "8224:8222"
+    command:
+      - "--jetstream"
+      - "--http_port=8222"
+      - "--cluster_name=mall"
+      - "--cluster=nats://0.0.0.0:6222"
+      - "--routes=nats://mall-nats-1:6222,nats://mall-nats-2:6222,nats://mall-nats-3:6222"
+    volumes:
+      - nats3data:/data
+    depends_on:
+      nats-1:
+        condition: service_started
+
   jaeger:
     image: jaegertracing/all-in-one:1.60
     container_name: mall-jaeger
@@ -188,6 +266,9 @@ volumes:
   pgdata:
   redisdata:
   natsdata:
+  nats1data:
+  nats2data:
+  nats3data:
   etcddata:
   miniodata:
   quickwitdata:

@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mall-config
+  namespace: mall
+data:
+  PORT: "8080"
+  DATABASE_URL: "postgres://mall:mall_dev@mall-postgres:5432/mall?sslmode=disable"
+  REDIS_ADDR: "mall-redis:6379"
+  NATS_URL: "nats://mall-nats:4222"

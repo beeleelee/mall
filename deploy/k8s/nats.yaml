@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mall-nats
+  namespace: mall
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mall-nats
+  template:
+    metadata:
+      labels:
+        app: mall-nats
+    spec:
+      containers:
+        - name: nats
+          image: nats:2.10-alpine
+          args:
+            - "--jetstream"
+            - "--store_dir=/data"
+          ports:
+            - containerPort: 4222
+              name: client
+            - containerPort: 8222
+              name: http
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          resources:
+            requests:
+              cpu: 100m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+      volumes:
+        - name: data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mall-nats
+  namespace: mall
+spec:
+  selector:
+    app: mall-nats
+  ports:
+    - protocol: TCP
+      port: 4222
+      targetPort: 4222
+      name: client
+    - protocol: TCP
+      port: 8222
+      targetPort: 8222
+      name: http
