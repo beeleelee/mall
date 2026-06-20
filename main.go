@@ -42,6 +42,7 @@ import (
 	infraOrder "github.com/beeleelee/mall/infrastructure/order"
 	infraPayment "github.com/beeleelee/mall/infrastructure/payment"
 	infraDiscount "github.com/beeleelee/mall/infrastructure/discount"
+	infraFulfillment "github.com/beeleelee/mall/infrastructure/fulfillment"
 	domainPayment "github.com/beeleelee/mall/domain/payment"
 	domainDiscount "github.com/beeleelee/mall/domain/discount"
 	"github.com/beeleelee/mall/interfaces/mcp"
@@ -179,6 +180,9 @@ func main() {
 	discountRepo := infraDiscount.NewPostgresDiscountRepository(db)
 	discountSvc := domainDiscount.NewDiscountService(discountRepo, logger)
 	discountHandler := rest.NewDiscountHandler(discountSvc, sf)
+
+	fulfillmentSvc := infraFulfillment.NewDefaultFulfillmentService()
+	fulfillmentHandler := rest.NewFulfillmentHandler(fulfillmentSvc)
 
 	saga := appOrder.NewCheckoutCompletedSaga(orderSvc, sf, logger)
 
@@ -524,6 +528,12 @@ func main() {
 		Method:  http.MethodPost,
 		Path:    "/api/v1/discounts/deactivate",
 		Handler: auth(http.HandlerFunc(discountHandler.Deactivate)).ServeHTTP,
+	})
+
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPost,
+		Path:    "/api/v1/fulfillment/rates",
+		Handler: auth(http.HandlerFunc(fulfillmentHandler.CalculateRates)).ServeHTTP,
 	})
 
 	quit := make(chan os.Signal, 1)
