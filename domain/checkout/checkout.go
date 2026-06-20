@@ -15,6 +15,7 @@ type CheckoutSession struct {
 	BillingAddress  *Address
 	ShippingOption  *ShippingOption
 	PaymentHandler  string
+	MandateID       kernel.ID
 	Subtotal        int64
 	ShippingCost    int64
 	TaxAmount       int64
@@ -53,6 +54,7 @@ func NewCheckoutSessionFromSnapshot(
 	shippingAddress, billingAddress *Address,
 	shippingOption *ShippingOption,
 	paymentHandler string,
+	mandateID kernel.ID,
 	subtotal, shippingCost, taxAmount, grandTotal int64,
 	status CheckoutStatus,
 	continueURL string,
@@ -68,6 +70,7 @@ func NewCheckoutSessionFromSnapshot(
 		BillingAddress:  billingAddress,
 		ShippingOption:  shippingOption,
 		PaymentHandler:  paymentHandler,
+		MandateID:       mandateID,
 		Subtotal:        subtotal,
 		ShippingCost:    shippingCost,
 		TaxAmount:       taxAmount,
@@ -175,6 +178,18 @@ func (s *CheckoutSession) Escalate(continueURL string) error {
 	s.ContinueURL = continueURL
 	s.touch()
 	s.AddEvent(CheckoutRequiresEscalationEvent{CheckoutID: s.ID, UserID: s.UserID, ContinueURL: continueURL})
+	return nil
+}
+
+func (s *CheckoutSession) SelectMandate(mandateID kernel.ID) error {
+	if s.Status != CheckoutStatusIncomplete {
+		return kernel.NewDomainError(kernel.ErrInvalidArgument, "can only select mandate when incomplete")
+	}
+	if mandateID <= 0 {
+		return kernel.NewDomainError(kernel.ErrInvalidArgument, "mandate_id must be positive")
+	}
+	s.MandateID = mandateID
+	s.touch()
 	return nil
 }
 

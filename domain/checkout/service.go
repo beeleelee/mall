@@ -12,12 +12,17 @@ import (
 
 var tracer = otel.Tracer("mall.domain.checkout")
 
+type MandateVerifier interface {
+	VerifyAndExecute(ctx context.Context, mandateID, userID kernel.ID, amount int64) error
+}
+
 type CheckoutService struct {
-	repo      CheckoutRepository
-	taxSvc    TaxService
-	priceCalc PriceCalculator
-	publisher CheckoutEventPublisher
-	logger    kernel.Logger
+	repo           CheckoutRepository
+	taxSvc         TaxService
+	priceCalc      PriceCalculator
+	publisher      CheckoutEventPublisher
+	logger         kernel.Logger
+	mandateVerifier MandateVerifier
 }
 
 func NewCheckoutService(
@@ -26,13 +31,15 @@ func NewCheckoutService(
 	priceCalc PriceCalculator,
 	publisher CheckoutEventPublisher,
 	logger kernel.Logger,
+	mandateVerifier MandateVerifier,
 ) *CheckoutService {
 	return &CheckoutService{
-		repo:      repo,
-		taxSvc:    taxSvc,
-		priceCalc: priceCalc,
-		publisher: publisher,
-		logger:    logger,
+		repo:            repo,
+		taxSvc:          taxSvc,
+		priceCalc:       priceCalc,
+		publisher:       publisher,
+		logger:          logger,
+		mandateVerifier: mandateVerifier,
 	}
 }
 
@@ -126,6 +133,24 @@ func (s *CheckoutService) SelectShippingOption(ctx context.Context, id kernel.ID
 	}
 
 	if err := session.SelectShippingOption(option); err != nil {
+		return nil, err
+	}
+
+	if err := s.repo.Save(ctx, session); err != nil {
+		return nil, err
+	}
+
+	s.publishEvents(ctx, session)
+	return session, nil
+}
+
+func (s *CheckoutService) SelectMandate(ctx context.Context, id kernel.ID, mandateID kernel.ID) (*CheckoutSession, error) {
+	session, err := s.repo.FindByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := session.SelectMandate(mandateID); err != nil {
 		return nil, err
 	}
 
@@ -234,6 +259,12 @@ func (s *CheckoutService) StartComplete(ctx context.Context, id kernel.ID, conti
 	}
 
 	if continueURL != "" {
+		if session.PaymentHandler == "ap2_mandate" && s.mandateVerifier != nil && session.MandateID > 0 {
+			if err := s.mandateVerifier.VerifyAndExecute(ctx, session.MandateID, session.UserID, session.GrandTotal); err != nil {
+				return nil, false, err
+			}
+		}
+
 		if err := session.Escalate(continueURL); err != nil {
 			return nil, false, err
 		}
@@ -242,6 +273,12 @@ func (s *CheckoutService) StartComplete(ctx context.Context, id kernel.ID, conti
 		}
 		s.publishEvents(ctx, session)
 		return session, true, nil
+	}
+
+	if session.PaymentHandler == "ap2_mandate" && s.mandateVerifier != nil && session.MandateID > 0 {
+		if err := s.mandateVerifier.VerifyAndExecute(ctx, session.MandateID, session.UserID, session.GrandTotal); err != nil {
+			return nil, false, err
+		}
 	}
 
 	if err := session.MarkReady(); err != nil {
@@ -268,6 +305,12 @@ func (s *CheckoutService) Complete(ctx context.Context, id kernel.ID) (*Checkout
 	session, err := s.repo.FindByID(ctx, id)
 	if err != nil {
 		return nil, err
+	}
+
+	if session.PaymentHandler == "ap2_mandate" && s.mandateVerifier != nil && session.MandateID > 0 {
+		if err := s.mandateVerifier.VerifyAndExecute(ctx, session.MandateID, session.UserID, session.GrandTotal); err != nil {
+			return nil, err
+		}
 	}
 
 	if err := session.Complete(); err != nil {

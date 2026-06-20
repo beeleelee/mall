@@ -85,7 +85,7 @@ func newTestCheckoutHandler(t *testing.T) *CheckoutHandler {
 	logger := fakeLog{}
 	taxSvc := fakeTaxService{}
 	priceCalc := fakePriceCalculator{}
-	svc := domain.NewCheckoutService(repo, taxSvc, priceCalc, pub, logger)
+	svc := domain.NewCheckoutService(repo, taxSvc, priceCalc, pub, logger, nil)
 	sf, err := kernel.NewSnowflake(1)
 	if err != nil {
 		t.Fatalf("NewSnowflake failed: %v", err)

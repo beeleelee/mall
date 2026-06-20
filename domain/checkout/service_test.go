@@ -14,6 +14,7 @@ func checkoutTestService() *CheckoutService {
 		fakePriceCalculator{},
 		newFakePublisher(),
 		fakeLoggerCheckout{},
+		nil,
 	)
 }
 

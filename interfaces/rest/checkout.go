@@ -313,6 +313,50 @@ func (h *CheckoutHandler) SelectPaymentHandler(w http.ResponseWriter, r *http.Re
 	writeCheckoutResponse(w, http.StatusOK, session)
 }
 
+type selectMandateInput struct {
+	MandateID int64 `json:"mandate_id"`
+}
+
+func (h *CheckoutHandler) SelectMandate(w http.ResponseWriter, r *http.Request) {
+	userID, err := userIDFromContext(r)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+
+	vars := pathvar.Vars(r)
+	idStr := vars["id"]
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		writeDomainError(w, kernel.NewDomainError(kernel.ErrInvalidArgument, "invalid checkout id"))
+		return
+	}
+
+	session, err := h.svc.GetCheckout(r.Context(), kernel.ID(id))
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+	if session.UserID != userID {
+		writeDomainError(w, kernel.NewDomainError(kernel.ErrPermissionDenied, "checkout does not belong to user"))
+		return
+	}
+
+	var req selectMandateInput
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpx.Error(w, err)
+		return
+	}
+
+	session, err = h.svc.SelectMandate(r.Context(), kernel.ID(id), kernel.ID(req.MandateID))
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+
+	writeCheckoutResponse(w, http.StatusOK, session)
+}
+
 type completeCheckoutRequest struct {
 	ContinueURL string `json:"continue_url,omitempty"`
 }

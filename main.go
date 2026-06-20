@@ -160,7 +160,13 @@ func main() {
 	defaultPriceCalc := domainCheckout.NewDefaultPriceCalculator()
 	checkoutRepo := infraCheckout.NewPostgresCheckoutRepository(db, rdb)
 	checkoutPub := infraCheckout.NewNATSCheckoutEventPublisher(js)
-	checkoutSvc := domainCheckout.NewCheckoutService(checkoutRepo, defaultTaxSvc, defaultPriceCalc, checkoutPub, logger)
+
+	mandateRepo := infraPayment.NewPostgresMandateRepository(db)
+	paymentSvc := domainPayment.NewPaymentService(mandateRepo, logger)
+	paymentHandler := rest.NewPaymentHandler(paymentSvc, sf)
+
+	mandateVerifier := infraCheckout.NewCheckoutMandateVerifier(paymentSvc)
+	checkoutSvc := domainCheckout.NewCheckoutService(checkoutRepo, defaultTaxSvc, defaultPriceCalc, checkoutPub, logger, mandateVerifier)
 	checkoutHandler := rest.NewCheckoutHandler(checkoutSvc, sf)
 	checkoutWSHandler := rest.NewCheckoutWSHandler(checkoutSvc, logger)
 
@@ -172,10 +178,6 @@ func main() {
 	webhookRepo := infraOrder.NewPostgresWebhookRepository(db)
 	webhookSvc := domainOrder.NewWebhookService(webhookRepo, sf)
 	webhookHandler := rest.NewWebhookHandler(webhookSvc)
-
-	mandateRepo := infraPayment.NewPostgresMandateRepository(db)
-	paymentSvc := domainPayment.NewPaymentService(mandateRepo, logger)
-	paymentHandler := rest.NewPaymentHandler(paymentSvc, sf)
 
 	discountRepo := infraDiscount.NewPostgresDiscountRepository(db)
 	discountSvc := domainDiscount.NewDiscountService(discountRepo, logger)
@@ -403,6 +405,11 @@ func main() {
 		Method:  http.MethodPost,
 		Path:    "/api/v1/checkouts/:id/payment-handler",
 		Handler: auth(http.HandlerFunc(checkoutHandler.SelectPaymentHandler)).ServeHTTP,
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPost,
+		Path:    "/api/v1/checkouts/:id/mandate",
+		Handler: auth(http.HandlerFunc(checkoutHandler.SelectMandate)).ServeHTTP,
 	})
 	srv.AddRoute(gozerorest.Route{
 		Method:  http.MethodPost,
