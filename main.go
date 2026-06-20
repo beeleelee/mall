@@ -36,11 +36,13 @@ import (
 	"github.com/beeleelee/mall/infrastructure/database"
 	infraIdentity "github.com/beeleelee/mall/infrastructure/identity"
 	"github.com/beeleelee/mall/infrastructure/logging"
+	"github.com/beeleelee/mall/infrastructure/metrics"
 	infraOAuth "github.com/beeleelee/mall/infrastructure/oauth"
 	infraOrder "github.com/beeleelee/mall/infrastructure/order"
 	"github.com/beeleelee/mall/interfaces/mcp"
 	"github.com/beeleelee/mall/interfaces/middleware"
 	"github.com/beeleelee/mall/interfaces/rest"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 func main() {
@@ -134,6 +136,9 @@ func main() {
 	}
 
 	healthHandler := rest.NewHealthHandler(db, rdb, nc)
+
+	metricsRecorder := metrics.NewPrometheusRecorder("mall")
+	metricsMW := middleware.NewMetricsMiddleware(metricsRecorder)
 
 	catalogRepo := infraCatalog.NewPostgresProductRepository(db, rdb)
 	catalogSvc := domainCatalog.NewCatalogService(catalogRepo, logger)
@@ -233,6 +238,7 @@ func main() {
 	supportedCaps := []string{"dev.ucp.shopping.catalog", "dev.ucp.shopping.cart", "dev.ucp.shopping.checkout", "dev.ucp.shopping.order", "dev.ucp.shopping.ecp", "dev.ucp.shopping.ap2_mandate", "dev.ucp.shopping.fulfillment", "dev.ucp.shopping.discount"}
 	srv.Use(gozerorest.ToMiddleware(middleware.UCPAgentMiddleware))
 	srv.Use(gozerorest.ToMiddleware(middleware.NegotiationMiddleware(supportedCaps)))
+	srv.Use(gozerorest.ToMiddleware(metricsMW.Wrap))
 
 	auth := middleware.AuthMiddleware(jwtSecret)
 
@@ -245,6 +251,11 @@ func main() {
 		Method:  http.MethodGet,
 		Path:    "/readyz",
 		Handler: healthHandler.Readyz,
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodGet,
+		Path:    "/metrics",
+		Handler: promhttp.Handler().ServeHTTP,
 	})
 	srv.AddRoute(gozerorest.Route{
 		Method:  http.MethodGet,
