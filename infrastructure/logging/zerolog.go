@@ -13,8 +13,9 @@ import (
 )
 
 type ZerologLogger struct {
-	log     zerolog.Logger
-	svcName string
+	log        zerolog.Logger
+	svcName    string
+	capability string
 }
 
 func NewZerologLogger(serviceName string) *ZerologLogger {
@@ -47,6 +48,14 @@ func NewZerologLogger(serviceName string) *ZerologLogger {
 	}
 
 	return &ZerologLogger{log: l, svcName: serviceName}
+}
+
+func (l *ZerologLogger) WithCapability(cap string) *ZerologLogger {
+	return &ZerologLogger{
+		log:        l.log.With().Str("capability", cap).Logger(),
+		svcName:    l.svcName,
+		capability: cap,
+	}
 }
 
 func (l *ZerologLogger) Debug(ctx context.Context, msg string, fields ...kernel.LogField) {
