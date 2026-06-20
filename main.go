@@ -38,6 +38,7 @@ import (
 	"github.com/beeleelee/mall/infrastructure/logging"
 	"github.com/beeleelee/mall/infrastructure/metrics"
 	infraOAuth "github.com/beeleelee/mall/infrastructure/oauth"
+	"github.com/beeleelee/mall/infrastructure/tracing"
 	infraOrder "github.com/beeleelee/mall/infrastructure/order"
 	"github.com/beeleelee/mall/interfaces/mcp"
 	"github.com/beeleelee/mall/interfaces/middleware"
@@ -181,7 +182,8 @@ func main() {
 
 		cons.Consume(func(msg jetstream.Msg) {
 			msg.Ack()
-			if err := saga.Handle(context.Background(), msg.Data()); err != nil {
+			ctx := tracing.ExtractFromJetStream(msg)
+			if err := saga.Handle(ctx, msg.Data()); err != nil {
 				log.Printf("saga: handle failed: %v", err)
 			}
 		})
@@ -201,9 +203,10 @@ func main() {
 
 		cons.Consume(func(msg jetstream.Msg) {
 			msg.Ack()
+			ctx := tracing.ExtractFromJetStream(msg)
 
 			subject := msg.Subject()
-			webhooks, err := webhookRepo.FindByEvent(context.Background(), subject)
+			webhooks, err := webhookRepo.FindByEvent(ctx, subject)
 			if err != nil || len(webhooks) == 0 {
 				return
 			}
@@ -212,7 +215,7 @@ func main() {
 				if !wh.Active {
 					continue
 				}
-				if err := webhookDeliverer.Deliver(context.Background(), wh, subject, msg.Data()); err != nil {
+				if err := webhookDeliverer.Deliver(ctx, wh, subject, msg.Data()); err != nil {
 					log.Printf("webhook delivery failed for %s (url=%s): %v", subject, wh.URL, err)
 				}
 			}

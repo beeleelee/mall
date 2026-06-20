@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/nats-io/nats.go"
+	"github.com/nats-io/nats.go/jetstream"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"
 )
@@ -17,4 +18,8 @@ func InjectTrace(ctx context.Context, msg *nats.Msg) {
 
 func ExtractTrace(msg *nats.Msg) context.Context {
 	return otel.GetTextMapPropagator().Extract(context.Background(), propagation.HeaderCarrier(msg.Header))
+}
+
+func ExtractFromJetStream(msg jetstream.Msg) context.Context {
+	return otel.GetTextMapPropagator().Extract(context.Background(), propagation.HeaderCarrier(msg.Headers()))
 }

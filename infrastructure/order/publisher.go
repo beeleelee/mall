@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 
 	"github.com/beeleelee/mall/domain/kernel"
 	domain "github.com/beeleelee/mall/domain/order"
+	"github.com/beeleelee/mall/infrastructure/tracing"
 )
 
 type NATSOrderEventPublisher struct {
@@ -39,7 +41,14 @@ func (p *NATSOrderEventPublisher) PublishOrderEvent(ctx context.Context, order *
 		return kernel.NewDomainErrorWithCause(kernel.ErrInternal, "marshal order event", err)
 	}
 
-	_, err = p.js.Publish(ctx, "order."+string(order.Status), data)
+	msg := &nats.Msg{
+		Subject: "order." + string(order.Status),
+		Data:    data,
+		Header:  nats.Header{},
+	}
+	tracing.InjectTrace(ctx, msg)
+
+	_, err = p.js.PublishMsg(ctx, msg)
 	if err != nil {
 		return kernel.NewDomainErrorWithCause(kernel.ErrInternal, "publish order event", err)
 	}
