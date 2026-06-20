@@ -43,12 +43,12 @@ func (e CheckoutCompletedEvent) OccurredAt() time.Time  { return time.Now() }
 func (e CheckoutCompletedEvent) AggregateID() kernel.ID { return e.CheckoutID }
 
 type CheckoutRequiresEscalationEvent struct {
-	CheckoutID kernel.ID
-	UserID     kernel.ID
+	CheckoutID  kernel.ID
+	UserID      kernel.ID
 	ContinueURL string
 }
 
-func (e CheckoutRequiresEscalationEvent) EventName() string     { return "checkout.requires_escalation" }
+func (e CheckoutRequiresEscalationEvent) EventName() string      { return "checkout.requires_escalation" }
 func (e CheckoutRequiresEscalationEvent) OccurredAt() time.Time  { return time.Now() }
 func (e CheckoutRequiresEscalationEvent) AggregateID() kernel.ID { return e.CheckoutID }
 
@@ -57,6 +57,6 @@ type CheckoutCancelledEvent struct {
 	UserID     kernel.ID
 }
 
-func (e CheckoutCancelledEvent) EventName() string     { return "checkout.cancelled" }
+func (e CheckoutCancelledEvent) EventName() string      { return "checkout.cancelled" }
 func (e CheckoutCancelledEvent) OccurredAt() time.Time  { return time.Now() }
 func (e CheckoutCancelledEvent) AggregateID() kernel.ID { return e.CheckoutID }

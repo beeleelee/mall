@@ -17,11 +17,11 @@ type MandateVerifier interface {
 }
 
 type CheckoutService struct {
-	repo           CheckoutRepository
-	taxSvc         TaxService
-	priceCalc      PriceCalculator
-	publisher      CheckoutEventPublisher
-	logger         kernel.Logger
+	repo            CheckoutRepository
+	taxSvc          TaxService
+	priceCalc       PriceCalculator
+	publisher       CheckoutEventPublisher
+	logger          kernel.Logger
 	mandateVerifier MandateVerifier
 }
 

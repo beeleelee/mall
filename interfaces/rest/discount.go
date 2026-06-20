@@ -86,8 +86,8 @@ func (h *DiscountHandler) Validate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	json.NewEncoder(w).Encode(map[string]any{
-		"valid":  valid,
-		"code":   discountResponse(dc),
+		"valid": valid,
+		"code":  discountResponse(dc),
 	})
 }
 
@@ -105,10 +105,10 @@ func (h *DiscountHandler) Apply(w http.ResponseWriter, r *http.Request) {
 	}
 
 	json.NewEncoder(w).Encode(map[string]any{
-		"applied":   applied,
-		"original":  req.Subtotal,
-		"final":     final,
-		"discount":  req.Subtotal - final,
+		"applied":  applied,
+		"original": req.Subtotal,
+		"final":    final,
+		"discount": req.Subtotal - final,
 	})
 }
 

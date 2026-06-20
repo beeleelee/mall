@@ -23,10 +23,10 @@ func NewPaymentHandler(svc *domain.PaymentService, sf *kernel.Snowflake) *Paymen
 }
 
 type createMandateRequest struct {
-	MandateID   int64   `json:"mandate_id,omitempty"`
-	MaxAmount   int64   `json:"max_amount"`
-	MerchantID  int64   `json:"merchant_id"`
-	Expiry      string  `json:"expiry"`
+	MandateID       int64    `json:"mandate_id,omitempty"`
+	MaxAmount       int64    `json:"max_amount"`
+	MerchantID      int64    `json:"merchant_id"`
+	Expiry          string   `json:"expiry"`
 	AllowedHandlers []string `json:"allowed_handlers,omitempty"`
 }
 
@@ -196,14 +196,14 @@ func (h *PaymentHandler) CancelMandate(w http.ResponseWriter, r *http.Request) {
 }
 
 type mandateResponseBody struct {
-	ID        int64  `json:"id"`
-	UserID    int64  `json:"user_id"`
-	Status    string `json:"status"`
-	MaxAmount int64  `json:"max_amount"`
-	MerchantID int64 `json:"merchant_id"`
-	Expiry    string `json:"expiry"`
-	Signature string `json:"signature,omitempty"`
-	Token     string `json:"token,omitempty"`
+	ID         int64  `json:"id"`
+	UserID     int64  `json:"user_id"`
+	Status     string `json:"status"`
+	MaxAmount  int64  `json:"max_amount"`
+	MerchantID int64  `json:"merchant_id"`
+	Expiry     string `json:"expiry"`
+	Signature  string `json:"signature,omitempty"`
+	Token      string `json:"token,omitempty"`
 }
 
 func mandateResponse(m *domain.Mandate) mandateResponseBody {

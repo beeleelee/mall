@@ -14,14 +14,14 @@ const (
 )
 
 type CircuitBreaker struct {
-	mu              sync.RWMutex
-	state           State
-	failureCount    int
-	successCount    int
+	mu               sync.RWMutex
+	state            State
+	failureCount     int
+	successCount     int
 	failureThreshold int
 	successThreshold int
-	timeout         time.Duration
-	lastFailure     time.Time
+	timeout          time.Duration
+	lastFailure      time.Time
 }
 
 func NewCircuitBreaker(failureThreshold, successThreshold int, timeout time.Duration) *CircuitBreaker {
@@ -43,7 +43,6 @@ func (cb *CircuitBreaker) Allow() bool {
 		if time.Since(cb.lastFailure) > cb.timeout {
 			cb.state = StateHalfOpen
 			cb.successCount = 0
-			state = StateHalfOpen
 		} else {
 			cb.mu.Unlock()
 			return false

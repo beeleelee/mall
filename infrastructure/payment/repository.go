@@ -8,8 +8,8 @@ import (
 
 	"github.com/jmoiron/sqlx"
 
-	domain "github.com/beeleelee/mall/domain/payment"
 	"github.com/beeleelee/mall/domain/kernel"
+	domain "github.com/beeleelee/mall/domain/payment"
 )
 
 type mandateRow struct {

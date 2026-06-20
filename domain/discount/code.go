@@ -15,15 +15,15 @@ const (
 
 type DiscountCode struct {
 	kernel.AggregateRoot
-	Code       string
-	Type       DiscountType
-	Value      int64
+	Code        string
+	Type        DiscountType
+	Value       int64
 	MinPurchase int64
-	MaxUsages  int
-	UsedCount  int
-	Expiry     time.Time
-	Active     bool
-	Stackable  bool
+	MaxUsages   int
+	UsedCount   int
+	Expiry      time.Time
+	Active      bool
+	Stackable   bool
 }
 
 func NewDiscountCode(id kernel.ID, code string, discountType DiscountType, value, minPurchase int64, maxUsages int, expiry time.Time, stackable bool) (*DiscountCode, error) {

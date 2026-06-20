@@ -8,10 +8,10 @@ type ECPMessage struct {
 }
 
 type ECPResponse struct {
-	JSONRPC string `json:"jsonrpc"`
-	Result  any    `json:"result,omitempty"`
+	JSONRPC string    `json:"jsonrpc"`
+	Result  any       `json:"result,omitempty"`
 	Error   *ECPError `json:"error,omitempty"`
-	ID      any    `json:"id,omitempty"`
+	ID      any       `json:"id,omitempty"`
 }
 
 type ECPError struct {
@@ -27,9 +27,9 @@ const (
 )
 
 type StateUpdateParams struct {
-	CheckoutID int64                  `json:"checkout_id"`
-	Status     string                 `json:"status"`
-	Fields     map[string]any         `json:"fields,omitempty"`
+	CheckoutID int64          `json:"checkout_id"`
+	Status     string         `json:"status"`
+	Fields     map[string]any `json:"fields,omitempty"`
 }
 
 type StateUpdateResult struct {

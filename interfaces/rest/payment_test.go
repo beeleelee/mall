@@ -166,7 +166,7 @@ func (r *fakePaymentRepo) Delete(_ context.Context, id kernel.ID) error {
 
 type fakeLoggerPayment struct{}
 
-func (fakeLoggerPayment) Debug(_ context.Context, _ string, _ ...kernel.LogField) {}
-func (fakeLoggerPayment) Info(_ context.Context, _ string, _ ...kernel.LogField)  {}
-func (fakeLoggerPayment) Warn(_ context.Context, _ string, _ ...kernel.LogField)  {}
+func (fakeLoggerPayment) Debug(_ context.Context, _ string, _ ...kernel.LogField)          {}
+func (fakeLoggerPayment) Info(_ context.Context, _ string, _ ...kernel.LogField)           {}
+func (fakeLoggerPayment) Warn(_ context.Context, _ string, _ ...kernel.LogField)           {}
 func (fakeLoggerPayment) Error(_ context.Context, _ string, _ error, _ ...kernel.LogField) {}

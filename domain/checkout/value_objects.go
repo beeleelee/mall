@@ -5,11 +5,11 @@ import "github.com/beeleelee/mall/domain/kernel"
 type CheckoutStatus string
 
 const (
-	CheckoutStatusIncomplete          CheckoutStatus = "incomplete"
-	CheckoutStatusReadyForComplete    CheckoutStatus = "ready_for_complete"
-	CheckoutStatusRequiresEscalation  CheckoutStatus = "requires_escalation"
-	CheckoutStatusCompleted           CheckoutStatus = "completed"
-	CheckoutStatusCancelled           CheckoutStatus = "cancelled"
+	CheckoutStatusIncomplete         CheckoutStatus = "incomplete"
+	CheckoutStatusReadyForComplete   CheckoutStatus = "ready_for_complete"
+	CheckoutStatusRequiresEscalation CheckoutStatus = "requires_escalation"
+	CheckoutStatusCompleted          CheckoutStatus = "completed"
+	CheckoutStatusCancelled          CheckoutStatus = "cancelled"
 )
 
 type CartSnapshotItem struct {

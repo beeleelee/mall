@@ -1,6 +1,7 @@
 package tracing
 
 import (
+	"context"
 	"os"
 
 	"go.opentelemetry.io/otel"
@@ -16,7 +17,7 @@ func InitTracerProvider(serviceName string) (*sdktrace.TracerProvider, error) {
 		return nil, nil
 	}
 
-	exporter, err := otlptracegrpc.New(nil,
+	exporter, err := otlptracegrpc.New(context.TODO(),
 		otlptracegrpc.WithEndpoint(endpoint),
 		otlptracegrpc.WithInsecure(),
 	)

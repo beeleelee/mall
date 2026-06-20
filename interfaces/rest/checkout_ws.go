@@ -1,6 +1,7 @@
 package rest
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -104,7 +105,7 @@ func (h *CheckoutWSHandler) handleMessage(r *http.Request, checkoutID, userID ke
 }
 
 func (h *CheckoutWSHandler) handleStateUpdate(checkoutID, userID kernel.ID) *ecp.ECPResponse {
-	session, err := h.svc.GetCheckout(nil, checkoutID)
+	session, err := h.svc.GetCheckout(context.Background(), checkoutID)
 	if err != nil {
 		return &ecp.ECPResponse{
 			Error: &ecp.ECPError{Code: -32000, Message: err.Error()},
