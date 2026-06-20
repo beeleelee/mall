@@ -240,6 +240,10 @@ func main() {
 	srv.Use(gozerorest.ToMiddleware(middleware.NegotiationMiddleware(supportedCaps)))
 	srv.Use(gozerorest.ToMiddleware(metricsMW.Wrap))
 
+	rateLimiter := middleware.NewRateLimiter(100, 200)
+	defer rateLimiter.Stop()
+	srv.Use(gozerorest.ToMiddleware(middleware.RateLimitMiddleware(rateLimiter)))
+
 	auth := middleware.AuthMiddleware(jwtSecret)
 
 	srv.AddRoute(gozerorest.Route{
