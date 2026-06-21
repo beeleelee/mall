@@ -98,3 +98,26 @@ func (s *IdentityService) SuspendUser(ctx context.Context, id kernel.ID) (*User,
 
 	return user, nil
 }
+
+func (s *IdentityService) ActivateUser(ctx context.Context, id kernel.ID) (*User, error) {
+	s.logger.Info(ctx, "identity.activate_user", kernel.Field("user_id", id.String()))
+
+	user, err := s.repo.FindByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := user.Activate(); err != nil {
+		return nil, err
+	}
+
+	if err := s.repo.Save(ctx, user); err != nil {
+		return nil, err
+	}
+
+	return user, nil
+}
+
+func (s *IdentityService) ListUsers(ctx context.Context, offset, limit int) ([]*User, error) {
+	return s.repo.FindAll(ctx, offset, limit)
+}

@@ -59,6 +59,10 @@ func (s *OrderService) FindByCheckoutID(ctx context.Context, checkoutID kernel.I
 	return s.repo.FindByCheckoutID(ctx, checkoutID)
 }
 
+func (s *OrderService) ListAllOrders(ctx context.Context, offset, limit int) ([]*Order, error) {
+	return s.repo.FindAll(ctx, offset, limit)
+}
+
 func (s *OrderService) StartProcessing(ctx context.Context, id kernel.ID) (*Order, error) {
 	order, err := s.repo.FindByID(ctx, id)
 	if err != nil {

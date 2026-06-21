@@ -10,16 +10,25 @@ import (
 
 	"github.com/beeleelee/mall/domain/kernel"
 
+	appidentity "github.com/beeleelee/mall/application/identity"
 	catalogdomain "github.com/beeleelee/mall/domain/catalog"
+	orderdomain "github.com/beeleelee/mall/domain/order"
 )
 
 type AdminHandler struct {
-	catalogSvc *catalogdomain.CatalogService
-	sf         *kernel.Snowflake
+	catalogSvc    *catalogdomain.CatalogService
+	orderSvc      *orderdomain.OrderService
+	identitySvc   *appidentity.IdentityAppService
+	sf            *kernel.Snowflake
 }
 
-func NewAdminHandler(catalogSvc *catalogdomain.CatalogService, sf *kernel.Snowflake) *AdminHandler {
-	return &AdminHandler{catalogSvc: catalogSvc, sf: sf}
+func NewAdminHandler(catalogSvc *catalogdomain.CatalogService, orderSvc *orderdomain.OrderService, identitySvc *appidentity.IdentityAppService, sf *kernel.Snowflake) *AdminHandler {
+	return &AdminHandler{
+		catalogSvc:  catalogSvc,
+		orderSvc:    orderSvc,
+		identitySvc: identitySvc,
+		sf:          sf,
+	}
 }
 
 type createProductRequest struct {
@@ -114,4 +123,59 @@ func (h *AdminHandler) DeleteProduct(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *AdminHandler) ListOrders(w http.ResponseWriter, r *http.Request) {
+	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+
+	orders, err := h.orderSvc.ListAllOrders(r.Context(), offset, limit)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+
+	resp := make([]orderResponse, len(orders))
+	for i, o := range orders {
+		resp[i] = buildOrderResponse(o)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(resp)
+}
+
+func (h *AdminHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
+	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+
+	users, err := h.identitySvc.ListUsers(r.Context(), offset, limit)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(users)
+}
+
+func (h *AdminHandler) ActivateUser(w http.ResponseWriter, r *http.Request) {
+	vars := pathvar.Vars(r)
+	idStr := vars["id"]
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		writeDomainError(w, kernel.NewDomainError(kernel.ErrInvalidArgument, "invalid user id"))
+		return
+	}
+
+	user, err := h.identitySvc.ActivateUser(r.Context(), id)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(user)
 }

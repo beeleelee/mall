@@ -127,6 +127,28 @@ func (r *PostgresUserRepository) FindByEmail(ctx context.Context, email string) 
 	return r.querySingle(ctx, "SELECT * FROM users WHERE email = $1", email)
 }
 
+func (r *PostgresUserRepository) FindAll(ctx context.Context, offset, limit int) ([]*domain.User, error) {
+	if limit <= 0 || limit > 100 {
+		limit = 20
+	}
+
+	var rows []userRow
+	err := r.db.SelectContext(ctx, &rows, `SELECT * FROM users ORDER BY created_at DESC LIMIT $1 OFFSET $2`, limit, offset)
+	if err != nil {
+		return nil, kernel.NewDomainErrorWithCause(kernel.ErrInternal, "find all users", err)
+	}
+
+	result := make([]*domain.User, 0, len(rows))
+	for _, row := range rows {
+		user, err := row.toDomain()
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, user)
+	}
+	return result, nil
+}
+
 func (r *PostgresUserRepository) Delete(ctx context.Context, id kernel.ID) error {
 	email, err := r.getEmailByID(ctx, id)
 	if err != nil {

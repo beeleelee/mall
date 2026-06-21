@@ -244,6 +244,28 @@ func (r *PostgresOrderRepository) FindByCheckoutID(ctx context.Context, checkout
 	return row.toDomain()
 }
 
+func (r *PostgresOrderRepository) FindAll(ctx context.Context, offset, limit int) ([]*domain.Order, error) {
+	if limit <= 0 || limit > 100 {
+		limit = 20
+	}
+
+	var rows []orderRow
+	err := r.db.SelectContext(ctx, &rows, `SELECT * FROM orders ORDER BY created_at DESC LIMIT $1 OFFSET $2`, limit, offset)
+	if err != nil {
+		return nil, kernel.NewDomainErrorWithCause(kernel.ErrInternal, "find all orders", err)
+	}
+
+	result := make([]*domain.Order, 0, len(rows))
+	for _, row := range rows {
+		order, err := row.toDomain()
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, order)
+	}
+	return result, nil
+}
+
 func (r *PostgresOrderRepository) Delete(ctx context.Context, id kernel.ID) error {
 	var userID int64
 	err := r.db.GetContext(ctx, &userID, `SELECT user_id FROM orders WHERE id = $1`, id.Int64())

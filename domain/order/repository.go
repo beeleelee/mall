@@ -11,6 +11,7 @@ type OrderRepository interface {
 	FindByID(ctx context.Context, id kernel.ID) (*Order, error)
 	FindByUserID(ctx context.Context, userID kernel.ID) ([]*Order, error)
 	FindByCheckoutID(ctx context.Context, checkoutID kernel.ID) (*Order, error)
+	FindAll(ctx context.Context, offset, limit int) ([]*Order, error)
 	Delete(ctx context.Context, id kernel.ID) error
 }
 

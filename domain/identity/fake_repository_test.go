@@ -52,6 +52,23 @@ func (f *fakeUserRepository) FindByEmail(_ context.Context, email string) (*User
 	return u, nil
 }
 
+func (f *fakeUserRepository) FindAll(_ context.Context, offset, limit int) ([]*User, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	result := make([]*User, 0, len(f.users))
+	for _, u := range f.users {
+		result = append(result, u)
+	}
+	if offset >= len(result) {
+		return []*User{}, nil
+	}
+	end := offset + limit
+	if end > len(result) {
+		end = len(result)
+	}
+	return result[offset:end], nil
+}
+
 func (f *fakeUserRepository) Delete(_ context.Context, id kernel.ID) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()

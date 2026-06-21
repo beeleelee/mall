@@ -131,3 +131,46 @@ func (s *IdentityAppService) SuspendUser(ctx context.Context, id int64) (*UserRe
 		Roles:  roles,
 	}, nil
 }
+
+func (s *IdentityAppService) ActivateUser(ctx context.Context, id int64) (*UserResponse, error) {
+	user, err := s.domain.ActivateUser(ctx, kernel.ID(id))
+	if err != nil {
+		return nil, err
+	}
+
+	roles := make([]string, len(user.Roles))
+	for i, r := range user.Roles {
+		roles[i] = string(r)
+	}
+
+	return &UserResponse{
+		ID:     user.ID.Int64(),
+		Email:  user.Email,
+		Name:   user.Name,
+		Status: string(user.Status),
+		Roles:  roles,
+	}, nil
+}
+
+func (s *IdentityAppService) ListUsers(ctx context.Context, offset, limit int) ([]*UserResponse, error) {
+	users, err := s.domain.ListUsers(ctx, offset, limit)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]*UserResponse, 0, len(users))
+	for _, user := range users {
+		roles := make([]string, len(user.Roles))
+		for i, r := range user.Roles {
+			roles[i] = string(r)
+		}
+		result = append(result, &UserResponse{
+			ID:     user.ID.Int64(),
+			Email:  user.Email,
+			Name:   user.Name,
+			Status: string(user.Status),
+			Roles:  roles,
+		})
+	}
+	return result, nil
+}
