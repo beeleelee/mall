@@ -2,6 +2,7 @@ package catalog
 
 import (
 	"context"
+	"time"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -88,6 +89,9 @@ func (s *CatalogService) GetProduct(ctx context.Context, id kernel.ID) (*Product
 }
 
 func (s *CatalogService) CreateProduct(ctx context.Context, id kernel.ID, sku SKU, name, description, category string, price Money, attributes map[string]any) (*Product, error) {
+	ctx, span := catalogTracer.Start(ctx, "catalog.create_product")
+	defer span.End()
+
 	s.logger.Info(ctx, "catalog.create_product", kernel.Field("sku", sku), kernel.Field("id", id))
 
 	product, err := NewProduct(id, sku, name, description, category, price, attributes)
@@ -100,4 +104,55 @@ func (s *CatalogService) CreateProduct(ctx context.Context, id kernel.ID, sku SK
 	}
 
 	return product, nil
+}
+
+func (s *CatalogService) UpdateProduct(ctx context.Context, id kernel.ID, name, description, category string, price Money, status ProductStatus, attributes map[string]any) (*Product, error) {
+	ctx, span := catalogTracer.Start(ctx, "catalog.update_product",
+		trace.WithAttributes(attribute.Int64("product_id", id.Int64())),
+	)
+	defer span.End()
+
+	product, err := s.repo.FindByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := product.UpdateDetails(name, description, category); err != nil {
+		return nil, err
+	}
+	if err := product.ChangePrice(price); err != nil {
+		return nil, err
+	}
+	if status != "" && status != product.Status {
+		if err := product.ChangeStatus(status); err != nil {
+			return nil, err
+		}
+	}
+	if attributes != nil {
+		product.Attributes = attributes
+	}
+
+	product.UpdatedAt = time.Now()
+
+	if err := s.repo.Save(ctx, product); err != nil {
+		return nil, err
+	}
+
+	s.logger.Info(ctx, "catalog.update_product", kernel.Field("product_id", id.String()))
+	return product, nil
+}
+
+func (s *CatalogService) DeleteProduct(ctx context.Context, id kernel.ID) error {
+	ctx, span := catalogTracer.Start(ctx, "catalog.delete_product",
+		trace.WithAttributes(attribute.Int64("product_id", id.Int64())),
+	)
+	defer span.End()
+
+	s.logger.Info(ctx, "catalog.delete_product", kernel.Field("product_id", id.String()))
+
+	if err := s.repo.Delete(ctx, id); err != nil {
+		return err
+	}
+
+	return nil
 }
