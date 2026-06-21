@@ -12,22 +12,25 @@ import (
 
 	appidentity "github.com/beeleelee/mall/application/identity"
 	catalogdomain "github.com/beeleelee/mall/domain/catalog"
+	inventorydomain "github.com/beeleelee/mall/domain/inventory"
 	orderdomain "github.com/beeleelee/mall/domain/order"
 )
 
 type AdminHandler struct {
-	catalogSvc    *catalogdomain.CatalogService
-	orderSvc      *orderdomain.OrderService
-	identitySvc   *appidentity.IdentityAppService
-	sf            *kernel.Snowflake
+	catalogSvc   *catalogdomain.CatalogService
+	orderSvc     *orderdomain.OrderService
+	identitySvc  *appidentity.IdentityAppService
+	inventorySvc *inventorydomain.InventoryService
+	sf           *kernel.Snowflake
 }
 
-func NewAdminHandler(catalogSvc *catalogdomain.CatalogService, orderSvc *orderdomain.OrderService, identitySvc *appidentity.IdentityAppService, sf *kernel.Snowflake) *AdminHandler {
+func NewAdminHandler(catalogSvc *catalogdomain.CatalogService, orderSvc *orderdomain.OrderService, identitySvc *appidentity.IdentityAppService, inventorySvc *inventorydomain.InventoryService, sf *kernel.Snowflake) *AdminHandler {
 	return &AdminHandler{
-		catalogSvc:  catalogSvc,
-		orderSvc:    orderSvc,
-		identitySvc: identitySvc,
-		sf:          sf,
+		catalogSvc:   catalogSvc,
+		orderSvc:     orderSvc,
+		identitySvc:  identitySvc,
+		inventorySvc: inventorySvc,
+		sf:           sf,
 	}
 }
 
@@ -178,4 +181,86 @@ func (h *AdminHandler) ActivateUser(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(user)
+}
+
+type setStockRequest struct {
+	ProductID         int64 `json:"product_id"`
+	Quantity          int   `json:"quantity"`
+	LowStockThreshold int   `json:"low_stock_threshold,omitempty"`
+}
+
+func (h *AdminHandler) SetStock(w http.ResponseWriter, r *http.Request) {
+	var req setStockRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpx.Error(w, err)
+		return
+	}
+
+	_, err := h.inventorySvc.GetStock(r.Context(), kernel.ID(req.ProductID))
+	if err == nil {
+		item, err := h.inventorySvc.UpdateStock(r.Context(), kernel.ID(req.ProductID), req.Quantity)
+		if err != nil {
+			writeDomainError(w, err)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(item)
+		return
+	}
+
+	pid, err := h.sf.NextID()
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+
+	threshold := req.LowStockThreshold
+	if threshold <= 0 {
+		threshold = 10
+	}
+
+	item, err := h.inventorySvc.SetStock(r.Context(), pid, kernel.ID(req.ProductID), req.Quantity, threshold)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(item)
+}
+
+func (h *AdminHandler) GetStock(w http.ResponseWriter, r *http.Request) {
+	vars := pathvar.Vars(r)
+	idStr := vars["productId"]
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		writeDomainError(w, kernel.NewDomainError(kernel.ErrInvalidArgument, "invalid product id"))
+		return
+	}
+
+	item, err := h.inventorySvc.GetStock(r.Context(), kernel.ID(id))
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(item)
+}
+
+func (h *AdminHandler) ListLowStock(w http.ResponseWriter, r *http.Request) {
+	threshold, _ := strconv.Atoi(r.URL.Query().Get("threshold"))
+
+	items, err := h.inventorySvc.ListLowStock(r.Context(), threshold)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(items)
 }

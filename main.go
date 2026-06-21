@@ -28,6 +28,7 @@ import (
 	domainCheckout "github.com/beeleelee/mall/domain/checkout"
 	domainDiscount "github.com/beeleelee/mall/domain/discount"
 	domainIdentity "github.com/beeleelee/mall/domain/identity"
+	domainInventory "github.com/beeleelee/mall/domain/inventory"
 	"github.com/beeleelee/mall/domain/kernel"
 	domainOAuth "github.com/beeleelee/mall/domain/oauth"
 	domainOrder "github.com/beeleelee/mall/domain/order"
@@ -39,6 +40,7 @@ import (
 	infraDiscount "github.com/beeleelee/mall/infrastructure/discount"
 	infraFulfillment "github.com/beeleelee/mall/infrastructure/fulfillment"
 	infraIdentity "github.com/beeleelee/mall/infrastructure/identity"
+	infraInventory "github.com/beeleelee/mall/infrastructure/inventory"
 	"github.com/beeleelee/mall/infrastructure/logging"
 	"github.com/beeleelee/mall/infrastructure/metrics"
 	infraOAuth "github.com/beeleelee/mall/infrastructure/oauth"
@@ -186,7 +188,11 @@ func main() {
 	fulfillmentSvc := infraFulfillment.NewDefaultFulfillmentService()
 	fulfillmentHandler := rest.NewFulfillmentHandler(fulfillmentSvc)
 
-	adminHandler := rest.NewAdminHandler(catalogSvc, orderSvc, appSvc, sf)
+	inventoryRepo := infraInventory.NewPostgresInventoryRepository(db, rdb)
+	inventoryLogger := logger.WithCapability("inventory")
+	inventorySvc := domainInventory.NewInventoryService(inventoryRepo, inventoryLogger)
+
+	adminHandler := rest.NewAdminHandler(catalogSvc, orderSvc, appSvc, inventorySvc, sf)
 	adminMW := middleware.AdminMiddleware(userRepo)
 
 	saga := appOrder.NewCheckoutCompletedSaga(orderSvc, sf, logger)
@@ -579,6 +585,21 @@ func main() {
 		Method:  http.MethodPost,
 		Path:    "/api/v1/admin/users/:id/activate",
 		Handler: adminAuth(adminHandler.ActivateUser),
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPost,
+		Path:    "/api/v1/admin/inventory",
+		Handler: adminAuth(adminHandler.SetStock),
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodGet,
+		Path:    "/api/v1/admin/inventory/:productId",
+		Handler: adminAuth(adminHandler.GetStock),
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodGet,
+		Path:    "/api/v1/admin/inventory/low-stock",
+		Handler: adminAuth(adminHandler.ListLowStock),
 	})
 
 	quit := make(chan os.Signal, 1)
