@@ -56,6 +56,21 @@ func (f *fakeOrderRepo) FindByCheckoutID(_ context.Context, checkoutID kernel.ID
 	return nil, kernel.NewDomainError(kernel.ErrNotFound, "order not found")
 }
 
+func (f *fakeOrderRepo) FindAll(_ context.Context, offset, limit int) ([]*domain.Order, error) {
+	result := make([]*domain.Order, 0, len(f.orders))
+	for _, o := range f.orders {
+		result = append(result, o)
+	}
+	if offset >= len(result) {
+		return []*domain.Order{}, nil
+	}
+	end := offset + limit
+	if end > len(result) {
+		end = len(result)
+	}
+	return result[offset:end], nil
+}
+
 func (f *fakeOrderRepo) Delete(_ context.Context, id kernel.ID) error {
 	delete(f.orders, id)
 	return nil

@@ -186,6 +186,9 @@ func main() {
 	fulfillmentSvc := infraFulfillment.NewDefaultFulfillmentService()
 	fulfillmentHandler := rest.NewFulfillmentHandler(fulfillmentSvc)
 
+	adminHandler := rest.NewAdminHandler(catalogSvc, orderSvc, appSvc, sf)
+	adminMW := middleware.AdminMiddleware(userRepo)
+
 	saga := appOrder.NewCheckoutCompletedSaga(orderSvc, sf, logger)
 
 	go func() {
@@ -541,6 +544,41 @@ func main() {
 		Method:  http.MethodPost,
 		Path:    "/api/v1/fulfillment/rates",
 		Handler: auth(http.HandlerFunc(fulfillmentHandler.CalculateRates)).ServeHTTP,
+	})
+
+	adminAuth := func(handler http.HandlerFunc) http.HandlerFunc {
+		return adminMW(auth(http.HandlerFunc(handler))).ServeHTTP
+	}
+
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPost,
+		Path:    "/api/v1/admin/products",
+		Handler: adminAuth(adminHandler.CreateProduct),
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPut,
+		Path:    "/api/v1/admin/products/:id",
+		Handler: adminAuth(adminHandler.UpdateProduct),
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodDelete,
+		Path:    "/api/v1/admin/products/:id",
+		Handler: adminAuth(adminHandler.DeleteProduct),
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodGet,
+		Path:    "/api/v1/admin/orders",
+		Handler: adminAuth(adminHandler.ListOrders),
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodGet,
+		Path:    "/api/v1/admin/users",
+		Handler: adminAuth(adminHandler.ListUsers),
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPost,
+		Path:    "/api/v1/admin/users/:id/activate",
+		Handler: adminAuth(adminHandler.ActivateUser),
 	})
 
 	quit := make(chan os.Signal, 1)

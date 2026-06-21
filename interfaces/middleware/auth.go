@@ -58,7 +58,7 @@ func AuthMiddleware(jwtSecret []byte) func(http.Handler) http.Handler {
 	}
 }
 
-func AdminMiddleware(userRepo *identity.UserRepository) func(http.Handler) http.Handler {
+func AdminMiddleware(userRepo identity.UserRepository) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			info, ok := UserFromContext(r.Context())
@@ -67,7 +67,7 @@ func AdminMiddleware(userRepo *identity.UserRepository) func(http.Handler) http.
 				return
 			}
 
-			user, err := (*userRepo).FindByID(r.Context(), kernel.ID(info.UserID))
+			user, err := userRepo.FindByID(r.Context(), kernel.ID(info.UserID))
 			if err != nil {
 				writeAuthError(w, "user not found")
 				return
