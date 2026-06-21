@@ -57,6 +57,23 @@ Persistence: `pgx`/`sqlx` + `go-redis`. Identity uses bcrypt via `golang.org/x/c
 - **Application service**: `IdentityAppService` in `application/identity/` generates IDs via Snowflake, delegates to domain. New features should follow this pattern.
 - **Webhooks**: `Webhook` aggregate in `domain/order/`, `WebhookRepository` interface, `WebhookService` with Register/ListByUser/Delete. HMAC-SHA256 signatures via `infra/webhook.go`. Delivery consumer subscribes to `order.>` JetStream subject, 3 retries with 1s backoff.
 
+## Admin (requires admin role)
+
+| Method | Path | Handler |
+|--------|------|---------|
+| POST | `/api/v1/admin/products` | CreateProduct |
+| PUT | `/api/v1/admin/products/:id` | UpdateProduct |
+| DELETE | `/api/v1/admin/products/:id` | DeleteProduct |
+| GET | `/api/v1/admin/orders` | ListOrders |
+| GET | `/api/v1/admin/users` | ListUsers |
+| POST | `/api/v1/admin/users/:id/activate` | ActivateUser |
+| POST | `/api/v1/admin/inventory` | SetStock |
+| GET | `/api/v1/admin/inventory/:productId` | GetStock |
+| GET | `/api/v1/admin/inventory/low-stock` | ListLowStock |
+
+- **Admin auth**: `AdminMiddleware` wraps the auth middleware and checks `UserRoleAdmin` via `UserRepository`
+- **Seed admin**: Manually assign `admin` role to a user via DB or use the existing identity register + direct DB update
+
 ## Routes
 
 | Method | Path | Handler | Auth |

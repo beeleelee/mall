@@ -170,3 +170,35 @@ The outcome is a **single integration point** that collapses N×N complexity —
 **New dependencies**: WebSocket library (gorilla/websocket ✅), AP2 mandate domain ✅, PgBouncer ✅, Prometheus client ✅, K8s manifests ✅
 
 **Exit criteria**: ✅ The system handles mixed autonomy — fully agentic purchases via AP2 and human-in-the-loop via ECP — with production-grade observability, resilience, and deployment automation.
+
+---
+
+### Phase 4: Admin & Management APIs (Now)
+
+**Goal**: Provide full platform management capabilities — product CRUD, inventory tracking, order management, user management — through admin-only API endpoints.
+
+**Exit criteria**: A platform admin can manage products, inventory, orders, and users via REST API without direct database access.
+
+#### Todo
+
+- [x] **4.1** Product CRUD: `CreateProduct`, `UpdateProduct`, `DeleteProduct` in `CatalogService` + admin REST handlers
+- [x] **4.2** Inventory domain: `InventoryItem` aggregate, `InventoryService` (SetStock, Reserve, Release, Confirm), `InventoryRepository`, domain events, 23 unit tests
+- [x] **4.3** Inventory infrastructure: PostgreSQL migration `000013`, `PostgresInventoryRepository` with Redis cache-aside, integration tests
+- [x] **4.4** Admin order management: `ListAllOrders` on `OrderService` + admin REST handler
+- [x] **4.5** Admin user management: `ListUsers`, `ActivateUser` on `IdentityService` + admin REST handler
+- [x] **4.6** Admin middleware: role-based access with `AdminMiddleware` checking `UserRoleAdmin`
+- [x] **4.7** Wire everything: admin routes registered in `main.go`, inventory service wired into admin handler
+
+**Routes added**:
+
+| Method | Path | Handler | Auth |
+|--------|------|---------|------|
+| POST | `/api/v1/admin/products` | CreateProduct | Admin |
+| PUT | `/api/v1/admin/products/:id` | UpdateProduct | Admin |
+| DELETE | `/api/v1/admin/products/:id` | DeleteProduct | Admin |
+| GET | `/api/v1/admin/orders` | ListOrders | Admin |
+| GET | `/api/v1/admin/users` | ListUsers | Admin |
+| POST | `/api/v1/admin/users/:id/activate` | ActivateUser | Admin |
+| POST | `/api/v1/admin/inventory` | SetStock | Admin |
+| GET | `/api/v1/admin/inventory/:productId` | GetStock | Admin |
+| GET | `/api/v1/admin/inventory/low-stock` | ListLowStock | Admin |
