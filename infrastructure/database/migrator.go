@@ -147,7 +147,7 @@ func (m *Migrator) apply(mig Migration) error {
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	if _, err := tx.Exec(mig.UpSQL); err != nil {
 		return err

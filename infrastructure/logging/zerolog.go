@@ -8,8 +8,9 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/beeleelee/mall/domain/kernel"
 	"go.opentelemetry.io/otel/trace"
+
+	"github.com/beeleelee/mall/domain/kernel"
 )
 
 type ZerologLogger struct {

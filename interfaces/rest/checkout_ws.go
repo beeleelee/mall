@@ -67,7 +67,7 @@ func (h *CheckoutWSHandler) ServeWS(w http.ResponseWriter, r *http.Request) {
 
 		var msg ecp.ECPMessage
 		if err := json.Unmarshal(raw, &msg); err != nil {
-			writeJSON(ecp.ECPResponse{
+			_ = writeJSON(ecp.ECPResponse{
 				JSONRPC: "2.0",
 				Error:   &ecp.ECPError{Code: -32700, Message: "parse error"},
 				ID:      nil,
@@ -81,7 +81,7 @@ func (h *CheckoutWSHandler) ServeWS(w http.ResponseWriter, r *http.Request) {
 			if resp.ID == nil {
 				resp.ID = msg.ID
 			}
-			writeJSON(resp)
+			_ = writeJSON(resp)
 		}
 	}
 }

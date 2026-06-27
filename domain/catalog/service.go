@@ -150,9 +150,5 @@ func (s *CatalogService) DeleteProduct(ctx context.Context, id kernel.ID) error 
 
 	s.logger.Info(ctx, "catalog.delete_product", kernel.Field("product_id", id.String()))
 
-	if err := s.repo.Delete(ctx, id); err != nil {
-		return err
-	}
-
-	return nil
+	return s.repo.Delete(ctx, id)
 }

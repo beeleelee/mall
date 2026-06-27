@@ -52,15 +52,21 @@ func (r orderRow) toDomain() (*domain.Order, error) {
 
 	var shippingAddr checkout.Address
 	if len(r.ShippingAddress) > 0 {
-		json.Unmarshal(r.ShippingAddress, &shippingAddr)
+		if err := json.Unmarshal(r.ShippingAddress, &shippingAddr); err != nil {
+			return nil, kernel.NewDomainErrorWithCause(kernel.ErrInternal, "unmarshal shipping address", err)
+		}
 	}
 	var billingAddr checkout.Address
 	if len(r.BillingAddress) > 0 {
-		json.Unmarshal(r.BillingAddress, &billingAddr)
+		if err := json.Unmarshal(r.BillingAddress, &billingAddr); err != nil {
+			return nil, kernel.NewDomainErrorWithCause(kernel.ErrInternal, "unmarshal billing address", err)
+		}
 	}
 	var shippingOpt checkout.ShippingOption
 	if len(r.ShippingOption) > 0 {
-		json.Unmarshal(r.ShippingOption, &shippingOpt)
+		if err := json.Unmarshal(r.ShippingOption, &shippingOpt); err != nil {
+			return nil, kernel.NewDomainErrorWithCause(kernel.ErrInternal, "unmarshal shipping option", err)
+		}
 	}
 
 	return domain.NewOrderFromSnapshot(

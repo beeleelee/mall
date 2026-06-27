@@ -66,7 +66,7 @@ func TestCartService_UpdateQuantity(t *testing.T) {
 	svc := newTestService()
 	ctx := context.Background()
 
-	_ = svc.AddItem(ctx, AddItemInput{CartID: 1, UserID: 42, ProductID: 100, Quantity: 2, UnitPrice: 1000})
+	_, _ = svc.AddItem(ctx, AddItemInput{CartID: 1, UserID: 42, ProductID: 100, Quantity: 2, UnitPrice: 1000})
 
 	cart, err := svc.UpdateQuantity(ctx, 42, 100, 5)
 	if err != nil {
@@ -81,7 +81,7 @@ func TestCartService_RemoveItem(t *testing.T) {
 	svc := newTestService()
 	ctx := context.Background()
 
-	_ = svc.AddItem(ctx, AddItemInput{CartID: 1, UserID: 42, ProductID: 100, Quantity: 2, UnitPrice: 1000})
+	_, _ = svc.AddItem(ctx, AddItemInput{CartID: 1, UserID: 42, ProductID: 100, Quantity: 2, UnitPrice: 1000})
 
 	cart, err := svc.RemoveItem(ctx, 42, 100)
 	if err != nil {
@@ -96,7 +96,7 @@ func TestCartService_ClearCart(t *testing.T) {
 	svc := newTestService()
 	ctx := context.Background()
 
-	_ = svc.AddItem(ctx, AddItemInput{CartID: 1, UserID: 42, ProductID: 100, Quantity: 2, UnitPrice: 1000})
+	_, _ = svc.AddItem(ctx, AddItemInput{CartID: 1, UserID: 42, ProductID: 100, Quantity: 2, UnitPrice: 1000})
 
 	cart, err := svc.ClearCart(ctx, 42)
 	if err != nil {
@@ -145,10 +145,10 @@ func TestCartService_EventsPublished(t *testing.T) {
 	svc := NewCartService(newFakeCartRepo(), pub, fakeLoggerCart{})
 	ctx := context.Background()
 
-	_ = svc.AddItem(ctx, AddItemInput{CartID: 1, UserID: 42, ProductID: 100, Quantity: 2, UnitPrice: 1000})
-	_ = svc.AddItem(ctx, AddItemInput{CartID: 1, UserID: 42, ProductID: 101, Quantity: 1, UnitPrice: 2000})
-	_ = svc.RemoveItem(ctx, 42, 100)
-	_ = svc.ClearCart(ctx, 42)
+	_, _ = svc.AddItem(ctx, AddItemInput{CartID: 1, UserID: 42, ProductID: 100, Quantity: 2, UnitPrice: 1000})
+	_, _ = svc.AddItem(ctx, AddItemInput{CartID: 1, UserID: 42, ProductID: 101, Quantity: 1, UnitPrice: 2000})
+	_, _ = svc.RemoveItem(ctx, 42, 100)
+	_, _ = svc.ClearCart(ctx, 42)
 
 	pub.mu.Lock()
 	count := len(pub.published)

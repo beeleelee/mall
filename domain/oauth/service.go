@@ -185,7 +185,7 @@ func (s *OAuthService) Refresh(ctx context.Context, input TokenRefreshInput) (*T
 		return nil, kernel.NewDomainError(kernel.ErrUnauthenticated, "refresh token expired")
 	}
 
-	s.tokens.Revoke(ctx, rt.ID)
+	_ = s.tokens.Revoke(ctx, rt.ID)
 
 	accessToken, err := SignJWT(rt.UserID, input.ClientID, rt.Scope, s.accessTTL, s.jwtSecret)
 	if err != nil {
@@ -221,9 +221,5 @@ func (s *OAuthService) Revoke(ctx context.Context, input RevokeInput) error {
 		return kernel.NewDomainError(kernel.ErrUnauthenticated, "invalid client credentials")
 	}
 
-	if err := s.tokens.Revoke(ctx, input.Token); err != nil {
-		return err
-	}
-
-	return nil
+	return s.tokens.Revoke(ctx, input.Token)
 }

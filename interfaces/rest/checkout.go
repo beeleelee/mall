@@ -377,7 +377,7 @@ func (h *CheckoutHandler) Complete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req completeCheckoutRequest
-	json.NewDecoder(r.Body).Decode(&req)
+	_ = json.NewDecoder(r.Body).Decode(&req)
 
 	session, escalated, err := h.svc.StartComplete(r.Context(), kernel.ID(id), req.ContinueURL)
 	if err != nil {

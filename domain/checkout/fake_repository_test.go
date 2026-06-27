@@ -86,8 +86,7 @@ func (fakePriceCalculator) Calculate(_ context.Context, input PriceInput) (*Pric
 }
 
 type fakePublisher struct {
-	mu        sync.Mutex
-	published []*CheckoutSession
+	mu sync.Mutex
 }
 
 func newFakePublisher() *fakePublisher {

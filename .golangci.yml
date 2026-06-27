@@ -37,3 +37,13 @@ issues:
   exclude-use-default: false
   max-issues-per-linter: 0
   max-same-issues: 0
+  exclude:
+    - Error return value of .*Close.* is not checked
+    - Error return value of .*\.Encode.* is not checked
+    - Error return value of .*FlushDB.* is not checked
+    - Error return value of `os\.Setenv` is not checked
+    - Error return value of `os\.Unsetenv` is not checked
+    - Error return value of `msg\.Ack` is not checked
+    - Error return value of `cons\.Consume` is not checked
+  exclude-files:
+    - .*_test\.go$

@@ -3,8 +3,9 @@ package oauth
 import (
 	"strings"
 
-	"github.com/beeleelee/mall/domain/kernel"
 	"golang.org/x/crypto/bcrypt"
+
+	"github.com/beeleelee/mall/domain/kernel"
 )
 
 type ClientStatus string

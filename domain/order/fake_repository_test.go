@@ -2,11 +2,13 @@ package order
 
 import (
 	"context"
+	"sync"
 
 	"github.com/beeleelee/mall/domain/kernel"
 )
 
 type fakeOrderRepo struct {
+	mu     sync.Mutex
 	orders map[kernel.ID]*Order
 	byUser map[kernel.ID][]kernel.ID
 }
@@ -92,9 +94,7 @@ func (f *fakeOrderRepo) Delete(_ context.Context, id kernel.ID) error {
 	return nil
 }
 
-type fakeOrderPublisher struct {
-	mu sync.Mutex
-}
+type fakeOrderPublisher struct{}
 
 func newFakeOrderPublisher() *fakeOrderPublisher {
 	return &fakeOrderPublisher{}

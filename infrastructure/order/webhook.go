@@ -32,7 +32,7 @@ type webhookRow struct {
 func (r webhookRow) toDomain() *domain.Webhook {
 	var events []string
 	if len(r.Events) > 0 {
-		json.Unmarshal(r.Events, &events)
+		_ = json.Unmarshal(r.Events, &events)
 	}
 	if events == nil {
 		events = []string{}
