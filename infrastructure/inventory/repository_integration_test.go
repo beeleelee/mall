@@ -29,13 +29,13 @@ func servicesUp() bool {
 	if err != nil {
 		return false
 	}
-	pg.Close()
+	_ = pg.Close()
 
 	rd, err := net.DialTimeout("tcp", "localhost:6379", 3*time.Second)
 	if err != nil {
 		return false
 	}
-	rd.Close()
+	_ = rd.Close()
 
 	return true
 }
@@ -57,16 +57,16 @@ func newIntegrationFixture(t *testing.T) *integrationFixture {
 
 	schema := fmt.Sprintf("test_%08x", rand.Int63())[:16]
 	if _, err := db.Exec(fmt.Sprintf(`CREATE SCHEMA IF NOT EXISTS "%s"`, schema)); err != nil {
-		db.Close()
+		_ = db.Close()
 		t.Fatalf("create schema: %v", err)
 	}
 	if _, err := db.Exec(fmt.Sprintf(`SET search_path TO "%s", public`, schema)); err != nil {
-		db.Close()
+		_ = db.Close()
 		t.Fatalf("set search_path: %v", err)
 	}
 
 	if _, err := db.Exec(upSQL); err != nil {
-		db.Close()
+		_ = db.Close()
 		t.Fatalf("apply migration: %v", err)
 	}
 
@@ -78,10 +78,10 @@ func newIntegrationFixture(t *testing.T) *integrationFixture {
 	repo := NewPostgresInventoryRepository(db, rdb)
 
 	cleanup := func() {
-		rdb.FlushDB(context.Background())
-		rdb.Close()
-		db.Exec(fmt.Sprintf(`DROP SCHEMA "%s" CASCADE`, schema))
-		db.Close()
+		_ = rdb.FlushDB(context.Background())
+		_ = rdb.Close()
+		_, _ = db.Exec(fmt.Sprintf(`DROP SCHEMA "%s" CASCADE`, schema))
+		_ = db.Close()
 	}
 
 	return &integrationFixture{
@@ -155,13 +155,13 @@ func TestUpdateStock(t *testing.T) {
 
 	ctx := context.Background()
 
-	f.db.ExecContext(ctx, `INSERT INTO products (id, sku, name, price_amount, price_currency) VALUES (200, 'TEST-002', 'Test Product 2', 2000, 'USD')`)
+	_, _ = f.db.ExecContext(ctx, `INSERT INTO products (id, sku, name, price_amount, price_currency) VALUES (200, 'TEST-002', 'Test Product 2', 2000, 'USD')`)
 
 	item, _ := domain.NewInventoryItem(2, 200, 100, 10)
-	f.repo.Save(ctx, item)
+	_ = f.repo.Save(ctx, item)
 
-	item.SetStock(75)
-	f.repo.Save(ctx, item)
+	_ = item.SetStock(75)
+	_ = f.repo.Save(ctx, item)
 
 	found, _ := f.repo.FindByProductID(ctx, 200)
 	if found.QuantityAvailable != 75 {
@@ -175,21 +175,21 @@ func TestReserveAndConfirm(t *testing.T) {
 
 	ctx := context.Background()
 
-	f.db.ExecContext(ctx, `INSERT INTO products (id, sku, name, price_amount, price_currency) VALUES (300, 'TEST-003', 'Test Product 3', 3000, 'USD')`)
+	_, _ = f.db.ExecContext(ctx, `INSERT INTO products (id, sku, name, price_amount, price_currency) VALUES (300, 'TEST-003', 'Test Product 3', 3000, 'USD')`)
 
 	item, _ := domain.NewInventoryItem(3, 300, 50, 10)
-	f.repo.Save(ctx, item)
+	_ = f.repo.Save(ctx, item)
 
-	item.Reserve(10)
-	f.repo.Save(ctx, item)
+	_ = item.Reserve(10)
+	_ = f.repo.Save(ctx, item)
 
 	found, _ := f.repo.FindByProductID(ctx, 300)
 	if found.ReservedQuantity != 10 {
 		t.Errorf("expected reserved 10, got %d", found.ReservedQuantity)
 	}
 
-	item.ConfirmReservation(10)
-	f.repo.Save(ctx, item)
+	_ = item.ConfirmReservation(10)
+	_ = f.repo.Save(ctx, item)
 
 	found, _ = f.repo.FindByProductID(ctx, 300)
 	if found.QuantityAvailable != 40 {
@@ -203,17 +203,17 @@ func TestFindLowStock(t *testing.T) {
 
 	ctx := context.Background()
 
-	f.db.ExecContext(ctx, `INSERT INTO products (id, sku, name, price_amount, price_currency) VALUES (400, 'TEST-004', 'Test Product 4', 1000, 'USD')`)
-	f.db.ExecContext(ctx, `INSERT INTO products (id, sku, name, price_amount, price_currency) VALUES (401, 'TEST-005', 'Test Product 5', 2000, 'USD')`)
-	f.db.ExecContext(ctx, `INSERT INTO products (id, sku, name, price_amount, price_currency) VALUES (402, 'TEST-006', 'Test Product 6', 3000, 'USD')`)
+	_, _ = f.db.ExecContext(ctx, `INSERT INTO products (id, sku, name, price_amount, price_currency) VALUES (400, 'TEST-004', 'Test Product 4', 1000, 'USD')`)
+	_, _ = f.db.ExecContext(ctx, `INSERT INTO products (id, sku, name, price_amount, price_currency) VALUES (401, 'TEST-005', 'Test Product 5', 2000, 'USD')`)
+	_, _ = f.db.ExecContext(ctx, `INSERT INTO products (id, sku, name, price_amount, price_currency) VALUES (402, 'TEST-006', 'Test Product 6', 3000, 'USD')`)
 
 	item4, _ := domain.NewInventoryItem(4, 400, 5, 10)
 	item5, _ := domain.NewInventoryItem(5, 401, 20, 10)
 	item6, _ := domain.NewInventoryItem(6, 402, 50, 10)
 
-	f.repo.Save(ctx, item4)
-	f.repo.Save(ctx, item5)
-	f.repo.Save(ctx, item6)
+	_ = f.repo.Save(ctx, item4)
+	_ = f.repo.Save(ctx, item5)
+	_ = f.repo.Save(ctx, item6)
 
 	items, err := f.repo.FindLowStock(ctx, 10)
 	if err != nil {
@@ -236,10 +236,10 @@ func TestFindAll(t *testing.T) {
 
 	for i := 0; i < 5; i++ {
 		pid := int64(500 + i)
-		f.db.ExecContext(ctx, `INSERT INTO products (id, sku, name, price_amount, price_currency) VALUES ($1, $2, $3, 1000, 'USD')`,
+		_, _ = f.db.ExecContext(ctx, `INSERT INTO products (id, sku, name, price_amount, price_currency) VALUES ($1, $2, $3, 1000, 'USD')`,
 			pid, fmt.Sprintf("TEST-%03d", i), fmt.Sprintf("Product %d", i))
 		item, _ := domain.NewInventoryItem(kernel.ID(10+i), kernel.ID(pid), 100, 10)
-		f.repo.Save(ctx, item)
+		_ = f.repo.Save(ctx, item)
 	}
 
 	items, err := f.repo.FindAll(ctx, 0, 3)

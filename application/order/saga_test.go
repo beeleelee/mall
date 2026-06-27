@@ -144,7 +144,7 @@ func TestCheckoutCompletedSaga_IgnoresNonCompleted(t *testing.T) {
 
 	payload := makeCompletedPayload(200)
 	var evt checkoutCompletedPayload
-	json.Unmarshal(payload, &evt)
+	_ = json.Unmarshal(payload, &evt)
 	evt.Status = "cancelled"
 	data, _ := json.Marshal(evt)
 
@@ -194,7 +194,7 @@ func TestCheckoutCompletedSaga_FieldsPopulatedCorrectly(t *testing.T) {
 	ctx := context.Background()
 	data := makeCompletedPayload(400)
 
-	saga.Handle(ctx, data)
+	_ = saga.Handle(ctx, data)
 
 	order, _ := saga.orderSvc.FindByCheckoutID(ctx, 400)
 	if order.UserID != 42 {

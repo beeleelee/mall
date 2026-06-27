@@ -74,7 +74,7 @@ func TestReserve_Success(t *testing.T) {
 
 func TestReserve_InsufficientStock(t *testing.T) {
 	item, _ := NewInventoryItem(1, 101, 100, 10)
-	item.Reserve(90)
+	_ = item.Reserve(90)
 	if err := item.Reserve(20); err == nil {
 		t.Fatal("expected error for insufficient stock")
 	}
@@ -89,7 +89,7 @@ func TestReserve_InvalidQuantity(t *testing.T) {
 
 func TestReleaseReservation(t *testing.T) {
 	item, _ := NewInventoryItem(1, 101, 100, 10)
-	item.Reserve(50)
+	_ = item.Reserve(50)
 	if err := item.ReleaseReservation(20); err != nil {
 		t.Fatalf("ReleaseReservation failed: %v", err)
 	}
@@ -103,7 +103,7 @@ func TestReleaseReservation(t *testing.T) {
 
 func TestReleaseReservation_ExceedsReserved(t *testing.T) {
 	item, _ := NewInventoryItem(1, 101, 100, 10)
-	item.Reserve(30)
+	_ = item.Reserve(30)
 	if err := item.ReleaseReservation(50); err == nil {
 		t.Fatal("expected error for releasing more than reserved")
 	}
@@ -111,7 +111,7 @@ func TestReleaseReservation_ExceedsReserved(t *testing.T) {
 
 func TestConfirmReservation(t *testing.T) {
 	item, _ := NewInventoryItem(1, 101, 100, 10)
-	item.Reserve(40)
+	_ = item.Reserve(40)
 	if err := item.ConfirmReservation(40); err != nil {
 		t.Fatalf("ConfirmReservation failed: %v", err)
 	}
@@ -125,7 +125,7 @@ func TestConfirmReservation(t *testing.T) {
 
 func TestConfirmReservation_ExceedsReserved(t *testing.T) {
 	item, _ := NewInventoryItem(1, 101, 100, 10)
-	item.Reserve(30)
+	_ = item.Reserve(30)
 	if err := item.ConfirmReservation(50); err == nil {
 		t.Fatal("expected error for confirming more than reserved")
 	}
@@ -148,19 +148,19 @@ func TestIsOutOfStock(t *testing.T) {
 func TestFullFlow(t *testing.T) {
 	item, _ := NewInventoryItem(1, 101, 50, 10)
 
-	item.Reserve(10)
-	item.ConfirmReservation(10)
+	_ = item.Reserve(10)
+	_ = item.ConfirmReservation(10)
 	if item.QuantityAvailable != 40 {
 		t.Errorf("after confirm, expected 40, got %d", item.QuantityAvailable)
 	}
 
-	item.Reserve(5)
-	item.ReleaseReservation(5)
+	_ = item.Reserve(5)
+	_ = item.ReleaseReservation(5)
 	if item.ReservedQuantity != 0 {
 		t.Errorf("after release, expected 0, got %d", item.ReservedQuantity)
 	}
 
-	item.SetStock(3)
+	_ = item.SetStock(3)
 	if !item.IsLowStock() {
 		t.Error("expected low stock after reducing to 3")
 	}

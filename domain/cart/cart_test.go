@@ -48,8 +48,8 @@ func TestCart_AddItem(t *testing.T) {
 
 func TestCart_AddItem_DuplicateProduct(t *testing.T) {
 	c, _ := NewCart(1, 42)
-	c.AddItem(CartItem{ProductID: 100, SKU: "SKU001", Name: "Product 1", Quantity: 2, UnitPrice: 1000})
-	c.AddItem(CartItem{ProductID: 100, SKU: "SKU001", Name: "Product 1", Quantity: 3, UnitPrice: 1000})
+	_ = c.AddItem(CartItem{ProductID: 100, SKU: "SKU001", Name: "Product 1", Quantity: 2, UnitPrice: 1000})
+	_ = c.AddItem(CartItem{ProductID: 100, SKU: "SKU001", Name: "Product 1", Quantity: 3, UnitPrice: 1000})
 
 	if len(c.Items) != 1 {
 		t.Errorf("expected 1 item, got %d", len(c.Items))
@@ -77,7 +77,7 @@ func TestCart_AddItem_NegativeQuantity(t *testing.T) {
 
 func TestCart_UpdateQuantity(t *testing.T) {
 	c, _ := NewCart(1, 42)
-	c.AddItem(CartItem{ProductID: 100, SKU: "SKU001", Name: "P", Quantity: 2, UnitPrice: 1000})
+	_ = c.AddItem(CartItem{ProductID: 100, SKU: "SKU001", Name: "P", Quantity: 2, UnitPrice: 1000})
 
 	if err := c.UpdateQuantity(100, 5); err != nil {
 		t.Fatal(err)
@@ -89,7 +89,7 @@ func TestCart_UpdateQuantity(t *testing.T) {
 
 func TestCart_UpdateQuantity_RemoveWhenZero(t *testing.T) {
 	c, _ := NewCart(1, 42)
-	c.AddItem(CartItem{ProductID: 100, SKU: "SKU001", Name: "P", Quantity: 2, UnitPrice: 1000})
+	_ = c.AddItem(CartItem{ProductID: 100, SKU: "SKU001", Name: "P", Quantity: 2, UnitPrice: 1000})
 
 	if err := c.UpdateQuantity(100, 0); err != nil {
 		t.Fatal(err)
@@ -109,8 +109,8 @@ func TestCart_UpdateQuantity_NotFound(t *testing.T) {
 
 func TestCart_RemoveItem(t *testing.T) {
 	c, _ := NewCart(1, 42)
-	c.AddItem(CartItem{ProductID: 100, SKU: "SKU001", Name: "P", Quantity: 2, UnitPrice: 1000})
-	c.AddItem(CartItem{ProductID: 101, SKU: "SKU002", Name: "Q", Quantity: 1, UnitPrice: 2000})
+	_ = c.AddItem(CartItem{ProductID: 100, SKU: "SKU001", Name: "P", Quantity: 2, UnitPrice: 1000})
+	_ = c.AddItem(CartItem{ProductID: 101, SKU: "SKU002", Name: "Q", Quantity: 1, UnitPrice: 2000})
 
 	if err := c.RemoveItem(100); err != nil {
 		t.Fatal(err)
@@ -133,8 +133,8 @@ func TestCart_RemoveItem_NotFound(t *testing.T) {
 
 func TestCart_Clear(t *testing.T) {
 	c, _ := NewCart(1, 42)
-	c.AddItem(CartItem{ProductID: 100, Quantity: 2, UnitPrice: 1000})
-	c.AddItem(CartItem{ProductID: 101, Quantity: 1, UnitPrice: 2000})
+	_ = c.AddItem(CartItem{ProductID: 100, Quantity: 2, UnitPrice: 1000})
+	_ = c.AddItem(CartItem{ProductID: 101, Quantity: 1, UnitPrice: 2000})
 
 	c.Clear()
 	if !c.IsEmpty() {
@@ -144,8 +144,8 @@ func TestCart_Clear(t *testing.T) {
 
 func TestCart_GetTotal(t *testing.T) {
 	c, _ := NewCart(1, 42)
-	c.AddItem(CartItem{ProductID: 100, SKU: "A", Name: "A", Quantity: 2, UnitPrice: 1000})
-	c.AddItem(CartItem{ProductID: 101, SKU: "B", Name: "B", Quantity: 3, UnitPrice: 500})
+	_ = c.AddItem(CartItem{ProductID: 100, SKU: "A", Name: "A", Quantity: 2, UnitPrice: 1000})
+	_ = c.AddItem(CartItem{ProductID: 101, SKU: "B", Name: "B", Quantity: 3, UnitPrice: 500})
 
 	total := c.GetTotal()
 	if total.Subtotal != 3500 {
@@ -165,10 +165,10 @@ func TestCart_ItemTotalPrice(t *testing.T) {
 
 func TestCart_Merge(t *testing.T) {
 	c1, _ := NewCart(1, 42)
-	c1.AddItem(CartItem{ProductID: 100, SKU: "A", Name: "A", Quantity: 2, UnitPrice: 1000})
+	_ = c1.AddItem(CartItem{ProductID: 100, SKU: "A", Name: "A", Quantity: 2, UnitPrice: 1000})
 
 	c2, _ := NewCart(2, 42)
-	c2.AddItem(CartItem{ProductID: 101, SKU: "B", Name: "B", Quantity: 1, UnitPrice: 2000})
+	_ = c2.AddItem(CartItem{ProductID: 101, SKU: "B", Name: "B", Quantity: 1, UnitPrice: 2000})
 
 	if err := c1.Merge(c2); err != nil {
 		t.Fatal(err)

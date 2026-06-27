@@ -66,7 +66,7 @@ func TestCartService_UpdateQuantity(t *testing.T) {
 	svc := newTestService()
 	ctx := context.Background()
 
-	svc.AddItem(ctx, AddItemInput{CartID: 1, UserID: 42, ProductID: 100, Quantity: 2, UnitPrice: 1000})
+	_ = svc.AddItem(ctx, AddItemInput{CartID: 1, UserID: 42, ProductID: 100, Quantity: 2, UnitPrice: 1000})
 
 	cart, err := svc.UpdateQuantity(ctx, 42, 100, 5)
 	if err != nil {
@@ -81,7 +81,7 @@ func TestCartService_RemoveItem(t *testing.T) {
 	svc := newTestService()
 	ctx := context.Background()
 
-	svc.AddItem(ctx, AddItemInput{CartID: 1, UserID: 42, ProductID: 100, Quantity: 2, UnitPrice: 1000})
+	_ = svc.AddItem(ctx, AddItemInput{CartID: 1, UserID: 42, ProductID: 100, Quantity: 2, UnitPrice: 1000})
 
 	cart, err := svc.RemoveItem(ctx, 42, 100)
 	if err != nil {
@@ -96,7 +96,7 @@ func TestCartService_ClearCart(t *testing.T) {
 	svc := newTestService()
 	ctx := context.Background()
 
-	svc.AddItem(ctx, AddItemInput{CartID: 1, UserID: 42, ProductID: 100, Quantity: 2, UnitPrice: 1000})
+	_ = svc.AddItem(ctx, AddItemInput{CartID: 1, UserID: 42, ProductID: 100, Quantity: 2, UnitPrice: 1000})
 
 	cart, err := svc.ClearCart(ctx, 42)
 	if err != nil {
@@ -123,12 +123,12 @@ func TestCartService_MergeCarts(t *testing.T) {
 	logger := fakeLoggerCart{}
 
 	cart1, _ := NewCart(1, 42)
-	cart1.AddItem(CartItem{ProductID: 100, SKU: "A", Name: "A", Quantity: 2, UnitPrice: 1000})
-	repo.Save(ctx, cart1)
+	_ = cart1.AddItem(CartItem{ProductID: 100, SKU: "A", Name: "A", Quantity: 2, UnitPrice: 1000})
+	_ = repo.Save(ctx, cart1)
 
 	cart2, _ := NewCart(2, 42)
-	cart2.AddItem(CartItem{ProductID: 101, SKU: "B", Name: "B", Quantity: 1, UnitPrice: 2000})
-	repo.Save(ctx, cart2)
+	_ = cart2.AddItem(CartItem{ProductID: 101, SKU: "B", Name: "B", Quantity: 1, UnitPrice: 2000})
+	_ = repo.Save(ctx, cart2)
 
 	svc := NewCartService(repo, pub, logger)
 	cart, err := svc.MergeCarts(ctx, 1, 2)
@@ -145,10 +145,10 @@ func TestCartService_EventsPublished(t *testing.T) {
 	svc := NewCartService(newFakeCartRepo(), pub, fakeLoggerCart{})
 	ctx := context.Background()
 
-	svc.AddItem(ctx, AddItemInput{CartID: 1, UserID: 42, ProductID: 100, Quantity: 2, UnitPrice: 1000})
-	svc.AddItem(ctx, AddItemInput{CartID: 1, UserID: 42, ProductID: 101, Quantity: 1, UnitPrice: 2000})
-	svc.RemoveItem(ctx, 42, 100)
-	svc.ClearCart(ctx, 42)
+	_ = svc.AddItem(ctx, AddItemInput{CartID: 1, UserID: 42, ProductID: 100, Quantity: 2, UnitPrice: 1000})
+	_ = svc.AddItem(ctx, AddItemInput{CartID: 1, UserID: 42, ProductID: 101, Quantity: 1, UnitPrice: 2000})
+	_ = svc.RemoveItem(ctx, 42, 100)
+	_ = svc.ClearCart(ctx, 42)
 
 	pub.mu.Lock()
 	count := len(pub.published)

@@ -42,18 +42,18 @@ func newIntegrationFixture(t *testing.T) *integrationFixture {
 
 	schema := fmt.Sprintf("test_%08x", rand.Int63())[:16]
 	if _, err := db.Exec(fmt.Sprintf(`CREATE SCHEMA IF NOT EXISTS "%s"`, schema)); err != nil {
-		db.Close()
+		_ = db.Close()
 		t.Fatalf("create schema: %v", err)
 	}
 	if _, err := db.Exec(fmt.Sprintf(`SET search_path TO "%s", public`, schema)); err != nil {
-		db.Close()
+		_ = db.Close()
 		t.Fatalf("set search_path: %v", err)
 	}
 
 	migrator := database.NewMigrator(db)
 	if err := migrator.Up(); err != nil {
-		db.Exec(fmt.Sprintf(`DROP SCHEMA IF EXISTS "%s" CASCADE`, schema))
-		db.Close()
+		_, _ = db.Exec(fmt.Sprintf(`DROP SCHEMA IF EXISTS "%s" CASCADE`, schema))
+		_ = db.Close()
 		t.Fatalf("migrate: %v", err)
 	}
 
@@ -62,12 +62,12 @@ func newIntegrationFixture(t *testing.T) *integrationFixture {
 		DB:   1,
 	})
 	if err := rdb.Ping(context.Background()).Err(); err != nil {
-		db.Exec(fmt.Sprintf(`DROP SCHEMA IF EXISTS "%s" CASCADE`, schema))
-		db.Close()
-		rdb.Close()
+		_, _ = db.Exec(fmt.Sprintf(`DROP SCHEMA IF EXISTS "%s" CASCADE`, schema))
+		_ = db.Close()
+		_ = rdb.Close()
 		t.Fatalf("connect redis: %v", err)
 	}
-	rdb.FlushDB(context.Background())
+	_ = rdb.FlushDB(context.Background())
 
 	repo := NewPostgresProductRepository(db, rdb)
 
@@ -77,10 +77,10 @@ func newIntegrationFixture(t *testing.T) *integrationFixture {
 		rdb:    rdb,
 		schema: schema,
 		cleanup: func() {
-			db.Exec(fmt.Sprintf(`DROP SCHEMA IF EXISTS "%s" CASCADE`, schema))
-			rdb.FlushDB(context.Background())
-			db.Close()
-			rdb.Close()
+			_, _ = db.Exec(fmt.Sprintf(`DROP SCHEMA IF EXISTS "%s" CASCADE`, schema))
+			_ = rdb.FlushDB(context.Background())
+			_ = db.Close()
+			_ = rdb.Close()
 		},
 	}
 }
@@ -90,13 +90,13 @@ func servicesUp() bool {
 	if err != nil {
 		return false
 	}
-	pg.Close()
+	_ = pg.Close()
 
 	rd, err := net.DialTimeout("tcp", "localhost:6379", 2*time.Second)
 	if err != nil {
 		return false
 	}
-	rd.Close()
+	_ = rd.Close()
 
 	return true
 }
@@ -154,7 +154,7 @@ func TestIntegration_SaveAndFindBySKU(t *testing.T) {
 	defer f.cleanup()
 
 	p, _ := domain.NewProduct(1, "INT-SKU-002", "SKU Lookup", "desc", "cat", domain.Money{Amount: 999, Currency: "USD"}, nil)
-	f.repo.Save(ctx, p)
+	_ = f.repo.Save(ctx, p)
 
 	got, err := f.repo.FindBySKU(ctx, "INT-SKU-002")
 	if err != nil {
@@ -208,8 +208,8 @@ func TestIntegration_SearchByCategory(t *testing.T) {
 
 	p1, _ := domain.NewProduct(1, "CAT-A", "A", "desc", "electronics", domain.Money{Amount: 100, Currency: "USD"}, nil)
 	p2, _ := domain.NewProduct(2, "CAT-B", "B", "desc", "clothing", domain.Money{Amount: 200, Currency: "USD"}, nil)
-	f.repo.Save(ctx, p1)
-	f.repo.Save(ctx, p2)
+	_ = f.repo.Save(ctx, p1)
+	_ = f.repo.Save(ctx, p2)
 
 	result, err := f.repo.Search(ctx, "", domain.SearchOptions{Category: "electronics"})
 	if err != nil {
@@ -243,12 +243,12 @@ func TestIntegration_SearchWithStatusFilter(t *testing.T) {
 
 	p1, _ := domain.NewProduct(1, "STA-A", "Active", "desc", "cat", domain.Money{Amount: 100, Currency: "USD"}, nil)
 	p2, _ := domain.NewProduct(2, "STA-B", "Inactive", "desc", "cat", domain.Money{Amount: 200, Currency: "USD"}, nil)
-	p2.ChangeStatus(domain.ProductStatusInactive)
+	_ = p2.ChangeStatus(domain.ProductStatusInactive)
 	p3, _ := domain.NewProduct(3, "STA-C", "Discontinued", "desc", "cat", domain.Money{Amount: 300, Currency: "USD"}, nil)
-	p3.ChangeStatus(domain.ProductStatusDiscontinued)
-	f.repo.Save(ctx, p1)
-	f.repo.Save(ctx, p2)
-	f.repo.Save(ctx, p3)
+	_ = p3.ChangeStatus(domain.ProductStatusDiscontinued)
+	_ = f.repo.Save(ctx, p1)
+	_ = f.repo.Save(ctx, p2)
+	_ = f.repo.Save(ctx, p3)
 
 	result, err := f.repo.Search(ctx, "", domain.SearchOptions{Status: domain.ProductStatusDiscontinued})
 	if err != nil {
@@ -365,7 +365,7 @@ func TestIntegration_DeleteProduct(t *testing.T) {
 	defer f.cleanup()
 
 	p, _ := domain.NewProduct(1, "INT-DEL", "To Delete", "desc", "cat", domain.Money{Amount: 100, Currency: "USD"}, nil)
-	f.repo.Save(ctx, p)
+	_ = f.repo.Save(ctx, p)
 
 	if err := f.repo.Delete(ctx, 1); err != nil {
 		t.Fatalf("delete: %v", err)
@@ -392,10 +392,10 @@ func TestIntegration_CachePopulation(t *testing.T) {
 	defer f.cleanup()
 
 	p, _ := domain.NewProduct(1, "INT-CACHE", "Cache Test", "desc", "cat", domain.Money{Amount: 500, Currency: "USD"}, nil)
-	f.repo.Save(ctx, p)
+	_ = f.repo.Save(ctx, p)
 
 	// Clear product from any cached state and do a fresh read
-	f.repo.FindByID(ctx, 1)
+	_, _ = f.repo.FindByID(ctx, 1)
 
 	key := f.repo.idCacheKey(1)
 	val, err := f.rdb.Get(ctx, key).Result()
@@ -421,17 +421,17 @@ func TestIntegration_CacheInvalidationOnSave(t *testing.T) {
 	defer f.cleanup()
 
 	p, _ := domain.NewProduct(1, "INT-INV", "Before", "desc", "cat", domain.Money{Amount: 100, Currency: "USD"}, nil)
-	f.repo.Save(ctx, p)
+	_ = f.repo.Save(ctx, p)
 
 	// Populate cache
-	f.repo.FindByID(ctx, 1)
+	_, _ = f.repo.FindByID(ctx, 1)
 	if _, err := f.rdb.Get(ctx, f.repo.idCacheKey(1)).Result(); err != nil {
 		t.Fatalf("expected cache hit before save: %v", err)
 	}
 
 	// Update product
-	p.ChangePrice(domain.Money{Amount: 200, Currency: "USD"})
-	f.repo.Save(ctx, p)
+	_ = p.ChangePrice(domain.Money{Amount: 200, Currency: "USD"})
+	_ = f.repo.Save(ctx, p)
 
 	// Cache should be invalidated
 	_, err := f.rdb.Get(ctx, f.repo.idCacheKey(1)).Result()
@@ -445,14 +445,14 @@ func TestIntegration_CacheInvalidationOnDelete(t *testing.T) {
 	defer f.cleanup()
 
 	p, _ := domain.NewProduct(1, "INT-DELC", "Del Cache", "desc", "cat", domain.Money{Amount: 100, Currency: "USD"}, nil)
-	f.repo.Save(ctx, p)
+	_ = f.repo.Save(ctx, p)
 
-	f.repo.FindByID(ctx, 1)
+	_, _ = f.repo.FindByID(ctx, 1)
 	if _, err := f.rdb.Get(ctx, f.repo.idCacheKey(1)).Result(); err != nil {
 		t.Fatalf("expected cache hit before delete: %v", err)
 	}
 
-	f.repo.Delete(ctx, 1)
+	_ = f.repo.Delete(ctx, 1)
 
 	_, err := f.rdb.Get(ctx, f.repo.idCacheKey(1)).Result()
 	if err != redis.Nil {
@@ -465,8 +465,8 @@ func TestIntegration_CacheTTL(t *testing.T) {
 	defer f.cleanup()
 
 	p, _ := domain.NewProduct(1, "INT-TTL", "TTL Test", "desc", "cat", domain.Money{Amount: 100, Currency: "USD"}, nil)
-	f.repo.Save(ctx, p)
-	f.repo.FindByID(ctx, 1)
+	_ = f.repo.Save(ctx, p)
+	_, _ = f.repo.FindByID(ctx, 1)
 
 	ttl, err := f.rdb.TTL(ctx, f.repo.idCacheKey(1)).Result()
 	if err != nil {
@@ -485,11 +485,11 @@ func TestIntegration_UpdateThenFind(t *testing.T) {
 	defer f.cleanup()
 
 	p, _ := domain.NewProduct(1, "INT-UPD", "Original", "original desc", "original cat", domain.Money{Amount: 1000, Currency: "USD"}, nil)
-	f.repo.Save(ctx, p)
+	_ = f.repo.Save(ctx, p)
 
-	p.ChangePrice(domain.Money{Amount: 2500, Currency: "USD"})
-	p.UpdateDetails("Updated", "updated desc", "updated cat")
-	f.repo.Save(ctx, p)
+	_ = p.ChangePrice(domain.Money{Amount: 2500, Currency: "USD"})
+	_ = p.UpdateDetails("Updated", "updated desc", "updated cat")
+	_ = f.repo.Save(ctx, p)
 
 	got, err := f.repo.FindByID(ctx, 1)
 	if err != nil {
@@ -515,7 +515,7 @@ func TestIntegration_AttributesRoundTrip(t *testing.T) {
 
 	attrs := map[string]any{"color": "navy", "size": "L", "weight_kg": 0.5}
 	p, _ := domain.NewProduct(1, "INT-ATTR", "Attr Test", "desc", "cat", domain.Money{Amount: 4999, Currency: "USD"}, attrs)
-	f.repo.Save(ctx, p)
+	_ = f.repo.Save(ctx, p)
 
 	got, err := f.repo.FindByID(ctx, 1)
 	if err != nil {

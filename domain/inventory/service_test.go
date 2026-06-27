@@ -113,7 +113,7 @@ func TestInventoryService_UpdateStock(t *testing.T) {
 	logger := fakeLogger{}
 	svc := NewInventoryService(repo, logger)
 
-	svc.SetStock(context.Background(), 1, 101, 100, 10)
+	_ = svc.SetStock(context.Background(), 1, 101, 100, 10)
 	item, err := svc.UpdateStock(context.Background(), 101, 200)
 	if err != nil {
 		t.Fatalf("UpdateStock failed: %v", err)
@@ -128,7 +128,7 @@ func TestInventoryService_Reserve(t *testing.T) {
 	logger := fakeLogger{}
 	svc := NewInventoryService(repo, logger)
 
-	svc.SetStock(context.Background(), 1, 101, 100, 10)
+	_ = svc.SetStock(context.Background(), 1, 101, 100, 10)
 	item, err := svc.Reserve(context.Background(), 101, 30)
 	if err != nil {
 		t.Fatalf("Reserve failed: %v", err)
@@ -143,7 +143,7 @@ func TestInventoryService_Reserve_Insufficient(t *testing.T) {
 	logger := fakeLogger{}
 	svc := NewInventoryService(repo, logger)
 
-	svc.SetStock(context.Background(), 1, 101, 10, 10)
+	_ = svc.SetStock(context.Background(), 1, 101, 10, 10)
 	_, err := svc.Reserve(context.Background(), 101, 30)
 	if err == nil {
 		t.Fatal("expected error for insufficient stock")
@@ -155,7 +155,7 @@ func TestInventoryService_GetStock(t *testing.T) {
 	logger := fakeLogger{}
 	svc := NewInventoryService(repo, logger)
 
-	svc.SetStock(context.Background(), 1, 101, 50, 10)
+	_ = svc.SetStock(context.Background(), 1, 101, 50, 10)
 	item, err := svc.GetStock(context.Background(), 101)
 	if err != nil {
 		t.Fatalf("GetStock failed: %v", err)
@@ -181,9 +181,9 @@ func TestInventoryService_ListLowStock(t *testing.T) {
 	logger := fakeLogger{}
 	svc := NewInventoryService(repo, logger)
 
-	svc.SetStock(context.Background(), 1, 101, 5, 10)
-	svc.SetStock(context.Background(), 2, 102, 20, 10)
-	svc.SetStock(context.Background(), 3, 103, 50, 10)
+	_ = svc.SetStock(context.Background(), 1, 101, 5, 10)
+	_ = svc.SetStock(context.Background(), 2, 102, 20, 10)
+	_ = svc.SetStock(context.Background(), 3, 103, 50, 10)
 
 	items, err := svc.ListLowStock(context.Background(), 10)
 	if err != nil {
@@ -202,16 +202,16 @@ func TestInventoryService_ReleaseAndConfirm(t *testing.T) {
 	logger := fakeLogger{}
 	svc := NewInventoryService(repo, logger)
 
-	svc.SetStock(context.Background(), 1, 101, 100, 10)
-	svc.Reserve(context.Background(), 101, 40)
-	svc.ReleaseReservation(context.Background(), 101, 10)
+	_ = svc.SetStock(context.Background(), 1, 101, 100, 10)
+	_ = svc.Reserve(context.Background(), 101, 40)
+	_ = svc.ReleaseReservation(context.Background(), 101, 10)
 
 	item, _ := svc.GetStock(context.Background(), 101)
 	if item.ReservedQuantity != 30 {
 		t.Errorf("after partial release, expected reserved 30, got %d", item.ReservedQuantity)
 	}
 
-	svc.ConfirmReservation(context.Background(), 101, 30)
+	_ = svc.ConfirmReservation(context.Background(), 101, 30)
 	item, _ = svc.GetStock(context.Background(), 101)
 	if item.QuantityAvailable != 70 {
 		t.Errorf("after confirm, expected available 70, got %d", item.QuantityAvailable)
