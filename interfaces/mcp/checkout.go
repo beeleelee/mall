@@ -118,6 +118,17 @@ var checkoutTools = []ToolDefinition{
 			},
 		},
 	},
+	{
+		Name:        "select_mandate",
+		Description: "Select an AP2 mandate for the checkout",
+		InputSchema: InputSchema{
+			Type: "object",
+			Properties: map[string]PropertySchema{
+				"id":         {Type: "number", Description: "Checkout ID"},
+				"mandate_id": {Type: "number", Description: "Mandate ID"},
+			},
+		},
+	},
 }
 
 func (h *CheckoutMCPHandler) ListTools() []ToolDefinition {
@@ -142,6 +153,8 @@ func (h *CheckoutMCPHandler) HandleTool(ctx context.Context, name string, raw js
 		return h.callComplete(ctx, raw)
 	case "cancel_checkout":
 		return h.callCancel(ctx, raw)
+	case "select_mandate":
+		return h.callSelectMandate(ctx, raw)
 	default:
 		return nil, kernel.NewDomainError(kernel.ErrInvalidArgument, "unknown tool: "+name)
 	}
@@ -339,6 +352,31 @@ func (h *CheckoutMCPHandler) callCancel(ctx context.Context, raw json.RawMessage
 	}
 
 	session, err := h.svc.Cancel(ctx, kernel.ID(args.ID))
+	if err != nil {
+		return nil, err
+	}
+
+	return checkoutToMap(session), nil
+}
+
+type selectMandateArgs struct {
+	ID        int64 `json:"id"`
+	MandateID int64 `json:"mandate_id"`
+}
+
+func (h *CheckoutMCPHandler) callSelectMandate(ctx context.Context, raw json.RawMessage) (any, error) {
+	var args selectMandateArgs
+	if err := json.Unmarshal(raw, &args); err != nil {
+		return nil, kernel.NewDomainError(kernel.ErrInvalidArgument, "invalid arguments")
+	}
+	if args.ID <= 0 {
+		return nil, kernel.NewDomainError(kernel.ErrInvalidArgument, "id must be positive")
+	}
+	if args.MandateID <= 0 {
+		return nil, kernel.NewDomainError(kernel.ErrInvalidArgument, "mandate_id must be positive")
+	}
+
+	session, err := h.svc.SelectMandate(ctx, kernel.ID(args.ID), kernel.ID(args.MandateID))
 	if err != nil {
 		return nil, err
 	}
