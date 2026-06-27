@@ -140,7 +140,7 @@ func (r *PostgresProductRepository) Search(ctx context.Context, query string, op
 	if err != nil {
 		return nil, kernel.NewDomainErrorWithCause(kernel.ErrInternal, "search products", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	products := []*domain.Product{}
 	for rows.Next() {
