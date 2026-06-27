@@ -44,6 +44,16 @@ var paymentTools = []ToolDefinition{
 		},
 	},
 	{
+		Name:        "get_mandate",
+		Description: "Get a mandate by its ID",
+		InputSchema: InputSchema{
+			Type: "object",
+			Properties: map[string]PropertySchema{
+				"id": {Type: "number", Description: "Mandate ID"},
+			},
+		},
+	},
+	{
 		Name:        "approve_mandate",
 		Description: "Approve a mandate with a signature",
 		InputSchema: InputSchema{
@@ -65,6 +75,26 @@ var paymentTools = []ToolDefinition{
 			},
 		},
 	},
+	{
+		Name:        "settle_mandate",
+		Description: "Settle a mandate after payment is captured",
+		InputSchema: InputSchema{
+			Type: "object",
+			Properties: map[string]PropertySchema{
+				"id": {Type: "number", Description: "Mandate ID"},
+			},
+		},
+	},
+	{
+		Name:        "cancel_mandate",
+		Description: "Cancel a mandate",
+		InputSchema: InputSchema{
+			Type: "object",
+			Properties: map[string]PropertySchema{
+				"id": {Type: "number", Description: "Mandate ID"},
+			},
+		},
+	},
 }
 
 func (h *PaymentMCPHandler) ListTools() []ToolDefinition {
@@ -77,10 +107,16 @@ func (h *PaymentMCPHandler) HandleTool(ctx context.Context, name string, raw jso
 		return h.callCreateMandate(ctx, raw)
 	case "list_mandates":
 		return h.callListMandates(ctx, raw)
+	case "get_mandate":
+		return h.callGetMandate(ctx, raw)
 	case "approve_mandate":
 		return h.callApproveMandate(ctx, raw)
 	case "execute_mandate":
 		return h.callExecuteMandate(ctx, raw)
+	case "settle_mandate":
+		return h.callSettleMandate(ctx, raw)
+	case "cancel_mandate":
+		return h.callCancelMandate(ctx, raw)
 	default:
 		return nil, kernel.NewDomainError(kernel.ErrInvalidArgument, "unknown tool: "+name)
 	}
@@ -187,6 +223,69 @@ func (h *PaymentMCPHandler) callExecuteMandate(ctx context.Context, raw json.Raw
 	}
 
 	m, err := h.svc.ExecuteMandate(ctx, kernel.ID(args.ID), args.Token)
+	if err != nil {
+		return nil, err
+	}
+
+	return mandateToMap(m), nil
+}
+
+type getMandateArgs struct {
+	ID int64 `json:"id"`
+}
+
+func (h *PaymentMCPHandler) callGetMandate(ctx context.Context, raw json.RawMessage) (any, error) {
+	var args getMandateArgs
+	if err := json.Unmarshal(raw, &args); err != nil {
+		return nil, kernel.NewDomainError(kernel.ErrInvalidArgument, "invalid arguments")
+	}
+	if args.ID <= 0 {
+		return nil, kernel.NewDomainError(kernel.ErrInvalidArgument, "id must be positive")
+	}
+
+	m, err := h.svc.GetMandate(ctx, kernel.ID(args.ID))
+	if err != nil {
+		return nil, err
+	}
+
+	return mandateToMap(m), nil
+}
+
+type settleMandateArgs struct {
+	ID int64 `json:"id"`
+}
+
+func (h *PaymentMCPHandler) callSettleMandate(ctx context.Context, raw json.RawMessage) (any, error) {
+	var args settleMandateArgs
+	if err := json.Unmarshal(raw, &args); err != nil {
+		return nil, kernel.NewDomainError(kernel.ErrInvalidArgument, "invalid arguments")
+	}
+	if args.ID <= 0 {
+		return nil, kernel.NewDomainError(kernel.ErrInvalidArgument, "id must be positive")
+	}
+
+	m, err := h.svc.SettleMandate(ctx, kernel.ID(args.ID))
+	if err != nil {
+		return nil, err
+	}
+
+	return mandateToMap(m), nil
+}
+
+type cancelMandateArgs struct {
+	ID int64 `json:"id"`
+}
+
+func (h *PaymentMCPHandler) callCancelMandate(ctx context.Context, raw json.RawMessage) (any, error) {
+	var args cancelMandateArgs
+	if err := json.Unmarshal(raw, &args); err != nil {
+		return nil, kernel.NewDomainError(kernel.ErrInvalidArgument, "invalid arguments")
+	}
+	if args.ID <= 0 {
+		return nil, kernel.NewDomainError(kernel.ErrInvalidArgument, "id must be positive")
+	}
+
+	m, err := h.svc.CancelMandate(ctx, kernel.ID(args.ID))
 	if err != nil {
 		return nil, err
 	}
