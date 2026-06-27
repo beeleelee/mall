@@ -3,6 +3,7 @@ package mcp
 import (
 	"context"
 	"encoding/json"
+	"time"
 
 	"github.com/beeleelee/mall/domain/kernel"
 
@@ -25,8 +26,10 @@ var paymentTools = []ToolDefinition{
 		InputSchema: InputSchema{
 			Type: "object",
 			Properties: map[string]PropertySchema{
-				"user_id":    {Type: "number", Description: "User ID"},
-				"max_amount": {Type: "number", Description: "Maximum amount in cents"},
+				"user_id":     {Type: "number", Description: "User ID"},
+				"max_amount":  {Type: "number", Description: "Maximum amount in cents"},
+				"merchant_id": {Type: "number", Description: "Merchant ID"},
+				"expiry":      {Type: "string", Description: "Expiry date in RFC3339 format (optional, defaults to +1 year)"},
 			},
 		},
 	},
@@ -84,8 +87,10 @@ func (h *PaymentMCPHandler) HandleTool(ctx context.Context, name string, raw jso
 }
 
 type createMandateArgs struct {
-	UserID    int64 `json:"user_id"`
-	MaxAmount int64 `json:"max_amount"`
+	UserID     int64  `json:"user_id"`
+	MaxAmount  int64  `json:"max_amount"`
+	MerchantID int64  `json:"merchant_id"`
+	Expiry     string `json:"expiry,omitempty"`
 }
 
 func (h *PaymentMCPHandler) callCreateMandate(ctx context.Context, raw json.RawMessage) (any, error) {
@@ -96,6 +101,18 @@ func (h *PaymentMCPHandler) callCreateMandate(ctx context.Context, raw json.RawM
 	if args.UserID <= 0 {
 		return nil, kernel.NewDomainError(kernel.ErrInvalidArgument, "user_id must be positive")
 	}
+	if args.MerchantID <= 0 {
+		return nil, kernel.NewDomainError(kernel.ErrInvalidArgument, "merchant_id must be positive")
+	}
+
+	expiry := time.Now().AddDate(1, 0, 0)
+	if args.Expiry != "" {
+		var err error
+		expiry, err = time.Parse(time.RFC3339, args.Expiry)
+		if err != nil {
+			return nil, kernel.NewDomainError(kernel.ErrInvalidArgument, "invalid expiry format, use RFC3339")
+		}
+	}
 
 	id, err := h.sf.NextID()
 	if err != nil {
@@ -103,7 +120,9 @@ func (h *PaymentMCPHandler) callCreateMandate(ctx context.Context, raw json.RawM
 	}
 
 	m, err := h.svc.RequestMandate(ctx, id, kernel.ID(args.UserID), domain.MandateScope{
-		MaxAmount: args.MaxAmount,
+		MaxAmount:  args.MaxAmount,
+		MerchantID: kernel.ID(args.MerchantID),
+		Expiry:     expiry,
 	})
 	if err != nil {
 		return nil, err
