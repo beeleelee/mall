@@ -153,7 +153,6 @@ func main() {
 	catalogSvc := domainCatalog.NewCatalogService(catalogRepo, logger)
 	catalogHandler := rest.NewCatalogHandler(catalogSvc)
 	mcpRouter := mcp.NewMCPRouter()
-	mcpRouter.Register(mcp.NewCatalogMCPHandler(catalogSvc))
 
 	cartRepo := infraCart.NewPostgresCartRepository(db, rdb)
 	cartPub := infraCart.NewNATSCartEventPublisher(js)
@@ -193,6 +192,14 @@ func main() {
 	inventoryRepo := infraInventory.NewPostgresInventoryRepository(db, rdb)
 	inventoryLogger := logger.WithCapability("inventory")
 	inventorySvc := domainInventory.NewInventoryService(inventoryRepo, inventoryLogger)
+
+	mcpRouter.Register(mcp.NewCatalogMCPHandler(catalogSvc))
+	mcpRouter.Register(mcp.NewCartMCPHandler(cartSvc, sf))
+	mcpRouter.Register(mcp.NewCheckoutMCPHandler(checkoutSvc, sf))
+	mcpRouter.Register(mcp.NewOrderMCPHandler(orderSvc))
+	mcpRouter.Register(mcp.NewDiscountMCPHandler(discountSvc, sf))
+	mcpRouter.Register(mcp.NewInventoryMCPHandler(inventorySvc, sf))
+	mcpRouter.Register(mcp.NewPaymentMCPHandler(paymentSvc, sf))
 
 	adminHandler := rest.NewAdminHandler(catalogSvc, orderSvc, appSvc, inventorySvc, sf)
 	adminMW := middleware.AdminMiddleware(userRepo)
