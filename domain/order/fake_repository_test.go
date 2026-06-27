@@ -2,13 +2,11 @@ package order
 
 import (
 	"context"
-	"sync"
 
 	"github.com/beeleelee/mall/domain/kernel"
 )
 
 type fakeOrderRepo struct {
-	mu     sync.Mutex
 	orders map[kernel.ID]*Order
 	byUser map[kernel.ID][]kernel.ID
 }
