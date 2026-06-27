@@ -17,7 +17,7 @@ func InitTracerProvider(serviceName string) (*sdktrace.TracerProvider, error) {
 		return nil, nil
 	}
 
-	exporter, err := otlptracegrpc.New(context.TODO(),
+	exporter, err := otlptracegrpc.New(context.Background(),
 		otlptracegrpc.WithEndpoint(endpoint),
 		otlptracegrpc.WithInsecure(),
 	)
