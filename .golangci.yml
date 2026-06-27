@@ -21,8 +21,6 @@ linters-settings:
     local-prefixes: github.com/beeleelee/mall
   revive:
     rules:
-      - name: exported
-        severity: warning
       - name: blank-imports
       - name: context-as-argument
       - name: error-return
