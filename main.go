@@ -152,7 +152,8 @@ func main() {
 	catalogRepo := infraCatalog.NewPostgresProductRepository(db, rdb)
 	catalogSvc := domainCatalog.NewCatalogService(catalogRepo, logger)
 	catalogHandler := rest.NewCatalogHandler(catalogSvc)
-	catalogMCPHandler := mcp.NewCatalogMCPHandler(catalogSvc)
+	mcpRouter := mcp.NewMCPRouter()
+	mcpRouter.Register(mcp.NewCatalogMCPHandler(catalogSvc))
 
 	cartRepo := infraCart.NewPostgresCartRepository(db, rdb)
 	cartPub := infraCart.NewNATSCartEventPublisher(js)
@@ -352,7 +353,7 @@ func main() {
 	srv.AddRoute(gozerorest.Route{
 		Method:  http.MethodPost,
 		Path:    "/mcp",
-		Handler: catalogMCPHandler.ServeHTTP,
+		Handler: mcpRouter.ServeHTTP,
 	})
 
 	srv.AddRoute(gozerorest.Route{

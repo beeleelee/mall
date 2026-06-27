@@ -3,74 +3,30 @@ package mcp
 import (
 	"context"
 	"encoding/json"
-	"net/http"
 
 	domain "github.com/beeleelee/mall/domain/catalog"
 	"github.com/beeleelee/mall/domain/kernel"
 )
 
 type CatalogMCPHandler struct {
-	svc *domain.CatalogService
+	svc   *domain.CatalogService
+	tools []ToolDefinition
 }
 
 func NewCatalogMCPHandler(svc *domain.CatalogService) *CatalogMCPHandler {
-	return &CatalogMCPHandler{svc: svc}
+	return &CatalogMCPHandler{
+		svc:   svc,
+		tools: catalogTools,
+	}
 }
 
-type jsonRPCRequest struct {
-	JSONRPC string          `json:"jsonrpc"`
-	Method  string          `json:"method"`
-	Params  json.RawMessage `json:"params,omitempty"`
-	ID      json.RawMessage `json:"id"`
-}
-
-type jsonRPCResponse struct {
-	JSONRPC string    `json:"jsonrpc"`
-	Result  any       `json:"result,omitempty"`
-	Error   *rpcError `json:"error,omitempty"`
-	ID      any       `json:"id"`
-}
-
-type rpcError struct {
-	Code    int    `json:"code"`
-	Message string `json:"message"`
-	Data    any    `json:"data,omitempty"`
-}
-
-type toolDefinition struct {
-	Name        string      `json:"name"`
-	Description string      `json:"description"`
-	InputSchema inputSchema `json:"inputSchema"`
-}
-
-type inputSchema struct {
-	Type       string                    `json:"type"`
-	Properties map[string]propertySchema `json:"properties"`
-}
-
-type propertySchema struct {
-	Type        string   `json:"type"`
-	Description string   `json:"description"`
-	Enum        []string `json:"enum,omitempty"`
-}
-
-type toolCallParams struct {
-	Name      string          `json:"name"`
-	Arguments json.RawMessage `json:"arguments"`
-}
-
-type toolContent struct {
-	Type string `json:"type"`
-	Text string `json:"text"`
-}
-
-var tools = []toolDefinition{
+var catalogTools = []ToolDefinition{
 	{
 		Name:        "search_catalog",
 		Description: "Search for products by query, category, or price range",
-		InputSchema: inputSchema{
+		InputSchema: InputSchema{
 			Type: "object",
-			Properties: map[string]propertySchema{
+			Properties: map[string]PropertySchema{
 				"query":     {Type: "string", Description: "Search query (matches name, description, SKU)"},
 				"category":  {Type: "string", Description: "Filter by category"},
 				"min_price": {Type: "number", Description: "Minimum price in cents"},
@@ -83,9 +39,9 @@ var tools = []toolDefinition{
 	{
 		Name:        "lookup_catalog",
 		Description: "Look up a product by its SKU",
-		InputSchema: inputSchema{
+		InputSchema: InputSchema{
 			Type: "object",
-			Properties: map[string]propertySchema{
+			Properties: map[string]PropertySchema{
 				"sku": {Type: "string", Description: "Product SKU (stock keeping unit)"},
 			},
 		},
@@ -93,83 +49,30 @@ var tools = []toolDefinition{
 	{
 		Name:        "get_product",
 		Description: "Get a product by its numeric ID",
-		InputSchema: inputSchema{
+		InputSchema: InputSchema{
 			Type: "object",
-			Properties: map[string]propertySchema{
+			Properties: map[string]PropertySchema{
 				"id": {Type: "number", Description: "Product numeric ID"},
 			},
 		},
 	},
 }
 
-func (h *CatalogMCPHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		writeRPCError(w, nil, -32600, "only POST is accepted")
-		return
-	}
-
-	var req jsonRPCRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeRPCError(w, nil, -32700, "parse error: invalid JSON")
-		return
-	}
-
-	if req.JSONRPC != "2.0" {
-		writeRPCError(w, req.ID, -32600, "invalid jsonrpc version")
-		return
-	}
-
-	switch req.Method {
-	case "tools/list":
-		h.handleListTools(w, req)
-	case "tools/call":
-		h.handleCallTool(w, r, req)
-	default:
-		writeRPCError(w, req.ID, -32601, "method not found: "+req.Method)
-	}
+func (h *CatalogMCPHandler) ListTools() []ToolDefinition {
+	return h.tools
 }
 
-func (h *CatalogMCPHandler) handleListTools(w http.ResponseWriter, req jsonRPCRequest) {
-	writeRPCResult(w, req.ID, map[string]any{
-		"tools": tools,
-	})
-}
-
-func (h *CatalogMCPHandler) handleCallTool(w http.ResponseWriter, r *http.Request, req jsonRPCRequest) {
-	var params toolCallParams
-	if err := json.Unmarshal(req.Params, &params); err != nil {
-		writeRPCError(w, req.ID, -32602, "invalid params")
-		return
-	}
-
-	var result any
-	var err error
-
-	ctx := r.Context()
-
-	switch params.Name {
+func (h *CatalogMCPHandler) HandleTool(ctx context.Context, name string, raw json.RawMessage) (any, error) {
+	switch name {
 	case "search_catalog":
-		result, err = h.callSearch(ctx, params.Arguments)
+		return h.callSearch(ctx, raw)
 	case "lookup_catalog":
-		result, err = h.callLookup(ctx, params.Arguments)
+		return h.callLookup(ctx, raw)
 	case "get_product":
-		result, err = h.callGetProduct(ctx, params.Arguments)
+		return h.callGetProduct(ctx, raw)
 	default:
-		writeRPCError(w, req.ID, -32601, "tool not found: "+params.Name)
-		return
+		return nil, kernel.NewDomainError(kernel.ErrInvalidArgument, "unknown tool: "+name)
 	}
-
-	if err != nil {
-		writeRPCError(w, req.ID, -32000, err.Error())
-		return
-	}
-
-	data, _ := json.Marshal(result)
-	writeRPCResult(w, req.ID, map[string]any{
-		"content": []toolContent{
-			{Type: "text", Text: string(data)},
-		},
-	})
 }
 
 type searchArgs struct {
@@ -272,26 +175,4 @@ func productToMap(p *domain.Product) map[string]any {
 		"status":     string(p.Status),
 		"attributes": p.Attributes,
 	}
-}
-
-func writeRPCResult(w http.ResponseWriter, id any, result any) {
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(jsonRPCResponse{
-		JSONRPC: "2.0",
-		Result:  result,
-		ID:      id,
-	})
-}
-
-func writeRPCError(w http.ResponseWriter, id any, code int, msg string) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK) // JSON-RPC uses 200 even for errors
-	json.NewEncoder(w).Encode(jsonRPCResponse{
-		JSONRPC: "2.0",
-		Error: &rpcError{
-			Code:    code,
-			Message: msg,
-		},
-		ID: id,
-	})
 }

@@ -67,10 +67,17 @@ func (fakeLoggerMCP) Info(_ context.Context, _ string, _ ...kernel.LogField)    
 func (fakeLoggerMCP) Warn(_ context.Context, _ string, _ ...kernel.LogField)           {}
 func (fakeLoggerMCP) Error(_ context.Context, _ string, _ error, _ ...kernel.LogField) {}
 
-func TestMCP_ToolsList(t *testing.T) {
+func newRouter(t *testing.T) (*MCPRouter, *fakeRepo) {
+	t.Helper()
 	repo := newFakeRepo()
 	svc := domain.NewCatalogService(repo, fakeLoggerMCP{})
-	h := NewCatalogMCPHandler(svc)
+	router := NewMCPRouter()
+	router.Register(NewCatalogMCPHandler(svc))
+	return router, repo
+}
+
+func TestMCP_ToolsList(t *testing.T) {
+	router, _ := newRouter(t)
 
 	body, _ := json.Marshal(map[string]any{
 		"jsonrpc": "2.0",
@@ -81,7 +88,7 @@ func TestMCP_ToolsList(t *testing.T) {
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodPost, "/mcp", bytes.NewReader(body))
 	r.Header.Set("Content-Type", "application/json")
-	h.ServeHTTP(w, r)
+	router.ServeHTTP(w, r)
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", w.Code)
@@ -106,9 +113,7 @@ func TestMCP_ToolsList(t *testing.T) {
 }
 
 func TestMCP_CallTool(t *testing.T) {
-	repo := newFakeRepo()
-	svc := domain.NewCatalogService(repo, fakeLoggerMCP{})
-	h := NewCatalogMCPHandler(svc)
+	router, repo := newRouter(t)
 
 	sf, _ := kernel.NewSnowflake(1)
 	id, _ := sf.NextID()
@@ -135,7 +140,7 @@ func TestMCP_CallTool(t *testing.T) {
 
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest(http.MethodPost, "/mcp", bytes.NewReader(body))
-		h.ServeHTTP(w, r)
+		router.ServeHTTP(w, r)
 
 		if w.Code != http.StatusOK {
 			t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
@@ -168,7 +173,7 @@ func TestMCP_CallTool(t *testing.T) {
 
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest(http.MethodPost, "/mcp", bytes.NewReader(body))
-		h.ServeHTTP(w, r)
+		router.ServeHTTP(w, r)
 
 		if w.Code != http.StatusOK {
 			t.Fatalf("expected 200, got %d", w.Code)
@@ -194,7 +199,7 @@ func TestMCP_CallTool(t *testing.T) {
 
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest(http.MethodPost, "/mcp", bytes.NewReader(body))
-		h.ServeHTTP(w, r)
+		router.ServeHTTP(w, r)
 
 		var resp map[string]any
 		json.Unmarshal(w.Body.Bytes(), &resp)
@@ -216,7 +221,7 @@ func TestMCP_CallTool(t *testing.T) {
 
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest(http.MethodPost, "/mcp", bytes.NewReader(body))
-		h.ServeHTTP(w, r)
+		router.ServeHTTP(w, r)
 
 		var resp map[string]any
 		json.Unmarshal(w.Body.Bytes(), &resp)
