@@ -10,18 +10,18 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/redis/go-redis/v9"
 
-	"github.com/beeleelee/mall/domain/kernel"
 	domain "github.com/beeleelee/mall/domain/inventory"
+	"github.com/beeleelee/mall/domain/kernel"
 )
 
 type inventoryRow struct {
-	ID                 int64     `db:"id"`
-	ProductID          int64     `db:"product_id"`
-	QuantityAvailable  int       `db:"quantity_available"`
-	ReservedQuantity   int       `db:"reserved_quantity"`
-	LowStockThreshold  int       `db:"low_stock_threshold"`
-	CreatedAt          time.Time `db:"created_at"`
-	UpdatedAt          time.Time `db:"updated_at"`
+	ID                int64     `db:"id"`
+	ProductID         int64     `db:"product_id"`
+	QuantityAvailable int       `db:"quantity_available"`
+	ReservedQuantity  int       `db:"reserved_quantity"`
+	LowStockThreshold int       `db:"low_stock_threshold"`
+	CreatedAt         time.Time `db:"created_at"`
+	UpdatedAt         time.Time `db:"updated_at"`
 }
 
 func (r inventoryRow) toDomain() *domain.InventoryItem {

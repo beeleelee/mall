@@ -38,7 +38,9 @@ type StockReservationConfirmed struct {
 	Quantity  int
 }
 
-func (e *StockReservationConfirmed) EventName() string      { return "inventory.stock.reservation_confirmed" }
+func (e *StockReservationConfirmed) EventName() string {
+	return "inventory.stock.reservation_confirmed"
+}
 func (e *StockReservationConfirmed) OccurredAt() time.Time  { return time.Now() }
 func (e *StockReservationConfirmed) AggregateID() kernel.ID { return e.ProductID }
 

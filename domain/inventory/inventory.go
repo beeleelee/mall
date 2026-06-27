@@ -8,10 +8,10 @@ import (
 
 type InventoryItem struct {
 	kernel.AggregateRoot
-	ProductID          kernel.ID
-	QuantityAvailable  int
-	ReservedQuantity   int
-	LowStockThreshold  int
+	ProductID         kernel.ID
+	QuantityAvailable int
+	ReservedQuantity  int
+	LowStockThreshold int
 }
 
 func NewInventoryItem(id kernel.ID, productID kernel.ID, quantity int, lowStockThreshold int) (*InventoryItem, error) {
@@ -26,11 +26,11 @@ func NewInventoryItem(id kernel.ID, productID kernel.ID, quantity int, lowStockT
 	}
 
 	item := &InventoryItem{
-		AggregateRoot:      kernel.NewAggregateRoot(id),
-		ProductID:          productID,
-		QuantityAvailable:  quantity,
-		ReservedQuantity:   0,
-		LowStockThreshold:  lowStockThreshold,
+		AggregateRoot:     kernel.NewAggregateRoot(id),
+		ProductID:         productID,
+		QuantityAvailable: quantity,
+		ReservedQuantity:  0,
+		LowStockThreshold: lowStockThreshold,
 	}
 
 	item.AddEvent(&StockUpdated{

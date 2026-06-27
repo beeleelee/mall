@@ -20,6 +20,8 @@ import (
 	"github.com/zeromicro/go-zero/core/trace"
 	gozerorest "github.com/zeromicro/go-zero/rest"
 
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+
 	appIdentity "github.com/beeleelee/mall/application/identity"
 	appOAuth "github.com/beeleelee/mall/application/oauth"
 	appOrder "github.com/beeleelee/mall/application/order"
@@ -50,7 +52,6 @@ import (
 	"github.com/beeleelee/mall/interfaces/mcp"
 	"github.com/beeleelee/mall/interfaces/middleware"
 	"github.com/beeleelee/mall/interfaces/rest"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 func main() {

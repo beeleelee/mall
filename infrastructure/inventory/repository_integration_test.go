@@ -12,8 +12,8 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/redis/go-redis/v9"
 
-	"github.com/beeleelee/mall/domain/kernel"
 	domain "github.com/beeleelee/mall/domain/inventory"
+	"github.com/beeleelee/mall/domain/kernel"
 )
 
 type integrationFixture struct {

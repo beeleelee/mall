@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"strings"
 
-	domain "github.com/beeleelee/mall/domain/oauth"
 	"github.com/beeleelee/mall/domain/identity"
 	"github.com/beeleelee/mall/domain/kernel"
+	domain "github.com/beeleelee/mall/domain/oauth"
 )
 
 type userContextKey struct{}

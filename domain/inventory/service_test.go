@@ -9,14 +9,14 @@ import (
 )
 
 type fakeInventoryRepo struct {
-	mu       sync.Mutex
-	items    map[kernel.ID]*InventoryItem
+	mu        sync.Mutex
+	items     map[kernel.ID]*InventoryItem
 	byProduct map[kernel.ID]kernel.ID
 }
 
 func newFakeInventoryRepo() *fakeInventoryRepo {
 	return &fakeInventoryRepo{
-		items:    make(map[kernel.ID]*InventoryItem),
+		items:     make(map[kernel.ID]*InventoryItem),
 		byProduct: make(map[kernel.ID]kernel.ID),
 	}
 }
