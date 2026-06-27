@@ -37,6 +37,58 @@ var orderTools = []ToolDefinition{
 			},
 		},
 	},
+	{
+		Name:        "process_order",
+		Description: "Start processing an order",
+		InputSchema: InputSchema{
+			Type: "object",
+			Properties: map[string]PropertySchema{
+				"id": {Type: "number", Description: "Order ID"},
+			},
+		},
+	},
+	{
+		Name:        "ship_order",
+		Description: "Ship an order with tracking information",
+		InputSchema: InputSchema{
+			Type: "object",
+			Properties: map[string]PropertySchema{
+				"id":              {Type: "number", Description: "Order ID"},
+				"tracking_number": {Type: "string", Description: "Tracking number"},
+				"carrier":         {Type: "string", Description: "Carrier name"},
+			},
+		},
+	},
+	{
+		Name:        "deliver_order",
+		Description: "Mark an order as delivered",
+		InputSchema: InputSchema{
+			Type: "object",
+			Properties: map[string]PropertySchema{
+				"id": {Type: "number", Description: "Order ID"},
+			},
+		},
+	},
+	{
+		Name:        "return_order",
+		Description: "Return a delivered order",
+		InputSchema: InputSchema{
+			Type: "object",
+			Properties: map[string]PropertySchema{
+				"id": {Type: "number", Description: "Order ID"},
+			},
+		},
+	},
+	{
+		Name:        "cancel_order",
+		Description: "Cancel an order (from confirmed or processing status)",
+		InputSchema: InputSchema{
+			Type: "object",
+			Properties: map[string]PropertySchema{
+				"id": {Type: "number", Description: "Order ID"},
+			},
+		},
+	},
 }
 
 func (h *OrderMCPHandler) ListTools() []ToolDefinition {
@@ -49,6 +101,16 @@ func (h *OrderMCPHandler) HandleTool(ctx context.Context, name string, raw json.
 		return h.callListOrders(ctx, raw)
 	case "get_order":
 		return h.callGetOrder(ctx, raw)
+	case "process_order":
+		return h.callProcessOrder(ctx, raw)
+	case "ship_order":
+		return h.callShipOrder(ctx, raw)
+	case "deliver_order":
+		return h.callDeliverOrder(ctx, raw)
+	case "return_order":
+		return h.callReturnOrder(ctx, raw)
+	case "cancel_order":
+		return h.callCancelOrder(ctx, raw)
 	default:
 		return nil, kernel.NewDomainError(kernel.ErrInvalidArgument, "unknown tool: "+name)
 	}
@@ -93,6 +155,113 @@ func (h *OrderMCPHandler) callGetOrder(ctx context.Context, raw json.RawMessage)
 	}
 
 	order, err := h.svc.GetOrder(ctx, kernel.ID(args.ID))
+	if err != nil {
+		return nil, err
+	}
+
+	return orderToMap(order), nil
+}
+
+type processOrderArgs struct {
+	ID int64 `json:"id"`
+}
+
+func (h *OrderMCPHandler) callProcessOrder(ctx context.Context, raw json.RawMessage) (any, error) {
+	var args processOrderArgs
+	if err := json.Unmarshal(raw, &args); err != nil {
+		return nil, kernel.NewDomainError(kernel.ErrInvalidArgument, "invalid arguments")
+	}
+	if args.ID <= 0 {
+		return nil, kernel.NewDomainError(kernel.ErrInvalidArgument, "id must be positive")
+	}
+
+	order, err := h.svc.StartProcessing(ctx, kernel.ID(args.ID))
+	if err != nil {
+		return nil, err
+	}
+
+	return orderToMap(order), nil
+}
+
+type shipOrderArgs struct {
+	ID             int64  `json:"id"`
+	TrackingNumber string `json:"tracking_number"`
+	Carrier        string `json:"carrier"`
+}
+
+func (h *OrderMCPHandler) callShipOrder(ctx context.Context, raw json.RawMessage) (any, error) {
+	var args shipOrderArgs
+	if err := json.Unmarshal(raw, &args); err != nil {
+		return nil, kernel.NewDomainError(kernel.ErrInvalidArgument, "invalid arguments")
+	}
+	if args.ID <= 0 {
+		return nil, kernel.NewDomainError(kernel.ErrInvalidArgument, "id must be positive")
+	}
+
+	order, err := h.svc.Ship(ctx, kernel.ID(args.ID), args.TrackingNumber, args.Carrier)
+	if err != nil {
+		return nil, err
+	}
+
+	return orderToMap(order), nil
+}
+
+type deliverOrderArgs struct {
+	ID int64 `json:"id"`
+}
+
+func (h *OrderMCPHandler) callDeliverOrder(ctx context.Context, raw json.RawMessage) (any, error) {
+	var args deliverOrderArgs
+	if err := json.Unmarshal(raw, &args); err != nil {
+		return nil, kernel.NewDomainError(kernel.ErrInvalidArgument, "invalid arguments")
+	}
+	if args.ID <= 0 {
+		return nil, kernel.NewDomainError(kernel.ErrInvalidArgument, "id must be positive")
+	}
+
+	order, err := h.svc.MarkDelivered(ctx, kernel.ID(args.ID))
+	if err != nil {
+		return nil, err
+	}
+
+	return orderToMap(order), nil
+}
+
+type returnOrderArgs struct {
+	ID int64 `json:"id"`
+}
+
+func (h *OrderMCPHandler) callReturnOrder(ctx context.Context, raw json.RawMessage) (any, error) {
+	var args returnOrderArgs
+	if err := json.Unmarshal(raw, &args); err != nil {
+		return nil, kernel.NewDomainError(kernel.ErrInvalidArgument, "invalid arguments")
+	}
+	if args.ID <= 0 {
+		return nil, kernel.NewDomainError(kernel.ErrInvalidArgument, "id must be positive")
+	}
+
+	order, err := h.svc.ReturnOrder(ctx, kernel.ID(args.ID))
+	if err != nil {
+		return nil, err
+	}
+
+	return orderToMap(order), nil
+}
+
+type cancelOrderArgs struct {
+	ID int64 `json:"id"`
+}
+
+func (h *OrderMCPHandler) callCancelOrder(ctx context.Context, raw json.RawMessage) (any, error) {
+	var args cancelOrderArgs
+	if err := json.Unmarshal(raw, &args); err != nil {
+		return nil, kernel.NewDomainError(kernel.ErrInvalidArgument, "invalid arguments")
+	}
+	if args.ID <= 0 {
+		return nil, kernel.NewDomainError(kernel.ErrInvalidArgument, "id must be positive")
+	}
+
+	order, err := h.svc.Cancel(ctx, kernel.ID(args.ID))
 	if err != nil {
 		return nil, err
 	}
