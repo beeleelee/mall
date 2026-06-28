@@ -106,7 +106,7 @@ func DefaultProfile() *Profile {
 				Version: "1.0.0",
 				Bindings: CapabilityBindings{
 					MCP: &MCPBinding{
-						Tools:         []string{"create_checkout", "get_checkout", "set_shipping_address", "set_billing_address", "select_shipping_option", "select_payment_handler", "complete_checkout", "cancel_checkout"},
+						Tools:         []string{"create_checkout", "get_checkout", "set_shipping_address", "set_billing_address", "select_shipping_option", "select_payment_handler", "select_mandate", "complete_checkout", "cancel_checkout"},
 						TransportType: "json-rpc-2.0",
 						Endpoint:      "/mcp",
 					},
@@ -119,6 +119,7 @@ func DefaultProfile() *Profile {
 							"set_billing_address":  "POST /{id}/billing-address",
 							"select_shipping":      "POST /{id}/shipping-option",
 							"select_payment":       "POST /{id}/payment-handler",
+							"select_mandate":       "POST /{id}/mandate",
 							"complete":             "POST /{id}/complete",
 							"cancel":               "POST /{id}/cancel",
 						},
@@ -129,7 +130,7 @@ func DefaultProfile() *Profile {
 				Version: "1.0.0",
 				Bindings: CapabilityBindings{
 					MCP: &MCPBinding{
-						Tools:         []string{"list_orders", "get_order"},
+						Tools:         []string{"list_orders", "get_order", "process_order", "ship_order", "deliver_order", "return_order", "cancel_order"},
 						TransportType: "json-rpc-2.0",
 						Endpoint:      "/mcp",
 					},
@@ -157,7 +158,7 @@ func DefaultProfile() *Profile {
 				Version: "1.0.0",
 				Bindings: CapabilityBindings{
 					MCP: &MCPBinding{
-						Tools:         []string{"create_mandate", "list_mandates", "approve_mandate", "execute_mandate"},
+						Tools:         []string{"create_mandate", "list_mandates", "get_mandate", "approve_mandate", "execute_mandate", "settle_mandate", "cancel_mandate"},
 						TransportType: "json-rpc-2.0",
 						Endpoint:      "/mcp",
 					},
@@ -178,6 +179,11 @@ func DefaultProfile() *Profile {
 			"dev.ucp.shopping.fulfillment": {
 				Version: "1.0.0",
 				Bindings: CapabilityBindings{
+					MCP: &MCPBinding{
+						Tools:         []string{"calculate_rates"},
+						TransportType: "json-rpc-2.0",
+						Endpoint:      "/mcp",
+					},
 					REST: &RESTBinding{
 						BaseURL: "/api/v1/fulfillment",
 						Endpoints: map[string]string{
@@ -218,6 +224,85 @@ func DefaultProfile() *Profile {
 							"create":   "POST /codes",
 							"validate": "POST /codes/validate",
 							"apply":    "POST /codes/apply",
+						},
+					},
+				},
+			},
+			"dev.ucp.shopping.identity": {
+				Version: "1.0.0",
+				Bindings: CapabilityBindings{
+					MCP: &MCPBinding{
+						Tools:         []string{"register_user", "login_user", "get_user", "suspend_user"},
+						TransportType: "json-rpc-2.0",
+						Endpoint:      "/mcp",
+					},
+					REST: &RESTBinding{
+						BaseURL: "/api/v1/auth",
+						Endpoints: map[string]string{
+							"register": "POST /register",
+							"login":    "POST /login",
+							"get_user": "GET /users/{id}",
+							"suspend":  "POST /users/{id}/suspend",
+						},
+					},
+				},
+			},
+			"dev.ucp.shopping.webhook": {
+				Version: "1.0.0",
+				Bindings: CapabilityBindings{
+					MCP: &MCPBinding{
+						Tools:         []string{"register_webhook", "list_webhooks", "delete_webhook"},
+						TransportType: "json-rpc-2.0",
+						Endpoint:      "/mcp",
+					},
+					REST: &RESTBinding{
+						BaseURL: "/api/v1/webhooks",
+						Endpoints: map[string]string{
+							"register": "POST /",
+							"list":     "GET /",
+							"delete":   "DELETE /{id}",
+						},
+					},
+				},
+			},
+			"dev.ucp.shopping.oauth": {
+				Version: "1.0.0",
+				Bindings: CapabilityBindings{
+					MCP: &MCPBinding{
+						Tools:         []string{"authorize", "token", "revoke"},
+						TransportType: "json-rpc-2.0",
+						Endpoint:      "/mcp",
+					},
+					REST: &RESTBinding{
+						BaseURL: "/oauth",
+						Endpoints: map[string]string{
+							"authorize": "POST /authorize",
+							"token":     "POST /token",
+							"revoke":    "POST /revoke",
+						},
+					},
+				},
+			},
+			"dev.ucp.shopping.admin": {
+				Version: "1.0.0",
+				Bindings: CapabilityBindings{
+					MCP: &MCPBinding{
+						Tools:         []string{"create_product", "update_product", "delete_product", "list_all_orders", "list_users", "activate_user", "set_stock", "get_stock", "list_low_stock"},
+						TransportType: "json-rpc-2.0",
+						Endpoint:      "/mcp",
+					},
+					REST: &RESTBinding{
+						BaseURL: "/api/v1/admin",
+						Endpoints: map[string]string{
+							"create_product": "POST /products",
+							"update_product": "PUT /products/{id}",
+							"delete_product": "DELETE /products/{id}",
+							"list_orders":    "GET /orders",
+							"list_users":     "GET /users",
+							"activate_user":  "POST /users/{id}/activate",
+							"set_stock":      "POST /inventory",
+							"get_stock":      "GET /inventory/{productId}",
+							"list_low_stock": "GET /inventory/low-stock",
 						},
 					},
 				},
