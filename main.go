@@ -200,6 +200,11 @@ func main() {
 	mcpRouter.Register(mcp.NewDiscountMCPHandler(discountSvc, sf))
 	mcpRouter.Register(mcp.NewInventoryMCPHandler(inventorySvc, sf))
 	mcpRouter.Register(mcp.NewPaymentMCPHandler(paymentSvc, sf))
+	mcpRouter.Register(mcp.NewIdentityMCPHandler(domainSvc, sf))
+	mcpRouter.Register(mcp.NewWebhookMCPHandler(webhookSvc))
+	mcpRouter.Register(mcp.NewFulfillmentMCPHandler(fulfillmentSvc))
+	mcpRouter.Register(mcp.NewOAuthMCPHandler(oauthDomainSvc))
+	mcpRouter.Register(mcp.NewAdminMCPHandler(catalogSvc, orderSvc, domainSvc, userRepo, inventorySvc, sf))
 
 	adminHandler := rest.NewAdminHandler(catalogSvc, orderSvc, appSvc, inventorySvc, sf)
 	adminMW := middleware.AdminMiddleware(userRepo)
