@@ -407,7 +407,7 @@ func (h *AdminMCPHandler) callActivateUser(ctx context.Context, raw json.RawMess
 
 // --- set_stock ---
 
-type setStockArgs struct {
+type adminSetStockArgs struct {
 	AdminUserID       int64 `json:"admin_user_id"`
 	ProductID         int64 `json:"product_id"`
 	Quantity          int   `json:"quantity"`
@@ -415,7 +415,7 @@ type setStockArgs struct {
 }
 
 func (h *AdminMCPHandler) callSetStock(ctx context.Context, raw json.RawMessage) (any, error) {
-	var args setStockArgs
+	var args adminSetStockArgs
 	if err := json.Unmarshal(raw, &args); err != nil {
 		return nil, kernel.NewDomainError(kernel.ErrInvalidArgument, "invalid arguments")
 	}
@@ -454,13 +454,13 @@ func (h *AdminMCPHandler) callSetStock(ctx context.Context, raw json.RawMessage)
 
 // --- get_stock ---
 
-type getStockArgs struct {
+type adminGetStockArgs struct {
 	AdminUserID int64 `json:"admin_user_id"`
 	ProductID   int64 `json:"product_id"`
 }
 
 func (h *AdminMCPHandler) callGetStock(ctx context.Context, raw json.RawMessage) (any, error) {
-	var args getStockArgs
+	var args adminGetStockArgs
 	if err := json.Unmarshal(raw, &args); err != nil {
 		return nil, kernel.NewDomainError(kernel.ErrInvalidArgument, "invalid arguments")
 	}
@@ -478,13 +478,13 @@ func (h *AdminMCPHandler) callGetStock(ctx context.Context, raw json.RawMessage)
 
 // --- list_low_stock ---
 
-type listLowStockArgs struct {
+type adminListLowStockArgs struct {
 	AdminUserID int64 `json:"admin_user_id"`
 	Threshold   int   `json:"threshold,omitempty"`
 }
 
 func (h *AdminMCPHandler) callListLowStock(ctx context.Context, raw json.RawMessage) (any, error) {
-	var args listLowStockArgs
+	var args adminListLowStockArgs
 	if err := json.Unmarshal(raw, &args); err != nil {
 		return nil, kernel.NewDomainError(kernel.ErrInvalidArgument, "invalid arguments")
 	}
