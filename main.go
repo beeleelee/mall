@@ -25,6 +25,7 @@ import (
 	appIdentity "github.com/beeleelee/mall/application/identity"
 	appOAuth "github.com/beeleelee/mall/application/oauth"
 	appOrder "github.com/beeleelee/mall/application/order"
+	domainA2A "github.com/beeleelee/mall/domain/a2a"
 	domainCart "github.com/beeleelee/mall/domain/cart"
 	domainCatalog "github.com/beeleelee/mall/domain/catalog"
 	domainCheckout "github.com/beeleelee/mall/domain/checkout"
@@ -35,6 +36,7 @@ import (
 	domainOAuth "github.com/beeleelee/mall/domain/oauth"
 	domainOrder "github.com/beeleelee/mall/domain/order"
 	domainPayment "github.com/beeleelee/mall/domain/payment"
+	infraA2A "github.com/beeleelee/mall/infrastructure/a2a"
 	infraCart "github.com/beeleelee/mall/infrastructure/cart"
 	infraCatalog "github.com/beeleelee/mall/infrastructure/catalog"
 	infraCheckout "github.com/beeleelee/mall/infrastructure/checkout"
@@ -209,6 +211,18 @@ func main() {
 	adminHandler := rest.NewAdminHandler(catalogSvc, orderSvc, appSvc, inventorySvc, sf)
 	adminMW := middleware.AdminMiddleware(userRepo)
 
+	a2aTaskRepo := infraA2A.NewPostgresTaskRepository(db)
+	a2aPushRepo := infraA2A.NewPostgresPushNotificationConfigRepository(db)
+	a2aSvc := domainA2A.NewAgentService(a2aTaskRepo, a2aPushRepo, logger, sf)
+
+	a2aSvc.RegisterSkill("catalog", &catalogSkillHandler{svc: catalogSvc})
+	a2aSvc.RegisterSkill("cart", &cartSkillHandler{svc: cartSvc, sf: sf})
+	a2aSvc.RegisterSkill("checkout", &checkoutSkillHandler{svc: checkoutSvc, sf: sf})
+	a2aSvc.RegisterSkill("order", &orderSkillHandler{svc: orderSvc})
+	a2aSvc.RegisterSkill("identity", &identitySkillHandler{svc: domainSvc, sf: sf})
+
+	a2aHandler := rest.NewA2AHandler(a2aSvc, fmt.Sprintf("http://localhost:%s", port))
+
 	saga := appOrder.NewCheckoutCompletedSaga(orderSvc, sf, logger)
 
 	go func() {
@@ -279,7 +293,7 @@ func main() {
 		Timeout: 30000,
 	})
 
-	supportedCaps := []string{"dev.ucp.shopping.catalog", "dev.ucp.shopping.cart", "dev.ucp.shopping.checkout", "dev.ucp.shopping.order", "dev.ucp.shopping.ecp", "dev.ucp.shopping.ap2_mandate", "dev.ucp.shopping.fulfillment", "dev.ucp.shopping.discount", "dev.ucp.shopping.admin"}
+	supportedCaps := []string{"dev.ucp.shopping.catalog", "dev.ucp.shopping.cart", "dev.ucp.shopping.checkout", "dev.ucp.shopping.order", "dev.ucp.shopping.ecp", "dev.ucp.shopping.ap2_mandate", "dev.ucp.shopping.fulfillment", "dev.ucp.shopping.discount", "dev.ucp.shopping.admin", "dev.a2a.agent"}
 	srv.Use(gozerorest.ToMiddleware(middleware.UCPAgentMiddleware))
 	srv.Use(gozerorest.ToMiddleware(middleware.NegotiationMiddleware(supportedCaps)))
 	srv.Use(gozerorest.ToMiddleware(metricsMW.Wrap))
@@ -616,6 +630,22 @@ func main() {
 		Handler: adminAuth(adminHandler.ListLowStock),
 	})
 
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodGet,
+		Path:    "/.well-known/a2a/agent-card",
+		Handler: a2aHandler.AgentCard,
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodGet,
+		Path:    "/.well-known/a2a/agent-card/extended",
+		Handler: auth(http.HandlerFunc(a2aHandler.ExtendedAgentCard)).ServeHTTP,
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPost,
+		Path:    "/a2a",
+		Handler: auth(http.HandlerFunc(a2aHandler.ServeJSONRPC)).ServeHTTP,
+	})
+
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 
@@ -698,6 +728,98 @@ func loadDotEnv() {
 			os.Setenv(k, v)
 		}
 	}
+}
+
+type catalogSkillHandler struct {
+	svc *domainCatalog.CatalogService
+}
+
+func (h *catalogSkillHandler) Handle(ctx context.Context, task *domainA2A.Task, msg domainA2A.Message) error {
+	var query string
+	for _, p := range msg.Parts {
+		if p.Type == domainA2A.PartTypeText {
+			query = p.Text
+			break
+		}
+	}
+	if query == "" {
+		return nil
+	}
+
+	opts := domainCatalog.SearchOptions{Limit: 10}
+	result, err := h.svc.Search(ctx, query, opts)
+	if err != nil {
+		return err
+	}
+
+	summary := fmt.Sprintf("Found %d products", len(result.Products))
+	task.AddArtifact(domainA2A.Artifact{
+		ID:    "search-results",
+		Name:  "Catalog Search Results",
+		Parts: []domainA2A.Part{domainA2A.TextPart(summary)},
+	})
+	return nil
+}
+
+type cartSkillHandler struct {
+	svc *domainCart.CartService
+	sf  *kernel.Snowflake
+}
+
+func (h *cartSkillHandler) Handle(ctx context.Context, task *domainA2A.Task, msg domainA2A.Message) error {
+	task.AddArtifact(domainA2A.Artifact{
+		ID:    "cart-result",
+		Name:  "Cart Response",
+		Parts: []domainA2A.Part{domainA2A.TextPart("cart operation received for user " + task.UserID.String())},
+	})
+	return nil
+}
+
+type checkoutSkillHandler struct {
+	svc *domainCheckout.CheckoutService
+	sf  *kernel.Snowflake
+}
+
+func (h *checkoutSkillHandler) Handle(ctx context.Context, task *domainA2A.Task, msg domainA2A.Message) error {
+	task.AddArtifact(domainA2A.Artifact{
+		ID:    "checkout-result",
+		Name:  "Checkout Response",
+		Parts: []domainA2A.Part{domainA2A.TextPart("checkout operation received")},
+	})
+	return nil
+}
+
+type orderSkillHandler struct {
+	svc *domainOrder.OrderService
+}
+
+func (h *orderSkillHandler) Handle(ctx context.Context, task *domainA2A.Task, msg domainA2A.Message) error {
+	orders, err := h.svc.GetOrdersByUser(ctx, task.UserID)
+	if err != nil {
+		return err
+	}
+
+	orderStr := fmt.Sprintf("Found %d orders", len(orders))
+	task.AddArtifact(domainA2A.Artifact{
+		ID:    "orders-result",
+		Name:  "Orders List",
+		Parts: []domainA2A.Part{domainA2A.TextPart(orderStr)},
+	})
+	return nil
+}
+
+type identitySkillHandler struct {
+	svc *domainIdentity.IdentityService
+	sf  *kernel.Snowflake
+}
+
+func (h *identitySkillHandler) Handle(ctx context.Context, task *domainA2A.Task, msg domainA2A.Message) error {
+	task.AddArtifact(domainA2A.Artifact{
+		ID:    "identity-result",
+		Name:  "Identity Response",
+		Parts: []domainA2A.Part{domainA2A.TextPart("identity operation received")},
+	})
+	return nil
 }
 
 func mustParsePort(port string) int {
