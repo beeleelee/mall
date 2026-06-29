@@ -307,6 +307,18 @@ func DefaultProfile() *Profile {
 					},
 				},
 			},
+			"dev.a2a.agent": {
+				Version: "1.0.0",
+				Bindings: CapabilityBindings{
+					REST: &RESTBinding{
+						BaseURL: "/.well-known/a2a",
+						Endpoints: map[string]string{
+							"agent_card":           "GET /agent-card",
+							"extended_agent_card":  "GET /agent-card/extended",
+						},
+					},
+				},
+			},
 		},
 		Authentication: AuthenticationInfo{
 			OAuth2: OAuth2Config{
