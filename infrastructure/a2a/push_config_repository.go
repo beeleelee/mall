@@ -3,6 +3,7 @@ package a2a
 import (
 	"context"
 	"database/sql"
+	"time"
 
 	"github.com/jmoiron/sqlx"
 
@@ -16,6 +17,7 @@ type pushConfigRow struct {
 	URL             string `db:"url"`
 	AuthScheme      string `db:"auth_scheme"`
 	AuthCredentials string `db:"auth_credentials"`
+	CreatedAt       time.Time `db:"created_at"`
 }
 
 func (r *pushConfigRow) toDomain() *domain.PushNotificationConfig {

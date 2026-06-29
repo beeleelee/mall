@@ -2,17 +2,17 @@
 
 ## What this is
 
-A **UCP-native e-commerce platform** in Go. Phase 2 (identity, OAuth, cart, checkout, order) in progress — order domain + infra just completed.
+A **UCP-native e-commerce platform** in Go with **A2A (Agent-to-Agent) Protocol** support. All phases complete — catalog, identity, OAuth, cart, checkout, order, inventory, payment/discount/fulfillment, admin, and A2A agent capabilities.
 
 ## Architecture
 
 DDD layering:
 | Layer | Path | Status |
 |-------|------|--------|
- | Domain | `domain/{catalog,identity,oauth,cart,checkout,order,kernel}/` | Catalog + identity + OAuth + cart + checkout + order done |
-| Application | `application/{identity,oauth}/` | Identity + OAuth app services done |
-| Infrastructure | `infrastructure/{catalog,identity,oauth,cart,checkout,order,database,...}/` | Catalog + identity + OAuth + cart + checkout + order repos, custom migrator done |
-| Interfaces | `interfaces/{middleware,rest}/` | UCP profile, middleware, identity + OAuth handlers done |
+ | Domain | `domain/{catalog,identity,oauth,cart,checkout,order,kernel,a2a,inventory,payment,discount,fulfillment,ecp}/` | All domains done |
+| Application | `application/{identity,oauth,order}/` | Identity + OAuth app services + Checkout→Order saga done |
+| Infrastructure | `infrastructure/{catalog,identity,oauth,cart,checkout,order,database,a2a,inventory,payment,discount,fulfillment,...}/` | All repos, migrator, NATS publishers done |
+| Interfaces | `interfaces/{middleware,rest,mcp}/` | REST + MCP + A2A handlers done |
 
 Web framework: **go-zero** (`github.com/zeromicro/go-zero`). Do not import gin, chi, or similar.
 Persistence: `pgx`/`sqlx` + `go-redis`. Identity uses bcrypt via `golang.org/x/crypto`.
@@ -109,6 +109,9 @@ Persistence: `pgx`/`sqlx` + `go-redis`. Identity uses bcrypt via `golang.org/x/c
 | POST | `/api/v1/webhooks` | Register webhook | Yes |
 | GET | `/api/v1/webhooks` | List webhooks | Yes |
 | DELETE | `/api/v1/webhooks/:id` | Unregister webhook | Yes |
+| GET | `/.well-known/a2a/agent-card` | A2A Agent Card | No |
+| GET | `/.well-known/a2a/agent-card/extended` | A2A Extended Agent Card | Yes |
+| POST | `/a2a` | A2A JSON-RPC (tasks/send, tasks/get, tasks/list, tasks/cancel, pushConfig/create, etc.) | Yes |
 
 ## Key files
 
@@ -117,7 +120,10 @@ Persistence: `pgx`/`sqlx` + `go-redis`. Identity uses bcrypt via `golang.org/x/c
 - `infrastructure/database/migrator.go` — custom SQL migration runner
 - `infrastructure/cart/publisher.go` — reference for NATS publisher (JetStream publisher)
 - `infrastructure/order/webhook.go` — PostgresWebhookRepository, HMAC signer, HTTP delivery with retries
+- `infrastructure/a2a/repository.go` — PostgresTaskRepository with JSONB, cursor pagination
 - `interfaces/mcp/catalog.go` — MCP JSON-RPC 2.0 handler (tools/list, tools/call)
+- `interfaces/rest/a2a.go` — A2A JSON-RPC router, Agent Card endpoint, SSE streaming
+- `domain/a2a/` — A2A data model (Task, Message, Part, Artifact, AgentCard) + AgentService
 - `roadmap.md` — detailed project plan
 
 ## Avoid

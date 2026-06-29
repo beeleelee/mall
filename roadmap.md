@@ -202,3 +202,20 @@ The outcome is a **single integration point** that collapses N×N complexity —
 | POST | `/api/v1/admin/inventory` | SetStock | Admin |
 | GET | `/api/v1/admin/inventory/:productId` | GetStock | Admin |
 | GET | `/api/v1/admin/inventory/low-stock` | ListLowStock | Admin |
+
+---
+
+### Phase 5: A2A (Agent-to-Agent) Protocol ✅
+
+**Goal**: Enable AI agents from different platforms to discover and delegate tasks to the mall's e-commerce agent via the standard A2A Protocol v1.0.
+
+**Exit criteria**: An A2A-compliant agent can discover the mall's Agent Card, send tasks via JSON-RPC, track task progress, and receive results.
+
+- [x] **5.1** A2A Domain Data Model: `Task`, `Message`, `Part`, `Artifact`, `AgentCard`, `PushNotificationConfig`, `AgentService` — 18 unit tests
+- [x] **5.2** A2A Infrastructure: Migration `000014` for `a2a_tasks` + `a2a_push_notification_configs`, `PostgresTaskRepository` with JSONB and cursor pagination, `PostgresPushNotificationConfigRepository` — 11 integration tests
+- [x] **5.3** Agent Card: `GET /.well-known/a2a/agent-card` public, `GET /.well-known/a2a/agent-card/extended` authenticated, UCP profile update
+- [x] **5.4** A2A JSON-RPC endpoint (`POST /a2a`): tasks/send, tasks/get, tasks/list, tasks/cancel, tasks/sendStream (SSE), tasks/subscribe (SSE), pushConfig CRUD, agent/getCard
+- [x] **5.5** Skill handlers bridging A2A tasks to catalog, cart, checkout, order, identity domain services
+- [x] **5.6** Wiring in `main.go`: route registration, auth middleware, AgentService with 5 skill handlers
+
+**Key files**: `domain/a2a/`, `infrastructure/a2a/`, `interfaces/rest/a2a.go`
