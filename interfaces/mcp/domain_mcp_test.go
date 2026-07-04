@@ -829,7 +829,7 @@ func TestMCP_ToolsList_AllDomains(t *testing.T) {
 		"list_all_orders": false, "list_users": false, "activate_user": false,
 	}
 
-	expectedCount := 3 + 5 + 9 + 7 + 4 + 3 + 7 + 4 + 3 + 1 + 3 + 9 // 58 with 3 duplicates
+	expectedCount := 3 + 5 + 9 + 8 + 4 + 3 + 7 + 4 + 3 + 1 + 3 + 9 // 59 with 3 duplicates
 
 	for _, tDef := range tools {
 		name := tDef.(map[string]any)["name"].(string)

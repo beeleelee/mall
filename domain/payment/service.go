@@ -7,8 +7,8 @@ import (
 )
 
 type PaymentService struct {
-	repo      MandateRepository
-	logger    kernel.Logger
+	repo           MandateRepository
+	logger         kernel.Logger
 	tokenValidator WalletTokenValidator
 }
 

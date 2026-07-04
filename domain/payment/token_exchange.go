@@ -8,8 +8,8 @@ import (
 )
 
 type TokenValidationResult struct {
-	Provider string `json:"provider"`
-	Token    string `json:"token"`
+	Provider string    `json:"provider"`
+	Token    string    `json:"token"`
 	Expiry   time.Time `json:"expiry,omitempty"`
 }
 

@@ -110,6 +110,8 @@ CREATE TABLE IF NOT EXISTS checkout_sessions (
     status           TEXT NOT NULL DEFAULT 'incomplete',
     continue_url     TEXT NOT NULL DEFAULT '',
     mandate_id       BIGINT NOT NULL DEFAULT 0,
+    wallet_provider  TEXT NOT NULL DEFAULT '',
+    wallet_token     TEXT NOT NULL DEFAULT '',
     completed_at     TIMESTAMPTZ,
     created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at       TIMESTAMPTZ NOT NULL DEFAULT now()
