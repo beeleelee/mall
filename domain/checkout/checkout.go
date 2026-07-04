@@ -16,6 +16,8 @@ type CheckoutSession struct {
 	ShippingOption  *ShippingOption
 	PaymentHandler  string
 	MandateID       kernel.ID
+	WalletProvider  string
+	WalletToken     string
 	Subtotal        int64
 	ShippingCost    int64
 	TaxAmount       int64
@@ -55,6 +57,7 @@ func NewCheckoutSessionFromSnapshot(
 	shippingOption *ShippingOption,
 	paymentHandler string,
 	mandateID kernel.ID,
+	walletProvider, walletToken string,
 	subtotal, shippingCost, taxAmount, grandTotal int64,
 	status CheckoutStatus,
 	continueURL string,
@@ -71,6 +74,8 @@ func NewCheckoutSessionFromSnapshot(
 		ShippingOption:  shippingOption,
 		PaymentHandler:  paymentHandler,
 		MandateID:       mandateID,
+		WalletProvider:  walletProvider,
+		WalletToken:     walletToken,
 		Subtotal:        subtotal,
 		ShippingCost:    shippingCost,
 		TaxAmount:       taxAmount,
@@ -190,6 +195,23 @@ func (s *CheckoutSession) SelectMandate(mandateID kernel.ID) error {
 	}
 	s.MandateID = mandateID
 	s.touch()
+	return nil
+}
+
+func (s *CheckoutSession) SubmitPaymentToken(provider, token string) error {
+	if s.Status != CheckoutStatusIncomplete {
+		return kernel.NewDomainError(kernel.ErrInvalidArgument, "can only submit payment token when incomplete")
+	}
+	if provider == "" {
+		return kernel.NewDomainError(kernel.ErrInvalidArgument, "wallet provider must not be empty")
+	}
+	if token == "" {
+		return kernel.NewDomainError(kernel.ErrInvalidArgument, "payment token must not be empty")
+	}
+	s.WalletProvider = provider
+	s.WalletToken = token
+	s.touch()
+	s.AddEvent(CheckoutUpdatedEvent{CheckoutID: s.ID, UserID: s.UserID})
 	return nil
 }
 

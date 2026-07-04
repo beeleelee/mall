@@ -51,6 +51,8 @@ type sessionRow struct {
 	ShippingOption  nullRawMessage `db:"shipping_option"`
 	PaymentHandler  string         `db:"payment_handler"`
 	MandateID       int64          `db:"mandate_id"`
+	WalletProvider  string         `db:"wallet_provider"`
+	WalletToken     string         `db:"wallet_token"`
 	Subtotal        int64          `db:"subtotal"`
 	ShippingCost    int64          `db:"shipping_cost"`
 	TaxAmount       int64          `db:"tax_amount"`
@@ -107,6 +109,8 @@ func (r sessionRow) toDomain() (*domain.CheckoutSession, error) {
 		shippingOpt,
 		r.PaymentHandler,
 		kernel.ID(r.MandateID),
+		r.WalletProvider,
+		r.WalletToken,
 		r.Subtotal,
 		r.ShippingCost,
 		r.TaxAmount,
@@ -160,6 +164,8 @@ func fromDomain(s *domain.CheckoutSession) (sessionRow, error) {
 		ShippingOption:  shippingOpt,
 		PaymentHandler:  s.PaymentHandler,
 		MandateID:       s.MandateID.Int64(),
+		WalletProvider:  s.WalletProvider,
+		WalletToken:     s.WalletToken,
 		Subtotal:        s.Subtotal,
 		ShippingCost:    s.ShippingCost,
 		TaxAmount:       s.TaxAmount,
@@ -193,8 +199,8 @@ func (r *PostgresCheckoutRepository) Save(ctx context.Context, session *domain.C
 	}
 
 	_, err = r.db.ExecContext(ctx, `
-		INSERT INTO checkout_sessions (id, user_id, cart_id, cart_snapshot, shipping_address, billing_address, shipping_option, payment_handler, mandate_id, subtotal, shipping_cost, tax_amount, grand_total, status, continue_url, completed_at, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+		INSERT INTO checkout_sessions (id, user_id, cart_id, cart_snapshot, shipping_address, billing_address, shipping_option, payment_handler, mandate_id, wallet_provider, wallet_token, subtotal, shipping_cost, tax_amount, grand_total, status, continue_url, completed_at, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
 		ON CONFLICT (id) DO UPDATE SET
 			user_id = EXCLUDED.user_id,
 			cart_id = EXCLUDED.cart_id,
@@ -204,6 +210,8 @@ func (r *PostgresCheckoutRepository) Save(ctx context.Context, session *domain.C
 			shipping_option = EXCLUDED.shipping_option,
 			payment_handler = EXCLUDED.payment_handler,
 			mandate_id = EXCLUDED.mandate_id,
+			wallet_provider = EXCLUDED.wallet_provider,
+			wallet_token = EXCLUDED.wallet_token,
 			subtotal = EXCLUDED.subtotal,
 			shipping_cost = EXCLUDED.shipping_cost,
 			tax_amount = EXCLUDED.tax_amount,
@@ -212,7 +220,7 @@ func (r *PostgresCheckoutRepository) Save(ctx context.Context, session *domain.C
 			continue_url = EXCLUDED.continue_url,
 			completed_at = EXCLUDED.completed_at,
 			updated_at = EXCLUDED.updated_at
-	`, row.ID, row.UserID, row.CartID, row.CartSnapshot, row.ShippingAddress, row.BillingAddress, row.ShippingOption, row.PaymentHandler, row.MandateID, row.Subtotal, row.ShippingCost, row.TaxAmount, row.GrandTotal, row.Status, row.ContinueURL, row.CompletedAt, row.CreatedAt, row.UpdatedAt)
+	`, row.ID, row.UserID, row.CartID, row.CartSnapshot, row.ShippingAddress, row.BillingAddress, row.ShippingOption, row.PaymentHandler, row.MandateID, row.WalletProvider, row.WalletToken, row.Subtotal, row.ShippingCost, row.TaxAmount, row.GrandTotal, row.Status, row.ContinueURL, row.CompletedAt, row.CreatedAt, row.UpdatedAt)
 	if err != nil {
 		return kernel.NewDomainErrorWithCause(kernel.ErrInternal, "save checkout session", err)
 	}
