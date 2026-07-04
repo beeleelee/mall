@@ -172,7 +172,10 @@ func main() {
 	paymentSvc := domainPayment.NewPaymentService(mandateRepo, logger, domainPayment.WithWalletTokenValidator(tokenValidator))
 	paymentHandler := rest.NewPaymentHandler(paymentSvc, sf)
 
-	mandateVerifier := infraCheckout.NewCheckoutMandateVerifier(paymentSvc)
+	dtmServer := envOrDefault("DTM_SERVER", "http://localhost:36789/api/dtmsvr")
+	callbackURL := envOrDefault("SAGA_CALLBACK_URL", "http://localhost:8080")
+	mandateSaga := appPayment.NewDTMMandateSaga(dtmServer, callbackURL, logger)
+	mandateVerifier := infraCheckout.NewCheckoutMandateVerifier(paymentSvc, mandateSaga, tokenValidator)
 	checkoutSvc := domainCheckout.NewCheckoutService(checkoutRepo, defaultTaxSvc, defaultPriceCalc, checkoutPub, logger, mandateVerifier)
 	checkoutHandler := rest.NewCheckoutHandler(checkoutSvc, sf)
 	checkoutWSHandler := rest.NewCheckoutWSHandler(checkoutSvc, logger)
@@ -227,8 +230,6 @@ func main() {
 
 	a2aHandler := rest.NewA2AHandler(a2aSvc, fmt.Sprintf("http://localhost:%s", port))
 
-	dtmServer := envOrDefault("DTM_SERVER", "http://localhost:36789/api/dtmsvr")
-	callbackURL := envOrDefault("SAGA_CALLBACK_URL", "http://localhost:8080")
 	dtmSaga := appOrder.NewDTMCheckoutSaga(orderSvc, dtmServer, callbackURL, sf, logger)
 
 	go func() {
@@ -249,9 +250,6 @@ func main() {
 			}
 		})
 	}()
-
-	mandateSaga := appPayment.NewDTMMandateSaga(dtmServer, callbackURL, logger)
-	_ = mandateSaga
 
 	webhookDeliverer := infraOrder.NewWebhookDeliverer()
 
