@@ -1,0 +1,2 @@
+ALTER TABLE checkout_sessions ADD COLUMN IF NOT EXISTS wallet_provider TEXT NOT NULL DEFAULT '';
+ALTER TABLE checkout_sessions ADD COLUMN IF NOT EXISTS wallet_token TEXT NOT NULL DEFAULT '';
