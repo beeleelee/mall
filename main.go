@@ -208,6 +208,8 @@ func main() {
 	mcpRouter.Register(mcp.NewOAuthMCPHandler(oauthDomainSvc))
 	mcpRouter.Register(mcp.NewAdminMCPHandler(catalogSvc, orderSvc, domainSvc, userRepo, inventorySvc, sf))
 
+	sagaHandler := rest.NewSagaHandler(inventorySvc, paymentSvc, checkoutSvc, orderSvc)
+
 	adminHandler := rest.NewAdminHandler(catalogSvc, orderSvc, appSvc, inventorySvc, sf)
 	adminMW := middleware.AdminMiddleware(userRepo)
 
@@ -223,7 +225,9 @@ func main() {
 
 	a2aHandler := rest.NewA2AHandler(a2aSvc, fmt.Sprintf("http://localhost:%s", port))
 
-	saga := appOrder.NewCheckoutCompletedSaga(orderSvc, sf, logger)
+	dtmServer := envOrDefault("DTM_SERVER", "http://localhost:36789/api/dtmsvr")
+	callbackURL := envOrDefault("SAGA_CALLBACK_URL", "http://localhost:8080")
+	dtmSaga := appOrder.NewDTMCheckoutSaga(orderSvc, dtmServer, callbackURL, sf, logger)
 
 	go func() {
 		cons, err := js.CreateOrUpdateConsumer(context.Background(), "checkout", jetstream.ConsumerConfig{
@@ -238,8 +242,8 @@ func main() {
 		cons.Consume(func(msg jetstream.Msg) {
 			msg.Ack()
 			ctx := tracing.ExtractFromJetStream(msg)
-			if err := saga.Handle(ctx, msg.Data()); err != nil {
-				log.Printf("saga: handle failed: %v", err)
+			if err := dtmSaga.Handle(ctx, msg.Data()); err != nil {
+				log.Printf("dtm-saga: handle failed: %v", err)
 			}
 		})
 	}()
@@ -628,6 +632,42 @@ func main() {
 		Method:  http.MethodGet,
 		Path:    "/api/v1/admin/inventory/low-stock",
 		Handler: adminAuth(adminHandler.ListLowStock),
+	})
+
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPost,
+		Path:    "/api/v1/saga/inventory/reserve",
+		Handler: sagaHandler.ReserveInventory,
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPost,
+		Path:    "/api/v1/saga/inventory/release",
+		Handler: sagaHandler.ReleaseInventory,
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPost,
+		Path:    "/api/v1/saga/inventory/confirm",
+		Handler: sagaHandler.ConfirmInventory,
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPost,
+		Path:    "/api/v1/saga/payment/verify",
+		Handler: sagaHandler.VerifyPayment,
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPost,
+		Path:    "/api/v1/saga/payment/cancel",
+		Handler: sagaHandler.CancelPayment,
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPost,
+		Path:    "/api/v1/saga/order/create",
+		Handler: sagaHandler.CreateOrder,
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPost,
+		Path:    "/api/v1/saga/order/cancel",
+		Handler: sagaHandler.CancelOrder,
 	})
 
 	srv.AddRoute(gozerorest.Route{

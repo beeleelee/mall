@@ -20,6 +20,7 @@ type checkoutCompletedPayload struct {
 	TaxAmount       int64                       `json:"tax_amount"`
 	GrandTotal      int64                       `json:"grand_total"`
 	PaymentHandler  string                      `json:"payment_handler"`
+	MandateID       int64                       `json:"mandate_id"`
 	Items           []checkout.CartSnapshotItem `json:"items"`
 	ShippingAddress *checkout.Address           `json:"shipping_address"`
 	BillingAddress  *checkout.Address           `json:"billing_address"`

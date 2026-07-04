@@ -21,6 +21,10 @@ func NewNATSCheckoutEventPublisher(js jetstream.JetStream) *NATSCheckoutEventPub
 }
 
 func (p *NATSCheckoutEventPublisher) PublishCheckoutUpdated(ctx context.Context, session *domain.CheckoutSession) error {
+	mandateID := int64(0)
+	if session.MandateID > 0 {
+		mandateID = session.MandateID.Int64()
+	}
 	payload := map[string]any{
 		"checkout_id":      session.ID.Int64(),
 		"user_id":          session.UserID.Int64(),
@@ -31,6 +35,7 @@ func (p *NATSCheckoutEventPublisher) PublishCheckoutUpdated(ctx context.Context,
 		"tax_amount":       session.TaxAmount,
 		"grand_total":      session.GrandTotal,
 		"payment_handler":  session.PaymentHandler,
+		"mandate_id":       mandateID,
 		"items":            session.CartSnapshot.Items,
 		"shipping_address": session.ShippingAddress,
 		"billing_address":  session.BillingAddress,
