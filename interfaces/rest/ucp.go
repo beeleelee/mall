@@ -154,6 +154,22 @@ func DefaultProfile() *Profile {
 					},
 				},
 			},
+			"dev.ucp.shopping.payment_token_exchange": {
+				Version: "1.0.0",
+				Bindings: CapabilityBindings{
+					MCP: &MCPBinding{
+						Tools:         []string{"exchange_payment_token"},
+						TransportType: "json-rpc-2.0",
+						Endpoint:      "/mcp",
+					},
+					REST: &RESTBinding{
+						BaseURL: "/api/v1/checkouts",
+						Endpoints: map[string]string{
+							"submit_payment_token": "POST /{id}/payment-token",
+						},
+					},
+				},
+			},
 			"dev.ucp.shopping.ap2_mandate": {
 				Version: "1.0.0",
 				Bindings: CapabilityBindings{
