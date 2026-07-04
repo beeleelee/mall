@@ -313,6 +313,51 @@ func (h *CheckoutHandler) SelectPaymentHandler(w http.ResponseWriter, r *http.Re
 	writeCheckoutResponse(w, http.StatusOK, session)
 }
 
+type paymentTokenInput struct {
+	WalletProvider string `json:"wallet_provider"`
+	Token          string `json:"token"`
+}
+
+func (h *CheckoutHandler) SubmitPaymentToken(w http.ResponseWriter, r *http.Request) {
+	userID, err := userIDFromContext(r)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+
+	vars := pathvar.Vars(r)
+	idStr := vars["id"]
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		writeDomainError(w, kernel.NewDomainError(kernel.ErrInvalidArgument, "invalid checkout id"))
+		return
+	}
+
+	session, err := h.svc.GetCheckout(r.Context(), kernel.ID(id))
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+	if session.UserID != userID {
+		writeDomainError(w, kernel.NewDomainError(kernel.ErrPermissionDenied, "checkout does not belong to user"))
+		return
+	}
+
+	var req paymentTokenInput
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpx.Error(w, err)
+		return
+	}
+
+	session, err = h.svc.SubmitPaymentToken(r.Context(), kernel.ID(id), req.WalletProvider, req.Token)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+
+	writeCheckoutResponse(w, http.StatusOK, session)
+}
+
 type selectMandateInput struct {
 	MandateID int64 `json:"mandate_id"`
 }
@@ -447,6 +492,8 @@ type checkoutResponse struct {
 	BillingAddress  *addressResponse        `json:"billing_address,omitempty"`
 	ShippingOption  *shippingOptionResponse `json:"shipping_option,omitempty"`
 	PaymentHandler  string                  `json:"payment_handler,omitempty"`
+	WalletProvider  string                  `json:"wallet_provider,omitempty"`
+	WalletToken     string                  `json:"wallet_token,omitempty"`
 	Subtotal        int64                   `json:"subtotal"`
 	ShippingCost    int64                   `json:"shipping_cost"`
 	TaxAmount       int64                   `json:"tax_amount"`
@@ -546,6 +593,8 @@ func writeCheckoutResponse(w http.ResponseWriter, status int, session *domain.Ch
 		BillingAddress:  ba,
 		ShippingOption:  so,
 		PaymentHandler:  session.PaymentHandler,
+		WalletProvider:  session.WalletProvider,
+		WalletToken:     session.WalletToken,
 		Subtotal:        session.Subtotal,
 		ShippingCost:    session.ShippingCost,
 		TaxAmount:       session.TaxAmount,

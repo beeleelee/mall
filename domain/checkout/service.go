@@ -163,6 +163,24 @@ func (s *CheckoutService) SelectMandate(ctx context.Context, id kernel.ID, manda
 	return session, nil
 }
 
+func (s *CheckoutService) SubmitPaymentToken(ctx context.Context, id kernel.ID, provider, token string) (*CheckoutSession, error) {
+	session, err := s.repo.FindByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := session.SubmitPaymentToken(provider, token); err != nil {
+		return nil, err
+	}
+
+	if err := s.repo.Save(ctx, session); err != nil {
+		return nil, err
+	}
+
+	s.publishEvents(ctx, session)
+	return session, nil
+}
+
 func (s *CheckoutService) SelectPaymentHandler(ctx context.Context, id kernel.ID, handler string) (*CheckoutSession, error) {
 	session, err := s.repo.FindByID(ctx, id)
 	if err != nil {

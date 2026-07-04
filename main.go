@@ -453,6 +453,11 @@ func main() {
 	})
 	srv.AddRoute(gozerorest.Route{
 		Method:  http.MethodPost,
+		Path:    "/api/v1/checkouts/:id/payment-token",
+		Handler: auth(http.HandlerFunc(checkoutHandler.SubmitPaymentToken)).ServeHTTP,
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPost,
 		Path:    "/api/v1/checkouts/:id/mandate",
 		Handler: auth(http.HandlerFunc(checkoutHandler.SelectMandate)).ServeHTTP,
 	})
