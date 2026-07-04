@@ -40,13 +40,6 @@ func (m *nullRawMessage) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-type taskStatusRow struct {
-	State       string     `db:"state"`
-	Message     string     `db:"message"`
-	UpdatedAt   time.Time  `db:"updated_at"`
-	CompletedAt *time.Time `db:"completed_at"`
-}
-
 type taskRow struct {
 	ID                int64          `db:"id"`
 	UserID            int64          `db:"user_id"`
@@ -243,7 +236,6 @@ func (r *PostgresTaskRepository) List(ctx context.Context, userID kernel.ID, ski
 		stateBytes, _ := json.Marshal(stateStrs)
 		query += fmt.Sprintf(" AND status_state = ANY($%d::text[])", argIdx)
 		args = append(args, string(stateBytes))
-		_ = argIdx // keep compiler happy; unused now
 		argIdx++
 	}
 
@@ -259,7 +251,6 @@ func (r *PostgresTaskRepository) List(ctx context.Context, userID kernel.ID, ski
 	query += " ORDER BY updated_at DESC"
 	query += fmt.Sprintf(" LIMIT $%d", argIdx)
 	args = append(args, pageSize)
-	argIdx++
 
 	var rows []taskRow
 	err := r.db.SelectContext(ctx, &rows, query, args...)

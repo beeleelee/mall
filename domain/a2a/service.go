@@ -55,24 +55,24 @@ func (s *AgentService) SendMessage(ctx context.Context, userID kernel.ID, messag
 
 	handler, ok := s.skills[skillID]
 	if !ok {
-		task.Transition(TaskStateFailed, "no handler for skill: "+skillID)
-		s.tasks.Save(ctx, task)
+		_ = task.Transition(TaskStateFailed, "no handler for skill: "+skillID)
+		_ = s.tasks.Save(ctx, task)
 		return task, NewA2AError(ErrSkillNotFound, "no handler for skill: "+skillID)
 	}
 
-	task.Transition(TaskStateWorking, "processing")
-	s.tasks.Save(ctx, task)
+	_ = task.Transition(TaskStateWorking, "processing")
+	_ = s.tasks.Save(ctx, task)
 
 	if err := handler.Handle(ctx, task, message); err != nil {
-		task.Transition(TaskStateFailed, err.Error())
-		s.tasks.Save(ctx, task)
+		_ = task.Transition(TaskStateFailed, err.Error())
+		_ = s.tasks.Save(ctx, task)
 		return task, nil
 	}
 
 	if !task.Status.State.IsTerminal() && task.Status.State != TaskStateInputRequired {
-		task.Transition(TaskStateCompleted, "task completed successfully")
+		_ = task.Transition(TaskStateCompleted, "task completed successfully")
 	}
-	s.tasks.Save(ctx, task)
+	_ = s.tasks.Save(ctx, task)
 	return task, nil
 }
 
@@ -90,22 +90,22 @@ func (s *AgentService) SendMessageToTask(ctx context.Context, taskID kernel.ID, 
 	}
 
 	task.AddMessage(message)
-	task.Transition(TaskStateWorking, "processing follow-up")
-	s.tasks.Save(ctx, task)
+	_ = task.Transition(TaskStateWorking, "processing follow-up")
+	_ = s.tasks.Save(ctx, task)
 
 	handler, ok := s.skills[task.SkillID]
 	if ok {
 		if err := handler.Handle(ctx, task, message); err != nil {
-			task.Transition(TaskStateFailed, err.Error())
-			s.tasks.Save(ctx, task)
+			_ = task.Transition(TaskStateFailed, err.Error())
+			_ = s.tasks.Save(ctx, task)
 			return task, nil
 		}
 	}
 
 	if !task.Status.State.IsTerminal() && task.Status.State != TaskStateInputRequired {
-		task.Transition(TaskStateCompleted, "follow-up completed")
+		_ = task.Transition(TaskStateCompleted, "follow-up completed")
 	}
-	s.tasks.Save(ctx, task)
+	_ = s.tasks.Save(ctx, task)
 	return task, nil
 }
 
@@ -137,8 +137,8 @@ func (s *AgentService) CancelTask(ctx context.Context, id kernel.ID) (*Task, err
 		return nil, NewA2AError(ErrTaskNotCancelable, "task is not cancelable")
 	}
 
-	task.Transition(TaskStateCanceled, "canceled by user")
-	s.tasks.Save(ctx, task)
+	_ = task.Transition(TaskStateCanceled, "canceled by user")
+	_ = s.tasks.Save(ctx, task)
 	return task, nil
 }
 

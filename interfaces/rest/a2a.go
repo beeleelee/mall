@@ -205,13 +205,13 @@ func (h *A2AHandler) handleSendStream(w http.ResponseWriter, r *http.Request, re
 
 	task, err := h.svc.SendMessage(r.Context(), userID, params.Message, params.ContextID)
 	if err != nil {
-		fmt.Fprintf(w, "data: %s\n\n", toJSON(map[string]any{"error": err.Error()}))
+		_, _ = fmt.Fprintf(w, "data: %s\n\n", toJSON(map[string]any{"error": err.Error()}))
 		flusher.Flush()
 		return
 	}
 
 	data := toJSON(a2a.StreamResponse{Task: task})
-	fmt.Fprintf(w, "data: %s\n\n", data)
+	_, _ = fmt.Fprintf(w, "data: %s\n\n", data)
 	flusher.Flush()
 
 	if task.Status.State == a2a.TaskStateWorking || task.Status.State == a2a.TaskStateSubmitted {
@@ -234,7 +234,7 @@ func (h *A2AHandler) handleSendStream(w http.ResponseWriter, r *http.Request, re
 						Status: updated.Status,
 					},
 				})
-				fmt.Fprintf(w, "data: %s\n\n", updateData)
+				_, _ = fmt.Fprintf(w, "data: %s\n\n", updateData)
 				flusher.Flush()
 
 				if updated.Status.State.IsTerminal() || updated.Status.State == a2a.TaskStateInputRequired {
@@ -244,7 +244,7 @@ func (h *A2AHandler) handleSendStream(w http.ResponseWriter, r *http.Request, re
 		}
 	}
 
-	fmt.Fprintf(w, "data: %s\n\n", toJSON(map[string]string{"event": "complete"}))
+	_, _ = fmt.Fprintf(w, "data: %s\n\n", toJSON(map[string]string{"event": "complete"}))
 	flusher.Flush()
 }
 
@@ -269,17 +269,17 @@ func (h *A2AHandler) handleSubscribeTask(w http.ResponseWriter, r *http.Request,
 
 	task, err := h.svc.GetTask(r.Context(), kernel.ID(params.ID))
 	if err != nil {
-		fmt.Fprintf(w, "data: %s\n\n", toJSON(map[string]any{"error": err.Error()}))
+		_, _ = fmt.Fprintf(w, "data: %s\n\n", toJSON(map[string]any{"error": err.Error()}))
 		flusher.Flush()
 		return
 	}
 
 	initialData := toJSON(a2a.StreamResponse{Task: task})
-	fmt.Fprintf(w, "data: %s\n\n", initialData)
+	_, _ = fmt.Fprintf(w, "data: %s\n\n", initialData)
 	flusher.Flush()
 
 	if task.Status.State.IsTerminal() {
-		fmt.Fprintf(w, "data: %s\n\n", toJSON(map[string]string{"event": "complete"}))
+		_, _ = fmt.Fprintf(w, "data: %s\n\n", toJSON(map[string]string{"event": "complete"}))
 		flusher.Flush()
 		return
 	}
@@ -303,7 +303,7 @@ func (h *A2AHandler) handleSubscribeTask(w http.ResponseWriter, r *http.Request,
 					Status: updated.Status,
 				},
 			})
-			fmt.Fprintf(w, "data: %s\n\n", updateData)
+			_, _ = fmt.Fprintf(w, "data: %s\n\n", updateData)
 			flusher.Flush()
 
 			if updated.Status.State.IsTerminal() || updated.Status.State == a2a.TaskStateInputRequired {
@@ -312,7 +312,7 @@ func (h *A2AHandler) handleSubscribeTask(w http.ResponseWriter, r *http.Request,
 		}
 	}
 
-	fmt.Fprintf(w, "data: %s\n\n", toJSON(map[string]string{"event": "complete"}))
+	_, _ = fmt.Fprintf(w, "data: %s\n\n", toJSON(map[string]string{"event": "complete"}))
 	flusher.Flush()
 }
 
@@ -519,17 +519,17 @@ func (h *A2AHandler) ServeSSE(w http.ResponseWriter, r *http.Request, taskID ker
 
 	task, err := h.svc.GetTask(r.Context(), taskID)
 	if err != nil {
-		fmt.Fprintf(w, "event: error\ndata: %s\n\n", err.Error())
+		_, _ = fmt.Fprintf(w, "event: error\ndata: %s\n\n", err.Error())
 		flusher.Flush()
 		return
 	}
 
 	data := toJSON(a2a.StreamResponse{Task: task})
-	fmt.Fprintf(w, "event: task\ndata: %s\n\n", data)
+	_, _ = fmt.Fprintf(w, "event: task\ndata: %s\n\n", data)
 	flusher.Flush()
 
 	if task.Status.State.IsTerminal() {
-		fmt.Fprintf(w, "event: complete\ndata: {}\n\n")
+		_, _ = fmt.Fprintf(w, "event: complete\ndata: {}\n\n")
 		flusher.Flush()
 		return
 	}
@@ -543,7 +543,7 @@ func (h *A2AHandler) ServeSSE(w http.ResponseWriter, r *http.Request, taskID ker
 	for {
 		select {
 		case <-ctx.Done():
-			fmt.Fprintf(w, "event: complete\ndata: {}\n\n")
+			_, _ = fmt.Fprintf(w, "event: complete\ndata: {}\n\n")
 			flusher.Flush()
 			return
 		case <-ticker.C:
@@ -559,11 +559,11 @@ func (h *A2AHandler) ServeSSE(w http.ResponseWriter, r *http.Request, taskID ker
 						Status: updated.Status,
 					},
 				})
-				fmt.Fprintf(w, "event: status\ndata: %s\n\n", updateData)
+				_, _ = fmt.Fprintf(w, "event: status\ndata: %s\n\n", updateData)
 				flusher.Flush()
 
 				if updated.Status.State.IsTerminal() || updated.Status.State == a2a.TaskStateInputRequired {
-					fmt.Fprintf(w, "event: complete\ndata: {}\n\n")
+					_, _ = fmt.Fprintf(w, "event: complete\ndata: {}\n\n")
 					flusher.Flush()
 					return
 				}
