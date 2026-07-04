@@ -127,8 +127,8 @@ The outcome is a **single integration point** that collapses N×N complexity —
    - ✅ Payment handler registry (declared in UCP profile)
    - ✅ Handler specifications: Stripe, Shop Pay, Google Pay, Apple Pay, AP2 mandate, Mock
    - ✅ Dynamic negotiation per transaction based on amount, region, requested handler
-   - ~ Payment Token Exchange capability *(deferred)*
-   - ✅ Mock payment handler for development + testing
+    - ✅ Payment Token Exchange capability
+    - ✅ Mock payment handler for development + testing
 
 4. **Extension capabilities** ✅
    - ✅ **Fulfillment**: `RateCalculator` interface, `DefaultFulfillmentService`, REST endpoint `POST /api/v1/fulfillment/rates`
@@ -219,3 +219,25 @@ The outcome is a **single integration point** that collapses N×N complexity —
 - [x] **5.6** Wiring in `main.go`: route registration, auth middleware, AgentService with 5 skill handlers
 
 **Key files**: `domain/a2a/`, `infrastructure/a2a/`, `interfaces/rest/a2a.go`
+
+### Payment Token Exchange
+
+**Deliverable under Phase 3.3**: Exchange external wallet payment tokens (Google Pay, Apple Pay, Stripe) for AP2 mandate executions, completing the "tokenization" capability on those handlers.
+
+**What was implemented**:
+- `WalletTokenValidator` interface in `domain/payment/token_exchange.go` with `ValidateToken(ctx, token, provider)` method
+- `TokenExchangedEvent` and `TokenVerificationFailedEvent` domain events
+- `PaymentService.ExchangeWalletToken()` — validates wallet token via the validator, executes mandate with validated token
+- `MockWalletTokenValidator` in `infrastructure/payment/` — accepts non-empty tokens, prepends `"validated-"` prefix
+- `CheckoutSession.WalletProvider` + `WalletToken` fields with `SubmitPaymentToken(provider, token)` domain method
+- `MandateVerifier.VerifyAndExecuteWithToken()` — new interface method for token-aware mandate verification
+- `CheckoutService.SubmitPaymentToken()` — service method bridging REST to domain
+- `POST /api/v1/checkouts/:id/payment-token` REST endpoint
+- `exchange_payment_token` MCP tool (JSON-RPC)
+- `dev.ucp.shopping.payment_token_exchange` UCP capability declaration
+- Migration `000015` adding `wallet_provider` + `wallet_token` columns to `checkout_sessions`
+- 10 new tests (3 domain payment, 4 checkout domain, 2 REST handler, 1 MCP)
+
+**UCP Capability**: `dev.ucp.shopping.payment_token_exchange` with REST binding `POST /{id}/payment-token` and MCP binding `exchange_payment_token`
+
+**Key files**: `domain/payment/token_exchange.go`, `infrastructure/payment/mock_token_validator.go`, `infrastructure/checkout/mandate_verifier.go`, `infrastructure/database/migrations/000015_add_checkout_payment_token.up.sql`
