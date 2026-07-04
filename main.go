@@ -168,7 +168,8 @@ func main() {
 	checkoutPub := infraCheckout.NewNATSCheckoutEventPublisher(js)
 
 	mandateRepo := infraPayment.NewPostgresMandateRepository(db)
-	paymentSvc := domainPayment.NewPaymentService(mandateRepo, logger)
+	tokenValidator := infraPayment.NewMockWalletTokenValidator()
+	paymentSvc := domainPayment.NewPaymentService(mandateRepo, logger, domainPayment.WithWalletTokenValidator(tokenValidator))
 	paymentHandler := rest.NewPaymentHandler(paymentSvc, sf)
 
 	mandateVerifier := infraCheckout.NewCheckoutMandateVerifier(paymentSvc)
