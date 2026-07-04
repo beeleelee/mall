@@ -24,12 +24,15 @@ type sagaOrderCreatePayload struct {
 	CartID     int64 `json:"cart_id"`
 }
 
+type sagaSubmitFn func(dtmServer, gid, cbURL string, items []sagaItem, mandateID int64, order sagaOrderCreatePayload) error
+
 type DTMCheckoutSaga struct {
-	orderSvc    *domain.OrderService
-	dtmServer   string
-	callbackURL string
-	idGen       func() (kernel.ID, error)
-	logger      kernel.Logger
+	orderSvc  *domain.OrderService
+	submitFn  sagaSubmitFn
+	dtmServer string
+	cbURL     string
+	idGen     func() (kernel.ID, error)
+	logger    kernel.Logger
 }
 
 func NewDTMCheckoutSaga(
@@ -40,12 +43,35 @@ func NewDTMCheckoutSaga(
 	logger kernel.Logger,
 ) *DTMCheckoutSaga {
 	return &DTMCheckoutSaga{
-		orderSvc:    orderSvc,
-		dtmServer:   dtmServer,
-		callbackURL: callbackURL,
-		idGen:       sf.NextID,
-		logger:      logger,
+		orderSvc:  orderSvc,
+		submitFn:  submitSaga,
+		dtmServer: dtmServer,
+		cbURL:     callbackURL,
+		idGen:     sf.NextID,
+		logger:    logger,
 	}
+}
+
+func submitSaga(dtmServer, gid, cbURL string, items []sagaItem, mandateID int64, order sagaOrderCreatePayload) error {
+	saga := dtmcli.NewSaga(dtmServer, gid)
+	saga.Add(
+		cbURL+"/api/v1/saga/inventory/reserve",
+		cbURL+"/api/v1/saga/inventory/release",
+		map[string]any{"items": items},
+	)
+	if mandateID > 0 {
+		saga.Add(
+			cbURL+"/api/v1/saga/payment/verify",
+			cbURL+"/api/v1/saga/payment/cancel",
+			map[string]any{"mandate_id": mandateID, "token": ""},
+		)
+	}
+	saga.Add(
+		cbURL+"/api/v1/saga/order/create",
+		cbURL+"/api/v1/saga/order/cancel",
+		order,
+	)
+	return saga.Submit()
 }
 
 func (s *DTMCheckoutSaga) Handle(ctx context.Context, data []byte) error {
@@ -71,7 +97,6 @@ func (s *DTMCheckoutSaga) Handle(ctx context.Context, data []byte) error {
 	}
 
 	gid := fmt.Sprintf("co-%d-%d", evt.CheckoutID, newID.Int64())
-	saga := dtmcli.NewSaga(s.dtmServer, gid)
 
 	items := make([]sagaItem, len(evt.Items))
 	for i, item := range evt.Items {
@@ -81,34 +106,14 @@ func (s *DTMCheckoutSaga) Handle(ctx context.Context, data []byte) error {
 		}
 	}
 
-	cb := s.callbackURL
-
-	saga.Add(
-		cb+"/api/v1/saga/inventory/reserve",
-		cb+"/api/v1/saga/inventory/release",
-		map[string]any{"items": items},
-	)
-
-	if evt.MandateID > 0 {
-		saga.Add(
-			cb+"/api/v1/saga/payment/verify",
-			cb+"/api/v1/saga/payment/cancel",
-			map[string]any{"mandate_id": evt.MandateID, "token": ""},
-		)
+	orderPayload := sagaOrderCreatePayload{
+		OrderID:    newID.Int64(),
+		CheckoutID: evt.CheckoutID,
+		UserID:     evt.UserID,
+		CartID:     evt.CartID,
 	}
 
-	saga.Add(
-		cb+"/api/v1/saga/order/create",
-		cb+"/api/v1/saga/order/cancel",
-		sagaOrderCreatePayload{
-			OrderID:    newID.Int64(),
-			CheckoutID: evt.CheckoutID,
-			UserID:     evt.UserID,
-			CartID:     evt.CartID,
-		},
-	)
-
-	if err := saga.Submit(); err != nil {
+	if err := s.submitFn(s.dtmServer, gid, s.cbURL, items, evt.MandateID, orderPayload); err != nil {
 		s.logger.Error(ctx, "dtm-saga: submit failed", err,
 			kernel.Field("gid", gid),
 			kernel.Field("checkout_id", evt.CheckoutID))
