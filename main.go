@@ -25,6 +25,7 @@ import (
 	appIdentity "github.com/beeleelee/mall/application/identity"
 	appOAuth "github.com/beeleelee/mall/application/oauth"
 	appOrder "github.com/beeleelee/mall/application/order"
+	appPayment "github.com/beeleelee/mall/application/payment"
 	domainA2A "github.com/beeleelee/mall/domain/a2a"
 	domainCart "github.com/beeleelee/mall/domain/cart"
 	domainCatalog "github.com/beeleelee/mall/domain/catalog"
@@ -247,6 +248,9 @@ func main() {
 			}
 		})
 	}()
+
+	mandateSaga := appPayment.NewDTMMandateSaga(dtmServer, callbackURL, logger)
+	_ = mandateSaga
 
 	webhookDeliverer := infraOrder.NewWebhookDeliverer()
 
@@ -668,6 +672,21 @@ func main() {
 		Method:  http.MethodPost,
 		Path:    "/api/v1/saga/order/cancel",
 		Handler: sagaHandler.CancelOrder,
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPost,
+		Path:    "/api/v1/saga/mandate/execute",
+		Handler: sagaHandler.ExecuteMandate,
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPost,
+		Path:    "/api/v1/saga/mandate/settle",
+		Handler: sagaHandler.SettleMandate,
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPost,
+		Path:    "/api/v1/saga/mandate/rollback",
+		Handler: sagaHandler.RollbackMandateSettle,
 	})
 
 	srv.AddRoute(gozerorest.Route{

@@ -118,7 +118,7 @@ The outcome is a **single integration point** that collapses N×N complexity —
 2. **AP2 (Agent Payments Protocol)** ✅
    - ✅ AP2 mandate lifecycle: `request → approve → execute → settle`
    - ✅ Mandate aggregate: `Mandate`, `MandateScope`, `MandateSignature`
-   - ~ DTM Saga for mandate creation *(deferred — single-service atomicity sufficient for now)*
+   - [x] DTM Saga for mandate creation (2-step saga: execute → settle, with cancel compensation via existing /api/v1/saga/payment/cancel)
    - ✅ Single-use, scoped payment tokens
    - ✅ AP2 mandate extension: `dev.ucp.shopping.ap2_mandate`
    - ✅ Integration with checkout: mandate verification + execution on `complete_checkout`

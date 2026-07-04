@@ -175,3 +175,40 @@ func (h *SagaHandler) CancelOrder(w http.ResponseWriter, r *http.Request) {
 	}
 	writeSagaOK(w)
 }
+
+type sagaMandateReq struct {
+	MandateID int64  `json:"mandate_id"`
+	Token     string `json:"token"`
+}
+
+func (h *SagaHandler) ExecuteMandate(w http.ResponseWriter, r *http.Request) {
+	var req sagaMandateReq
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeSagaError(w, "invalid request: "+err.Error())
+		return
+	}
+	if _, err := h.paymentSvc.ExecuteMandate(r.Context(), kernel.ID(req.MandateID), req.Token); err != nil {
+		writeSagaError(w, err.Error())
+		return
+	}
+	writeSagaOK(w)
+}
+
+func (h *SagaHandler) SettleMandate(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		MandateID int64 `json:"mandate_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeSagaError(w, "invalid request: "+err.Error())
+		return
+	}
+	if _, err := h.paymentSvc.SettleMandate(r.Context(), kernel.ID(req.MandateID)); err != nil {
+		writeSagaError(w, err.Error())
+		return
+	}
+	writeSagaOK(w)
+}
+
+func (h *SagaHandler) RollbackMandateSettle(w http.ResponseWriter, r *http.Request) {
+	writeSagaOK(w)
+}
