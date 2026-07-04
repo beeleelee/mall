@@ -3,16 +3,27 @@ package checkout
 import (
 	"context"
 
+	appPayment "github.com/beeleelee/mall/application/payment"
 	"github.com/beeleelee/mall/domain/kernel"
 	domainPayment "github.com/beeleelee/mall/domain/payment"
 )
 
 type CheckoutMandateVerifier struct {
-	paymentSvc *domainPayment.PaymentService
+	paymentSvc     *domainPayment.PaymentService
+	dtmSaga        *appPayment.DTMMandateSaga
+	tokenValidator domainPayment.WalletTokenValidator
 }
 
-func NewCheckoutMandateVerifier(paymentSvc *domainPayment.PaymentService) *CheckoutMandateVerifier {
-	return &CheckoutMandateVerifier{paymentSvc: paymentSvc}
+func NewCheckoutMandateVerifier(
+	paymentSvc *domainPayment.PaymentService,
+	dtmSaga *appPayment.DTMMandateSaga,
+	tokenValidator domainPayment.WalletTokenValidator,
+) *CheckoutMandateVerifier {
+	return &CheckoutMandateVerifier{
+		paymentSvc:     paymentSvc,
+		dtmSaga:        dtmSaga,
+		tokenValidator: tokenValidator,
+	}
 }
 
 func (v *CheckoutMandateVerifier) VerifyAndExecute(ctx context.Context, mandateID, userID kernel.ID, amount int64) error {
@@ -33,8 +44,8 @@ func (v *CheckoutMandateVerifier) VerifyAndExecute(ctx context.Context, mandateI
 		return kernel.NewDomainError(kernel.ErrInvalidArgument, "mandate has expired")
 	}
 
-	if _, err := v.paymentSvc.ExecuteMandate(ctx, mandateID, "checkout-"+mandateID.String()); err != nil {
-		return kernel.NewDomainErrorWithCause(kernel.ErrInternal, "mandate verification failed: cannot execute mandate", err)
+	if err := v.dtmSaga.Execute(ctx, mandateID, "checkout-"+mandateID.String()); err != nil {
+		return kernel.NewDomainErrorWithCause(kernel.ErrInternal, "mandate verification failed: cannot execute mandate saga", err)
 	}
 
 	return nil
@@ -58,8 +69,13 @@ func (v *CheckoutMandateVerifier) VerifyAndExecuteWithToken(ctx context.Context,
 		return kernel.NewDomainError(kernel.ErrInvalidArgument, "mandate has expired")
 	}
 
-	if _, err := v.paymentSvc.ExchangeWalletToken(ctx, mandateID, token, provider, userID); err != nil {
-		return kernel.NewDomainErrorWithCause(kernel.ErrInternal, "mandate verification failed: cannot exchange wallet token", err)
+	result, err := v.tokenValidator.ValidateToken(ctx, token, provider)
+	if err != nil {
+		return kernel.NewDomainErrorWithCause(kernel.ErrInvalidArgument, "mandate verification failed: wallet token validation failed", err)
+	}
+
+	if err := v.dtmSaga.Execute(ctx, mandateID, result.Token); err != nil {
+		return kernel.NewDomainErrorWithCause(kernel.ErrInternal, "mandate verification failed: cannot execute mandate saga", err)
 	}
 
 	return nil
