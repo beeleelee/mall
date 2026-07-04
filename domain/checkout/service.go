@@ -14,6 +14,7 @@ var tracer = otel.Tracer("mall.domain.checkout")
 
 type MandateVerifier interface {
 	VerifyAndExecute(ctx context.Context, mandateID, userID kernel.ID, amount int64) error
+	VerifyAndExecuteWithToken(ctx context.Context, mandateID, userID kernel.ID, amount int64, token, provider string) error
 }
 
 type CheckoutService struct {
@@ -260,7 +261,7 @@ func (s *CheckoutService) StartComplete(ctx context.Context, id kernel.ID, conti
 
 	if continueURL != "" {
 		if session.PaymentHandler == "ap2_mandate" && s.mandateVerifier != nil && session.MandateID > 0 {
-			if err := s.mandateVerifier.VerifyAndExecute(ctx, session.MandateID, session.UserID, session.GrandTotal); err != nil {
+			if err := s.verifyMandate(ctx, session); err != nil {
 				return nil, false, err
 			}
 		}
@@ -276,7 +277,7 @@ func (s *CheckoutService) StartComplete(ctx context.Context, id kernel.ID, conti
 	}
 
 	if session.PaymentHandler == "ap2_mandate" && s.mandateVerifier != nil && session.MandateID > 0 {
-		if err := s.mandateVerifier.VerifyAndExecute(ctx, session.MandateID, session.UserID, session.GrandTotal); err != nil {
+		if err := s.verifyMandate(ctx, session); err != nil {
 			return nil, false, err
 		}
 	}
@@ -308,7 +309,7 @@ func (s *CheckoutService) Complete(ctx context.Context, id kernel.ID) (*Checkout
 	}
 
 	if session.PaymentHandler == "ap2_mandate" && s.mandateVerifier != nil && session.MandateID > 0 {
-		if err := s.mandateVerifier.VerifyAndExecute(ctx, session.MandateID, session.UserID, session.GrandTotal); err != nil {
+		if err := s.verifyMandate(ctx, session); err != nil {
 			return nil, err
 		}
 	}
@@ -347,6 +348,13 @@ func (s *CheckoutService) Cancel(ctx context.Context, id kernel.ID) (*CheckoutSe
 
 	s.publishEvents(ctx, session)
 	return session, nil
+}
+
+func (s *CheckoutService) verifyMandate(ctx context.Context, session *CheckoutSession) error {
+	if session.WalletToken != "" && session.WalletProvider != "" {
+		return s.mandateVerifier.VerifyAndExecuteWithToken(ctx, session.MandateID, session.UserID, session.GrandTotal, session.WalletToken, session.WalletProvider)
+	}
+	return s.mandateVerifier.VerifyAndExecute(ctx, session.MandateID, session.UserID, session.GrandTotal)
 }
 
 func (s *CheckoutService) publishEvents(ctx context.Context, session *CheckoutSession) {
