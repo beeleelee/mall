@@ -530,5 +530,3 @@ func adminUserToMap(u *identity.User) map[string]any {
 		"roles":  roles,
 	}
 }
-
-

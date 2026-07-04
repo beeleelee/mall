@@ -52,8 +52,8 @@ var oauthTools = []ToolDefinition{
 		InputSchema: InputSchema{
 			Type: "object",
 			Properties: map[string]PropertySchema{
-				"token":        {Type: "string", Description: "Refresh token to revoke"},
-				"client_id":    {Type: "string", Description: "OAuth client ID"},
+				"token":         {Type: "string", Description: "Refresh token to revoke"},
+				"client_id":     {Type: "string", Description: "OAuth client ID"},
 				"client_secret": {Type: "string", Description: "OAuth client secret"},
 			},
 		},

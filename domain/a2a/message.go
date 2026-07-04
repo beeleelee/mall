@@ -22,10 +22,10 @@ type FileContent struct {
 }
 
 type Part struct {
-	Type PartType    `json:"type"`
-	Text string      `json:"text,omitempty"`
-	File *FileContent `json:"file,omitempty"`
-	Data any         `json:"data,omitempty"`
+	Type     PartType       `json:"type"`
+	Text     string         `json:"text,omitempty"`
+	File     *FileContent   `json:"file,omitempty"`
+	Data     any            `json:"data,omitempty"`
 	Metadata map[string]any `json:"metadata,omitempty"`
 }
 
@@ -45,7 +45,7 @@ func DataPart(data any) Part {
 }
 
 type Message struct {
-	Role        Role           `json:"role"`
-	Parts       []Part         `json:"parts"`
-	Metadata    map[string]any `json:"metadata,omitempty"`
+	Role     Role           `json:"role"`
+	Parts    []Part         `json:"parts"`
+	Metadata map[string]any `json:"metadata,omitempty"`
 }

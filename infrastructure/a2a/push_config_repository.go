@@ -12,11 +12,11 @@ import (
 )
 
 type pushConfigRow struct {
-	ID              int64  `db:"id"`
-	TaskID          int64  `db:"task_id"`
-	URL             string `db:"url"`
-	AuthScheme      string `db:"auth_scheme"`
-	AuthCredentials string `db:"auth_credentials"`
+	ID              int64     `db:"id"`
+	TaskID          int64     `db:"task_id"`
+	URL             string    `db:"url"`
+	AuthScheme      string    `db:"auth_scheme"`
+	AuthCredentials string    `db:"auth_credentials"`
 	CreatedAt       time.Time `db:"created_at"`
 }
 

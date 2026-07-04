@@ -3,15 +3,15 @@ package a2a
 import "errors"
 
 var (
-	ErrTaskNotFound                = errors.New("task not found")
-	ErrTaskNotCancelable           = errors.New("task is not cancelable")
+	ErrTaskNotFound                 = errors.New("task not found")
+	ErrTaskNotCancelable            = errors.New("task is not cancelable")
 	ErrPushNotificationNotSupported = errors.New("push notifications not supported")
-	ErrUnsupportedOperation        = errors.New("unsupported operation")
-	ErrContentTypeNotSupported     = errors.New("content type not supported")
-	ErrInvalidAgentResponse        = errors.New("invalid agent response")
-	ErrVersionNotSupported         = errors.New("a2a version not supported")
-	ErrExtensionSupportRequired    = errors.New("extension support required")
-	ErrSkillNotFound               = errors.New("skill not found")
+	ErrUnsupportedOperation         = errors.New("unsupported operation")
+	ErrContentTypeNotSupported      = errors.New("content type not supported")
+	ErrInvalidAgentResponse         = errors.New("invalid agent response")
+	ErrVersionNotSupported          = errors.New("a2a version not supported")
+	ErrExtensionSupportRequired     = errors.New("extension support required")
+	ErrSkillNotFound                = errors.New("skill not found")
 )
 
 type A2AError struct {

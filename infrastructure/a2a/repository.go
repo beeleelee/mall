@@ -48,19 +48,19 @@ type taskStatusRow struct {
 }
 
 type taskRow struct {
-	ID              int64          `db:"id"`
-	UserID          int64          `db:"user_id"`
-	SkillID         string         `db:"skill_id"`
-	StatusState     string         `db:"status_state"`
-	StatusMessage   string         `db:"status_message"`
-	StatusUpdatedAt time.Time      `db:"status_updated_at"`
-	StatusCompletedAt *time.Time   `db:"status_completed_at"`
-	ContextID       *string        `db:"context_id"`
-	History         nullRawMessage `db:"history"`
-	Artifacts       nullRawMessage `db:"artifacts"`
-	Metadata        nullRawMessage `db:"metadata"`
-	CreatedAt       time.Time      `db:"created_at"`
-	UpdatedAt       time.Time      `db:"updated_at"`
+	ID                int64          `db:"id"`
+	UserID            int64          `db:"user_id"`
+	SkillID           string         `db:"skill_id"`
+	StatusState       string         `db:"status_state"`
+	StatusMessage     string         `db:"status_message"`
+	StatusUpdatedAt   time.Time      `db:"status_updated_at"`
+	StatusCompletedAt *time.Time     `db:"status_completed_at"`
+	ContextID         *string        `db:"context_id"`
+	History           nullRawMessage `db:"history"`
+	Artifacts         nullRawMessage `db:"artifacts"`
+	Metadata          nullRawMessage `db:"metadata"`
+	CreatedAt         time.Time      `db:"created_at"`
+	UpdatedAt         time.Time      `db:"updated_at"`
 }
 
 func (r *taskRow) toDomain() (*domain.Task, error) {
@@ -135,19 +135,19 @@ func fromDomain(task *domain.Task) (*taskRow, error) {
 	}
 
 	return &taskRow{
-		ID:              task.ID.Int64(),
-		UserID:          task.UserID.Int64(),
-		SkillID:         task.SkillID,
-		StatusState:     string(task.Status.State),
-		StatusMessage:   task.Status.Message,
-		StatusUpdatedAt: task.Status.UpdatedAt,
+		ID:                task.ID.Int64(),
+		UserID:            task.UserID.Int64(),
+		SkillID:           task.SkillID,
+		StatusState:       string(task.Status.State),
+		StatusMessage:     task.Status.Message,
+		StatusUpdatedAt:   task.Status.UpdatedAt,
 		StatusCompletedAt: task.Status.CompletedAt,
-		ContextID:       contextID,
-		History:         history,
-		Artifacts:       artifacts,
-		Metadata:        metadata,
-		CreatedAt:       task.CreatedAt,
-		UpdatedAt:       task.UpdatedAt,
+		ContextID:         contextID,
+		History:           history,
+		Artifacts:         artifacts,
+		Metadata:          metadata,
+		CreatedAt:         task.CreatedAt,
+		UpdatedAt:         task.UpdatedAt,
 	}, nil
 }
 

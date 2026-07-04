@@ -195,7 +195,9 @@ func (fakePriceCalc) Calculate(_ context.Context, in domainCheckout.PriceInput) 
 
 type fakeMandateVerifier struct{}
 
-func (fakeMandateVerifier) VerifyAndExecute(_ context.Context, _, _ kernel.ID, _ int64) error { return nil }
+func (fakeMandateVerifier) VerifyAndExecute(_ context.Context, _, _ kernel.ID, _ int64) error {
+	return nil
+}
 
 // ---------------------------------------------------------------------------
 // Order fakes
@@ -761,7 +763,7 @@ func TestMCP_ToolsList_AllDomains(t *testing.T) {
 		"register_user": false, "login_user": false, "get_user": false, "suspend_user": false,
 		"register_webhook": false, "list_webhooks": false, "delete_webhook": false,
 		"calculate_rates": false,
-		"authorize": false, "token": false, "revoke": false,
+		"authorize":       false, "token": false, "revoke": false,
 		"create_product": false, "update_product": false, "delete_product": false,
 		"list_all_orders": false, "list_users": false, "activate_user": false,
 	}
@@ -979,7 +981,7 @@ func TestMCP_CheckoutSelectMandate(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 type fakeUserRepoForMCP struct {
-	users map[kernel.ID]*domainIdentity.User
+	users   map[kernel.ID]*domainIdentity.User
 	byEmail map[string]kernel.ID
 }
 

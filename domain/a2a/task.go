@@ -9,13 +9,13 @@ import (
 type TaskState string
 
 const (
-	TaskStateSubmitted    TaskState = "submitted"
-	TaskStateWorking      TaskState = "working"
+	TaskStateSubmitted     TaskState = "submitted"
+	TaskStateWorking       TaskState = "working"
 	TaskStateInputRequired TaskState = "input-required"
-	TaskStateCompleted    TaskState = "completed"
-	TaskStateFailed       TaskState = "failed"
-	TaskStateCanceled     TaskState = "canceled"
-	TaskStateRejected     TaskState = "rejected"
+	TaskStateCompleted     TaskState = "completed"
+	TaskStateFailed        TaskState = "failed"
+	TaskStateCanceled      TaskState = "canceled"
+	TaskStateRejected      TaskState = "rejected"
 )
 
 func (s TaskState) IsTerminal() bool {
@@ -45,13 +45,13 @@ type TaskStatus struct {
 
 type Task struct {
 	kernel.AggregateRoot
-	Status      TaskStatus   `json:"status"`
-	History     []Message    `json:"history,omitempty"`
-	Artifacts   []Artifact   `json:"artifacts,omitempty"`
-	ContextID   string       `json:"contextId,omitempty"`
-	Metadata    map[string]any `json:"metadata,omitempty"`
-	UserID      kernel.ID    `json:"userId,omitempty"`
-	SkillID     string       `json:"skillId,omitempty"`
+	Status    TaskStatus     `json:"status"`
+	History   []Message      `json:"history,omitempty"`
+	Artifacts []Artifact     `json:"artifacts,omitempty"`
+	ContextID string         `json:"contextId,omitempty"`
+	Metadata  map[string]any `json:"metadata,omitempty"`
+	UserID    kernel.ID      `json:"userId,omitempty"`
+	SkillID   string         `json:"skillId,omitempty"`
 }
 
 func NewTask(id kernel.ID, userID kernel.ID, skillID string, contextID string) *Task {
@@ -84,10 +84,10 @@ func (t *Task) Transition(state TaskState, message string) error {
 		CompletedAt: t.Status.CompletedAt,
 	}
 	t.AddEvent(TaskStatusChangedEvent{
-		TaskID:    t.ID,
-		OldState:  t.Status.State,
-		NewState:  state,
-		UserID:    t.UserID,
+		TaskID:   t.ID,
+		OldState: t.Status.State,
+		NewState: state,
+		UserID:   t.UserID,
 	})
 	return nil
 }

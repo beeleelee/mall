@@ -7,10 +7,10 @@ import (
 )
 
 type TaskStatusChangedEvent struct {
-	TaskID    kernel.ID
-	OldState  TaskState
-	NewState  TaskState
-	UserID    kernel.ID
+	TaskID   kernel.ID
+	OldState TaskState
+	NewState TaskState
+	UserID   kernel.ID
 }
 
 func (e TaskStatusChangedEvent) EventName() string      { return "a2a.task.status_changed" }

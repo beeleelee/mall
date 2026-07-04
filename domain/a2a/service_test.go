@@ -9,9 +9,9 @@ import (
 
 type fakeLogger struct{}
 
-func (l *fakeLogger) Debug(_ context.Context, msg string, fields ...kernel.LogField) {}
-func (l *fakeLogger) Info(_ context.Context, msg string, fields ...kernel.LogField)  {}
-func (l *fakeLogger) Warn(_ context.Context, msg string, fields ...kernel.LogField)  {}
+func (l *fakeLogger) Debug(_ context.Context, msg string, fields ...kernel.LogField)            {}
+func (l *fakeLogger) Info(_ context.Context, msg string, fields ...kernel.LogField)             {}
+func (l *fakeLogger) Warn(_ context.Context, msg string, fields ...kernel.LogField)             {}
 func (l *fakeLogger) Error(_ context.Context, msg string, err error, fields ...kernel.LogField) {}
 
 type fakeTaskRepo struct {
@@ -171,7 +171,7 @@ func TestTaskTransition(t *testing.T) {
 
 func TestTaskCancelable(t *testing.T) {
 	tests := []struct {
-		state    TaskState
+		state      TaskState
 		cancelable bool
 	}{
 		{TaskStateSubmitted, true},

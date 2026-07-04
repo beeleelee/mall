@@ -104,9 +104,9 @@ func (r *fakePushConfigRepo) Delete(_ context.Context, id kernel.ID) error {
 
 type fakeA2ALogger struct{}
 
-func (l *fakeA2ALogger) Debug(_ context.Context, msg string, fields ...kernel.LogField) {}
-func (l *fakeA2ALogger) Info(_ context.Context, msg string, fields ...kernel.LogField)  {}
-func (l *fakeA2ALogger) Warn(_ context.Context, msg string, fields ...kernel.LogField)  {}
+func (l *fakeA2ALogger) Debug(_ context.Context, msg string, fields ...kernel.LogField)            {}
+func (l *fakeA2ALogger) Info(_ context.Context, msg string, fields ...kernel.LogField)             {}
+func (l *fakeA2ALogger) Warn(_ context.Context, msg string, fields ...kernel.LogField)             {}
 func (l *fakeA2ALogger) Error(_ context.Context, msg string, err error, fields ...kernel.LogField) {}
 
 type echoA2ASkillHandler struct{}
@@ -196,10 +196,10 @@ func TestA2ASendMessageRPC(t *testing.T) {
 	}
 
 	var resp struct {
-		JSONRPC string `json:"jsonrpc"`
+		JSONRPC string         `json:"jsonrpc"`
 		Result  map[string]any `json:"result"`
-		Error   any    `json:"error"`
-		ID      int    `json:"id"`
+		Error   any            `json:"error"`
+		ID      int            `json:"id"`
 	}
 	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 		t.Fatal(err)
@@ -448,5 +448,3 @@ func TestA2AAgentCardRPC(t *testing.T) {
 		t.Errorf("expected correct name, got %v", resp.Result["name"])
 	}
 }
-
-

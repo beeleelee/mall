@@ -133,10 +133,10 @@ func (h *A2AHandler) handleGetTask(w http.ResponseWriter, r *http.Request, req a
 
 func (h *A2AHandler) handleListTasks(w http.ResponseWriter, r *http.Request, req a2aRPCRequest, userID kernel.ID) {
 	var params struct {
-		SkillID   string          `json:"skillId,omitempty"`
-		States    []string        `json:"states,omitempty"`
-		PageToken string          `json:"pageToken,omitempty"`
-		PageSize  int             `json:"pageSize,omitempty"`
+		SkillID   string   `json:"skillId,omitempty"`
+		States    []string `json:"states,omitempty"`
+		PageToken string   `json:"pageToken,omitempty"`
+		PageSize  int      `json:"pageSize,omitempty"`
 	}
 	if err := json.Unmarshal(req.Params, &params); err != nil {
 		writeA2AError(w, req.ID, -32602, "invalid params")
@@ -160,8 +160,8 @@ func (h *A2AHandler) handleListTasks(w http.ResponseWriter, r *http.Request, req
 	}
 
 	writeA2AResult(w, req.ID, map[string]any{
-		"tasks":          rpcTasks,
-		"nextPageToken":  nextToken,
+		"tasks":         rpcTasks,
+		"nextPageToken": nextToken,
 	})
 }
 
@@ -318,8 +318,8 @@ func (h *A2AHandler) handleSubscribeTask(w http.ResponseWriter, r *http.Request,
 
 func (h *A2AHandler) handleCreatePushConfig(w http.ResponseWriter, r *http.Request, req a2aRPCRequest, userID kernel.ID) {
 	var params struct {
-		TaskID int64       `json:"taskId"`
-		URL    string      `json:"url"`
+		TaskID int64        `json:"taskId"`
+		URL    string       `json:"url"`
 		Auth   a2a.AuthInfo `json:"authInfo,omitempty"`
 	}
 	if err := json.Unmarshal(req.Params, &params); err != nil {
@@ -449,10 +449,10 @@ func taskToRPC(task *a2a.Task) map[string]any {
 	artifacts := make([]map[string]any, 0, len(task.Artifacts))
 	for _, a := range task.Artifacts {
 		artifacts = append(artifacts, map[string]any{
-			"id":     a.ID,
-			"name":   a.Name,
-			"parts":  a.Parts,
-			"index":  a.Index,
+			"id":    a.ID,
+			"name":  a.Name,
+			"parts": a.Parts,
+			"index": a.Index,
 		})
 	}
 
@@ -465,12 +465,12 @@ func taskToRPC(task *a2a.Task) map[string]any {
 	}
 
 	result := map[string]any{
-		"id":     task.ID.Int64(),
+		"id":      task.ID.Int64(),
 		"skillId": task.SkillID,
 		"status": map[string]any{
-			"state":      task.Status.State,
-			"message":    task.Status.Message,
-			"updatedAt":  task.Status.UpdatedAt,
+			"state":     task.Status.State,
+			"message":   task.Status.Message,
+			"updatedAt": task.Status.UpdatedAt,
 		},
 		"artifacts": artifacts,
 	}

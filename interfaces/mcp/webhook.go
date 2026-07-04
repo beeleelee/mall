@@ -157,10 +157,10 @@ func (h *WebhookMCPHandler) callDelete(ctx context.Context, raw json.RawMessage)
 
 func webhookToMap(wh *domain.Webhook) map[string]any {
 	return map[string]any{
-		"id":     wh.ID.Int64(),
+		"id":      wh.ID.Int64(),
 		"user_id": wh.UserID.Int64(),
-		"url":    wh.URL,
-		"events": wh.Events,
-		"active": wh.Active,
+		"url":     wh.URL,
+		"events":  wh.Events,
+		"active":  wh.Active,
 	}
 }

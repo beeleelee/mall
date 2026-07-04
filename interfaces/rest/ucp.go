@@ -313,8 +313,8 @@ func DefaultProfile() *Profile {
 					REST: &RESTBinding{
 						BaseURL: "/.well-known/a2a",
 						Endpoints: map[string]string{
-							"agent_card":           "GET /agent-card",
-							"extended_agent_card":  "GET /agent-card/extended",
+							"agent_card":          "GET /agent-card",
+							"extended_agent_card": "GET /agent-card/extended",
 						},
 					},
 				},

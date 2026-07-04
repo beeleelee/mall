@@ -1,17 +1,17 @@
 package a2a
 
 type AgentCard struct {
-	Name             string            `json:"name"`
-	Description      string            `json:"description"`
-	URL              string            `json:"url"`
-	Provider         AgentProvider     `json:"provider"`
-	Version          string            `json:"version"`
-	Capabilities     AgentCapabilities `json:"capabilities"`
-	Skills           []AgentSkill      `json:"skills"`
-	Interfaces       []AgentInterface  `json:"interfaces"`
-	SecuritySchemes  map[string]SecurityScheme `json:"securitySchemes,omitempty"`
-	DefaultInputModes  []string `json:"defaultInputModes"`
-	DefaultOutputModes []string `json:"defaultOutputModes"`
+	Name               string                    `json:"name"`
+	Description        string                    `json:"description"`
+	URL                string                    `json:"url"`
+	Provider           AgentProvider             `json:"provider"`
+	Version            string                    `json:"version"`
+	Capabilities       AgentCapabilities         `json:"capabilities"`
+	Skills             []AgentSkill              `json:"skills"`
+	Interfaces         []AgentInterface          `json:"interfaces"`
+	SecuritySchemes    map[string]SecurityScheme `json:"securitySchemes,omitempty"`
+	DefaultInputModes  []string                  `json:"defaultInputModes"`
+	DefaultOutputModes []string                  `json:"defaultOutputModes"`
 }
 
 type AgentProvider struct {
@@ -20,9 +20,9 @@ type AgentProvider struct {
 }
 
 type AgentCapabilities struct {
-	Streaming          bool `json:"streaming"`
-	PushNotifications  bool `json:"pushNotifications"`
-	ExtendedAgentCard  bool `json:"extendedAgentCard"`
+	Streaming         bool `json:"streaming"`
+	PushNotifications bool `json:"pushNotifications"`
+	ExtendedAgentCard bool `json:"extendedAgentCard"`
 }
 
 type AgentSkill struct {
@@ -42,8 +42,8 @@ type AgentInterface struct {
 }
 
 type SecurityScheme struct {
-	Type   string `json:"type"`
-	Scheme string `json:"scheme,omitempty"`
+	Type         string `json:"type"`
+	Scheme       string `json:"scheme,omitempty"`
 	BearerFormat string `json:"bearerFormat,omitempty"`
 }
 
@@ -58,9 +58,9 @@ func DefaultAgentCard(baseURL string) *AgentCard {
 		},
 		Version: "1.0.0",
 		Capabilities: AgentCapabilities{
-			Streaming:          true,
-			PushNotifications:  true,
-			ExtendedAgentCard:  true,
+			Streaming:         true,
+			PushNotifications: true,
+			ExtendedAgentCard: true,
 		},
 		Skills: []AgentSkill{
 			{
@@ -118,8 +118,8 @@ func DefaultAgentCard(baseURL string) *AgentCard {
 		},
 		SecuritySchemes: map[string]SecurityScheme{
 			"bearer": {
-				Type:        "http",
-				Scheme:      "bearer",
+				Type:         "http",
+				Scheme:       "bearer",
 				BearerFormat: "JWT",
 			},
 		},
