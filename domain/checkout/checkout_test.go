@@ -282,6 +282,49 @@ func TestCartSnapshotItemTotalPrice(t *testing.T) {
 	}
 }
 
+func TestSubmitPaymentToken_Success(t *testing.T) {
+	s, _ := NewCheckoutSession(1, 42, 10, sampleSnapshot())
+
+	if err := s.SubmitPaymentToken("google_pay", "encrypted-token-data"); err != nil {
+		t.Fatal(err)
+	}
+	if s.WalletProvider != "google_pay" {
+		t.Errorf("expected google_pay, got %s", s.WalletProvider)
+	}
+	if s.WalletToken != "encrypted-token-data" {
+		t.Errorf("expected encrypted-token-data, got %s", s.WalletToken)
+	}
+}
+
+func TestSubmitPaymentToken_InvalidProvider(t *testing.T) {
+	s, _ := NewCheckoutSession(1, 42, 10, sampleSnapshot())
+
+	if err := s.SubmitPaymentToken("", "token"); err == nil {
+		t.Fatal("expected error for empty provider")
+	}
+}
+
+func TestSubmitPaymentToken_InvalidToken(t *testing.T) {
+	s, _ := NewCheckoutSession(1, 42, 10, sampleSnapshot())
+
+	if err := s.SubmitPaymentToken("google_pay", ""); err == nil {
+		t.Fatal("expected error for empty token")
+	}
+}
+
+func TestSubmitPaymentToken_WrongState(t *testing.T) {
+	s, _ := NewCheckoutSession(1, 42, 10, sampleSnapshot())
+	s.SetShippingAddress(sampleAddress())
+	s.SetBillingAddress(sampleAddress())
+	s.SelectShippingOption(sampleShippingOption())
+	s.SelectPaymentHandler("mock")
+	s.MarkReady()
+
+	if err := s.SubmitPaymentToken("google_pay", "token"); err == nil {
+		t.Fatal("expected error for wrong state")
+	}
+}
+
 func TestCartSnapshotTotal(t *testing.T) {
 	items := []CartSnapshotItem{
 		{Quantity: 2, UnitPrice: 1000},

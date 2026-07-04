@@ -303,3 +303,73 @@ func TestCheckoutHandler_Unauthenticated(t *testing.T) {
 		t.Errorf("expected 401, got %d", rec.Code)
 	}
 }
+
+func TestCheckoutHandler_SubmitPaymentToken_Success(t *testing.T) {
+	h := newTestCheckoutHandler(t)
+
+	body, _ := json.Marshal(map[string]any{
+		"cart_id": 10,
+		"items": []map[string]any{
+			{"product_id": 100, "sku": "SKU001", "name": "Test", "quantity": 1, "unit_price": 500},
+		},
+	})
+	req := userRequest(t, http.MethodPost, "/api/v1/checkouts", body, 42)
+	rec := httptest.NewRecorder()
+	h.Create(rec, req)
+
+	var createResp map[string]any
+	json.Unmarshal(rec.Body.Bytes(), &createResp)
+	checkoutID := int64(createResp["id"].(float64))
+
+	tokenBody, _ := json.Marshal(map[string]any{
+		"wallet_provider": "google_pay",
+		"token":           "encrypted-payment-data",
+	})
+	req2 := httptest.NewRequest(http.MethodPost, "/api/v1/checkouts/"+strconv.FormatInt(checkoutID, 10)+"/payment-token", bytes.NewReader(tokenBody))
+	req2 = req2.WithContext(middleware.ContextWithUser(req2.Context(), middleware.UserInfo{UserID: 42}))
+	req2 = pathvar.WithVars(req2, map[string]string{"id": strconv.FormatInt(checkoutID, 10)})
+	rec2 := httptest.NewRecorder()
+	h.SubmitPaymentToken(rec2, req2)
+
+	if rec2.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec2.Code, rec2.Body.String())
+	}
+
+	var resp map[string]any
+	json.Unmarshal(rec2.Body.Bytes(), &resp)
+	if resp["wallet_provider"] != "google_pay" {
+		t.Errorf("expected google_pay, got %v", resp["wallet_provider"])
+	}
+}
+
+func TestCheckoutHandler_SubmitPaymentToken_WrongUser(t *testing.T) {
+	h := newTestCheckoutHandler(t)
+
+	body, _ := json.Marshal(map[string]any{
+		"cart_id": 10,
+		"items": []map[string]any{
+			{"product_id": 100, "sku": "SKU001", "name": "Test", "quantity": 1, "unit_price": 500},
+		},
+	})
+	req := userRequest(t, http.MethodPost, "/api/v1/checkouts", body, 42)
+	rec := httptest.NewRecorder()
+	h.Create(rec, req)
+
+	var createResp map[string]any
+	json.Unmarshal(rec.Body.Bytes(), &createResp)
+	checkoutID := int64(createResp["id"].(float64))
+
+	tokenBody, _ := json.Marshal(map[string]any{
+		"wallet_provider": "google_pay",
+		"token":           "token",
+	})
+	req2 := httptest.NewRequest(http.MethodPost, "/api/v1/checkouts/"+strconv.FormatInt(checkoutID, 10)+"/payment-token", bytes.NewReader(tokenBody))
+	req2 = req2.WithContext(middleware.ContextWithUser(req2.Context(), middleware.UserInfo{UserID: 99}))
+	req2 = pathvar.WithVars(req2, map[string]string{"id": strconv.FormatInt(checkoutID, 10)})
+	rec2 := httptest.NewRecorder()
+	h.SubmitPaymentToken(rec2, req2)
+
+	if rec2.Code != http.StatusForbidden {
+		t.Errorf("expected 403, got %d", rec2.Code)
+	}
+}

@@ -90,6 +90,81 @@ func TestPaymentService_CancelMandate(t *testing.T) {
 	}
 }
 
+type fakeTokenValidator struct {
+	shouldFail bool
+}
+
+func (v *fakeTokenValidator) ValidateToken(_ context.Context, token, provider string) (*TokenValidationResult, error) {
+	if v.shouldFail {
+		return nil, kernel.NewDomainError(kernel.ErrInvalidArgument, "validation failed")
+	}
+	return &TokenValidationResult{
+		Provider: provider,
+		Token:    "validated-" + token,
+		Expiry:   time.Now().Add(24 * time.Hour),
+	}, nil
+}
+
+func TestPaymentService_ExchangeWalletToken(t *testing.T) {
+	repo := newFakeMandateRepo()
+	svc := NewPaymentService(repo, fakeLogger{}, WithWalletTokenValidator(&fakeTokenValidator{}))
+
+	scope := MandateScope{
+		MaxAmount:  10000,
+		MerchantID: 1,
+		Expiry:     time.Now().Add(24 * time.Hour),
+	}
+	svc.RequestMandate(context.Background(), 1, 42, scope)
+	svc.ApproveMandate(context.Background(), 1, "sig")
+
+	m, err := svc.ExchangeWalletToken(context.Background(), 1, "gpay-token", "google_pay", 42)
+	if err != nil {
+		t.Fatalf("ExchangeWalletToken: %v", err)
+	}
+	if m.Status != MandateStatusExecuted {
+		t.Fatalf("expected executed, got %s", m.Status)
+	}
+	if m.Token != "validated-gpay-token" {
+		t.Fatalf("expected validated token, got %s", m.Token)
+	}
+}
+
+func TestPaymentService_ExchangeWalletToken_WrongUser(t *testing.T) {
+	repo := newFakeMandateRepo()
+	svc := NewPaymentService(repo, fakeLogger{}, WithWalletTokenValidator(&fakeTokenValidator{}))
+
+	scope := MandateScope{
+		MaxAmount:  10000,
+		MerchantID: 1,
+		Expiry:     time.Now().Add(24 * time.Hour),
+	}
+	svc.RequestMandate(context.Background(), 1, 42, scope)
+	svc.ApproveMandate(context.Background(), 1, "sig")
+
+	_, err := svc.ExchangeWalletToken(context.Background(), 1, "token", "google_pay", 99)
+	if err == nil {
+		t.Fatal("expected error for wrong user")
+	}
+}
+
+func TestPaymentService_ExchangeWalletToken_ValidatorFailure(t *testing.T) {
+	repo := newFakeMandateRepo()
+	svc := NewPaymentService(repo, fakeLogger{}, WithWalletTokenValidator(&fakeTokenValidator{shouldFail: true}))
+
+	scope := MandateScope{
+		MaxAmount:  10000,
+		MerchantID: 1,
+		Expiry:     time.Now().Add(24 * time.Hour),
+	}
+	svc.RequestMandate(context.Background(), 1, 42, scope)
+	svc.ApproveMandate(context.Background(), 1, "sig")
+
+	_, err := svc.ExchangeWalletToken(context.Background(), 1, "bad-token", "google_pay", 42)
+	if err == nil {
+		t.Fatal("expected error for validation failure")
+	}
+}
+
 func TestPaymentService_ListUserMandates(t *testing.T) {
 	repo := newFakeMandateRepo()
 	svc := NewPaymentService(repo, fakeLogger{})

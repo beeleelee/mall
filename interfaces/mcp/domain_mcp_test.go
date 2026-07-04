@@ -199,6 +199,22 @@ func (fakeMandateVerifier) VerifyAndExecute(_ context.Context, _, _ kernel.ID, _
 	return nil
 }
 
+func (fakeMandateVerifier) VerifyAndExecuteWithToken(_ context.Context, _, _ kernel.ID, _ int64, _, _ string) error {
+	return nil
+}
+
+type fakeTokenValidatorMCP struct{}
+
+func (fakeTokenValidatorMCP) ValidateToken(_ context.Context, token, provider string) (*domainPayment.TokenValidationResult, error) {
+	if token == "" {
+		return nil, kernel.NewDomainError(kernel.ErrInvalidArgument, "token must not be empty")
+	}
+	return &domainPayment.TokenValidationResult{
+		Provider: provider,
+		Token:    "validated-" + token,
+	}, nil
+}
+
 // ---------------------------------------------------------------------------
 // Order fakes
 // ---------------------------------------------------------------------------
@@ -677,6 +693,51 @@ func TestMCP_PaymentTools(t *testing.T) {
 		"user_id": 100,
 	})
 	assertOK(t, w)
+}
+
+func TestMCP_ExchangePaymentToken(t *testing.T) {
+	sf, _ := kernel.NewSnowflake(1)
+	repo := newFakeMandateRepo()
+	svc := domainPayment.NewPaymentService(repo, fakeLoggerMCP{}, domainPayment.WithWalletTokenValidator(&fakeTokenValidatorMCP{}))
+	router := NewMCPRouter()
+	router.Register(NewPaymentMCPHandler(svc, sf))
+
+	w := rpcCall(t, router, "tools/call", "create_mandate", map[string]any{
+		"user_id":     100,
+		"max_amount":  50000,
+		"merchant_id": 1,
+	})
+	assertOK(t, w)
+
+	var resp map[string]any
+	json.Unmarshal(w.Body.Bytes(), &resp)
+	content := resp["result"].(map[string]any)["content"].([]any)
+	mandateID := int64ID(t, content[0].(map[string]any)["text"].(string), "id")
+
+	w = rpcCall(t, router, "tools/call", "approve_mandate", map[string]any{
+		"id":        mandateID,
+		"signature": "sig",
+	})
+	assertOK(t, w)
+
+	w = rpcCall(t, router, "tools/call", "exchange_payment_token", map[string]any{
+		"mandate_id": mandateID,
+		"user_id":    100,
+		"token":      "gpay-token",
+		"provider":   "google_pay",
+	})
+	assertOK(t, w)
+
+	json.Unmarshal(w.Body.Bytes(), &resp)
+	content = resp["result"].(map[string]any)["content"].([]any)
+	var result map[string]any
+	json.Unmarshal([]byte(content[0].(map[string]any)["text"].(string)), &result)
+	if result["status"] != "executed" {
+		t.Fatalf("expected executed, got %v", result["status"])
+	}
+	if result["token"] != "validated-gpay-token" {
+		t.Fatalf("expected validated-gpay-token, got %v", result["token"])
+	}
 }
 
 // ---------------------------------------------------------------------------
