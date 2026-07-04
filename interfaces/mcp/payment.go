@@ -86,6 +86,19 @@ var paymentTools = []ToolDefinition{
 		},
 	},
 	{
+		Name:        "exchange_payment_token",
+		Description: "Exchange a wallet payment token (e.g. Google Pay, Apple Pay) for a mandate execution",
+		InputSchema: InputSchema{
+			Type: "object",
+			Properties: map[string]PropertySchema{
+				"mandate_id": {Type: "number", Description: "Mandate ID"},
+				"user_id":    {Type: "number", Description: "User ID"},
+				"token":      {Type: "string", Description: "Wallet payment token (encrypted payment data)"},
+				"provider":   {Type: "string", Description: "Wallet provider (google_pay, apple_pay, stripe)"},
+			},
+		},
+	},
+	{
 		Name:        "cancel_mandate",
 		Description: "Cancel a mandate",
 		InputSchema: InputSchema{
@@ -115,6 +128,8 @@ func (h *PaymentMCPHandler) HandleTool(ctx context.Context, name string, raw jso
 		return h.callExecuteMandate(ctx, raw)
 	case "settle_mandate":
 		return h.callSettleMandate(ctx, raw)
+	case "exchange_payment_token":
+		return h.callExchangePaymentToken(ctx, raw)
 	case "cancel_mandate":
 		return h.callCancelMandate(ctx, raw)
 	default:
@@ -265,6 +280,39 @@ func (h *PaymentMCPHandler) callSettleMandate(ctx context.Context, raw json.RawM
 	}
 
 	m, err := h.svc.SettleMandate(ctx, kernel.ID(args.ID))
+	if err != nil {
+		return nil, err
+	}
+
+	return mandateToMap(m), nil
+}
+
+type exchangePaymentTokenArgs struct {
+	MandateID int64  `json:"mandate_id"`
+	UserID    int64  `json:"user_id"`
+	Token     string `json:"token"`
+	Provider  string `json:"provider"`
+}
+
+func (h *PaymentMCPHandler) callExchangePaymentToken(ctx context.Context, raw json.RawMessage) (any, error) {
+	var args exchangePaymentTokenArgs
+	if err := json.Unmarshal(raw, &args); err != nil {
+		return nil, kernel.NewDomainError(kernel.ErrInvalidArgument, "invalid arguments")
+	}
+	if args.MandateID <= 0 {
+		return nil, kernel.NewDomainError(kernel.ErrInvalidArgument, "mandate_id must be positive")
+	}
+	if args.UserID <= 0 {
+		return nil, kernel.NewDomainError(kernel.ErrInvalidArgument, "user_id must be positive")
+	}
+	if args.Token == "" {
+		return nil, kernel.NewDomainError(kernel.ErrInvalidArgument, "token must not be empty")
+	}
+	if args.Provider == "" {
+		return nil, kernel.NewDomainError(kernel.ErrInvalidArgument, "provider must not be empty")
+	}
+
+	m, err := h.svc.ExchangeWalletToken(ctx, kernel.ID(args.MandateID), args.Token, args.Provider, kernel.ID(args.UserID))
 	if err != nil {
 		return nil, err
 	}
