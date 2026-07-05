@@ -17,7 +17,7 @@ func newTestAppService(t *testing.T) *IdentityAppService {
 	if err != nil {
 		t.Fatalf("NewSnowflake failed: %v", err)
 	}
-	return NewIdentityAppService(svc, repo, logger, sf)
+	return NewIdentityAppService(svc, repo, newFakePasswordResetTokenRepo(), logger, sf)
 }
 
 func TestAppService_Register_Success(t *testing.T) {

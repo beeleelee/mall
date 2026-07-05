@@ -40,18 +40,20 @@ type UserResponse struct {
 }
 
 type IdentityAppService struct {
-	domain *domain.IdentityService
-	users  domain.UserRepository
-	logger kernel.Logger
-	sf     *kernel.Snowflake
+	domain    *domain.IdentityService
+	users     domain.UserRepository
+	tokenRepo domain.PasswordResetTokenRepository
+	logger    kernel.Logger
+	sf        *kernel.Snowflake
 }
 
-func NewIdentityAppService(domain *domain.IdentityService, users domain.UserRepository, logger kernel.Logger, sf *kernel.Snowflake) *IdentityAppService {
+func NewIdentityAppService(domain *domain.IdentityService, users domain.UserRepository, tokenRepo domain.PasswordResetTokenRepository, logger kernel.Logger, sf *kernel.Snowflake) *IdentityAppService {
 	return &IdentityAppService{
-		domain: domain,
-		users:  users,
-		logger: logger,
-		sf:     sf,
+		domain:    domain,
+		users:     users,
+		tokenRepo: tokenRepo,
+		logger:    logger,
+		sf:        sf,
 	}
 }
 
@@ -150,6 +152,14 @@ func (s *IdentityAppService) ActivateUser(ctx context.Context, id int64) (*UserR
 		Status: string(user.Status),
 		Roles:  roles,
 	}, nil
+}
+
+func (s *IdentityAppService) RequestPasswordReset(ctx context.Context, email string) (string, error) {
+	return s.domain.RequestPasswordReset(ctx, email, s.tokenRepo, s.sf)
+}
+
+func (s *IdentityAppService) ResetPassword(ctx context.Context, token, newPassword string) error {
+	return s.domain.ResetPassword(ctx, token, newPassword, s.tokenRepo)
 }
 
 func (s *IdentityAppService) ListUsers(ctx context.Context, offset, limit int) ([]*UserResponse, error) {

@@ -95,7 +95,8 @@ func main() {
 
 	logger := logging.NewZerologLogger("mall")
 	domainSvc := domainIdentity.NewIdentityService(userRepo, logger)
-	appSvc := appIdentity.NewIdentityAppService(domainSvc, userRepo, logger, sf)
+	passwordResetTokenRepo := infraIdentity.NewPostgresPasswordResetTokenRepository(db)
+	appSvc := appIdentity.NewIdentityAppService(domainSvc, userRepo, passwordResetTokenRepo, logger, sf)
 
 	identityHandler := rest.NewIdentityHandler(appSvc)
 	ucpHandler := rest.NewUCPHandler(nil)
@@ -376,6 +377,16 @@ func main() {
 		Method:  http.MethodPost,
 		Path:    "/api/v1/users/:id/suspend",
 		Handler: identityHandler.SuspendUser,
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPost,
+		Path:    "/api/v1/auth/password-reset-request",
+		Handler: identityHandler.RequestPasswordReset,
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPost,
+		Path:    "/api/v1/auth/password-reset",
+		Handler: identityHandler.ResetPassword,
 	})
 	srv.AddRoute(gozerorest.Route{
 		Method:  http.MethodPost,

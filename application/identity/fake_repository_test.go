@@ -82,6 +82,48 @@ func (f *fakeUserRepository) Delete(_ context.Context, id kernel.ID) error {
 	return nil
 }
 
+type fakePasswordResetTokenRepo struct {
+	mu     sync.Mutex
+	tokens map[string]*domain.PasswordResetToken
+}
+
+func newFakePasswordResetTokenRepo() *fakePasswordResetTokenRepo {
+	return &fakePasswordResetTokenRepo{tokens: make(map[string]*domain.PasswordResetToken)}
+}
+
+func (f *fakePasswordResetTokenRepo) Save(_ context.Context, token *domain.PasswordResetToken) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.tokens[token.TokenHash] = token
+	return nil
+}
+
+func (f *fakePasswordResetTokenRepo) FindByHash(_ context.Context, hash string) (*domain.PasswordResetToken, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	t, ok := f.tokens[hash]
+	if !ok {
+		return nil, kernel.NewDomainError(kernel.ErrNotFound, "token not found")
+	}
+	return t, nil
+}
+
+func (f *fakePasswordResetTokenRepo) MarkUsed(_ context.Context, id kernel.ID) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for _, t := range f.tokens {
+		if t.ID == id {
+			t.MarkUsed()
+			return nil
+		}
+	}
+	return kernel.NewDomainError(kernel.ErrNotFound, "token not found")
+}
+
+func (f *fakePasswordResetTokenRepo) DeleteExpired(_ context.Context) error {
+	return nil
+}
+
 type fakeLogger struct{}
 
 func (fakeLogger) Debug(_ context.Context, _ string, _ ...kernel.LogField)          {}

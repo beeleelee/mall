@@ -84,6 +84,15 @@ func (fakeLog) Info(_ context.Context, _ string, _ ...kernel.LogField)          
 func (fakeLog) Warn(_ context.Context, _ string, _ ...kernel.LogField)           {}
 func (fakeLog) Error(_ context.Context, _ string, _ error, _ ...kernel.LogField) {}
 
+type fakeTokenRepo struct{}
+
+func (f fakeTokenRepo) Save(_ context.Context, _ *domain.PasswordResetToken) error { return nil }
+func (f fakeTokenRepo) FindByHash(_ context.Context, _ string) (*domain.PasswordResetToken, error) {
+	return nil, kernel.NewDomainError(kernel.ErrNotFound, "not found")
+}
+func (f fakeTokenRepo) MarkUsed(_ context.Context, _ kernel.ID) error   { return nil }
+func (f fakeTokenRepo) DeleteExpired(_ context.Context) error           { return nil }
+
 func newTestIdentityHandler(t *testing.T) *IdentityHandler {
 	t.Helper()
 	repo := newFakeUserRepo()
@@ -93,7 +102,7 @@ func newTestIdentityHandler(t *testing.T) *IdentityHandler {
 	if err != nil {
 		t.Fatalf("NewSnowflake failed: %v", err)
 	}
-	appSvc := app.NewIdentityAppService(domainSvc, repo, logger, sf)
+	appSvc := app.NewIdentityAppService(domainSvc, repo, fakeTokenRepo{}, logger, sf)
 	return NewIdentityHandler(appSvc)
 }
 
