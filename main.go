@@ -244,11 +244,13 @@ func main() {
 		}
 
 		cons.Consume(func(msg jetstream.Msg) {
-			msg.Ack()
 			ctx := tracing.ExtractFromJetStream(msg)
 			if err := dtmSaga.Handle(ctx, msg.Data()); err != nil {
 				log.Printf("dtm-saga: handle failed: %v", err)
+				msg.Nak()
+				return
 			}
+			msg.Ack()
 		})
 	}()
 
@@ -265,12 +267,12 @@ func main() {
 		}
 
 		cons.Consume(func(msg jetstream.Msg) {
-			msg.Ack()
 			ctx := tracing.ExtractFromJetStream(msg)
 
 			subject := msg.Subject()
 			webhooks, err := webhookRepo.FindByEvent(ctx, subject)
 			if err != nil || len(webhooks) == 0 {
+				msg.Ack()
 				return
 			}
 
@@ -282,6 +284,7 @@ func main() {
 					log.Printf("webhook delivery failed for %s (url=%s): %v", subject, wh.URL, err)
 				}
 			}
+			msg.Ack()
 		})
 	}()
 
