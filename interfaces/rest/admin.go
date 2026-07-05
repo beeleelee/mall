@@ -25,17 +25,19 @@ type AdminHandler struct {
 	identitySvc  *appidentity.IdentityAppService
 	inventorySvc *inventorydomain.InventoryService
 	storageSvc   kernel.StorageService
+	categoryRepo catalogdomain.CategoryRepository
 	sf           *kernel.Snowflake
 	db           *sqlx.DB
 }
 
-func NewAdminHandler(catalogSvc *catalogdomain.CatalogService, orderSvc *orderdomain.OrderService, identitySvc *appidentity.IdentityAppService, inventorySvc *inventorydomain.InventoryService, storageSvc kernel.StorageService, sf *kernel.Snowflake, db *sqlx.DB) *AdminHandler {
+func NewAdminHandler(catalogSvc *catalogdomain.CatalogService, orderSvc *orderdomain.OrderService, identitySvc *appidentity.IdentityAppService, inventorySvc *inventorydomain.InventoryService, storageSvc kernel.StorageService, categoryRepo catalogdomain.CategoryRepository, sf *kernel.Snowflake, db *sqlx.DB) *AdminHandler {
 	return &AdminHandler{
 		catalogSvc:   catalogSvc,
 		orderSvc:     orderSvc,
 		identitySvc:  identitySvc,
 		inventorySvc: inventorySvc,
 		storageSvc:   storageSvc,
+		categoryRepo: categoryRepo,
 		sf:           sf,
 		db:           db,
 	}
@@ -334,6 +336,137 @@ func (h *AdminHandler) UploadImage(w http.ResponseWriter, r *http.Request) {
 		"id":  imgID.Int64(),
 		"url": url,
 	})
+}
+
+// --- Category CRUD ---
+
+type createCategoryRequest struct {
+	Name      string `json:"name"`
+	Slug      string `json:"slug"`
+	ParentID  int64  `json:"parent_id,omitempty"`
+	SortOrder int    `json:"sort_order,omitempty"`
+}
+
+type updateCategoryRequest struct {
+	Name      string `json:"name"`
+	Slug      string `json:"slug"`
+	ParentID  int64  `json:"parent_id,omitempty"`
+	SortOrder int    `json:"sort_order,omitempty"`
+}
+
+func (h *AdminHandler) CreateCategory(w http.ResponseWriter, r *http.Request) {
+	var req createCategoryRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeDomainError(w, kernel.NewDomainError(kernel.ErrInvalidArgument, "invalid request body"))
+		return
+	}
+
+	cid, err := h.sf.NextID()
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+
+	cat, err := catalogdomain.NewCategory(cid, req.Name, req.Slug, kernel.ID(req.ParentID), req.SortOrder)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+
+	if err := h.categoryRepo.Save(r.Context(), cat); err != nil {
+		writeDomainError(w, err)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(cat)
+}
+
+func (h *AdminHandler) UpdateCategory(w http.ResponseWriter, r *http.Request) {
+	vars := pathvar.Vars(r)
+	idStr := vars["id"]
+	cid, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		writeDomainError(w, kernel.NewDomainError(kernel.ErrInvalidArgument, "invalid category id"))
+		return
+	}
+
+	cat, err := h.categoryRepo.FindByID(r.Context(), kernel.ID(cid))
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+
+	var req updateCategoryRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeDomainError(w, kernel.NewDomainError(kernel.ErrInvalidArgument, "invalid request body"))
+		return
+	}
+
+	if err := cat.Update(req.Name, req.Slug, kernel.ID(req.ParentID), req.SortOrder); err != nil {
+		writeDomainError(w, err)
+		return
+	}
+
+	if err := h.categoryRepo.Save(r.Context(), cat); err != nil {
+		writeDomainError(w, err)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(cat)
+}
+
+func (h *AdminHandler) ListCategories(w http.ResponseWriter, r *http.Request) {
+	categories, err := h.categoryRepo.FindAll(r.Context())
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(categories)
+}
+
+func (h *AdminHandler) GetCategory(w http.ResponseWriter, r *http.Request) {
+	vars := pathvar.Vars(r)
+	idStr := vars["id"]
+	cid, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		writeDomainError(w, kernel.NewDomainError(kernel.ErrInvalidArgument, "invalid category id"))
+		return
+	}
+
+	cat, err := h.categoryRepo.FindByID(r.Context(), kernel.ID(cid))
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(cat)
+}
+
+func (h *AdminHandler) DeleteCategory(w http.ResponseWriter, r *http.Request) {
+	vars := pathvar.Vars(r)
+	idStr := vars["id"]
+	cid, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		writeDomainError(w, kernel.NewDomainError(kernel.ErrInvalidArgument, "invalid category id"))
+		return
+	}
+
+	if err := h.categoryRepo.Delete(r.Context(), kernel.ID(cid)); err != nil {
+		writeDomainError(w, err)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *AdminHandler) DeleteImage(w http.ResponseWriter, r *http.Request) {

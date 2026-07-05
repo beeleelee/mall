@@ -226,7 +226,8 @@ func main() {
 		log.Printf("warning: minio not available, images disabled: %v", storErr)
 	}
 
-	adminHandler := rest.NewAdminHandler(catalogSvc, orderSvc, appSvc, inventorySvc, storageSvc, sf, db)
+	categoryRepo := infraCatalog.NewPostgresCategoryRepository(db)
+	adminHandler := rest.NewAdminHandler(catalogSvc, orderSvc, appSvc, inventorySvc, storageSvc, categoryRepo, sf, db)
 	adminMW := middleware.AdminMiddleware(userRepo)
 
 	a2aTaskRepo := infraA2A.NewPostgresTaskRepository(db)
@@ -676,6 +677,32 @@ func main() {
 		Method:  http.MethodDelete,
 		Path:    "/api/v1/admin/products/:id/images/:imageId",
 		Handler: adminAuth(adminHandler.DeleteImage),
+	})
+
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodGet,
+		Path:    "/api/v1/admin/categories",
+		Handler: adminAuth(adminHandler.ListCategories),
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPost,
+		Path:    "/api/v1/admin/categories",
+		Handler: adminAuth(adminHandler.CreateCategory),
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodGet,
+		Path:    "/api/v1/admin/categories/:id",
+		Handler: adminAuth(adminHandler.GetCategory),
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPut,
+		Path:    "/api/v1/admin/categories/:id",
+		Handler: adminAuth(adminHandler.UpdateCategory),
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodDelete,
+		Path:    "/api/v1/admin/categories/:id",
+		Handler: adminAuth(adminHandler.DeleteCategory),
 	})
 
 	type sagaRoute struct {

@@ -47,8 +47,11 @@ type searchResultResponse struct {
 func (h *CatalogHandler) Search(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 
+	categoryID, _ := strconv.ParseInt(q.Get("category_id"), 10, 64)
+
 	opts := domain.SearchOptions{
 		Category:      q.Get("category"),
+		CategoryID:    kernel.ID(categoryID),
 		Cursor:        domain.Cursor(q.Get("cursor")),
 		FulltextQuery: q.Get("q"),
 	}
