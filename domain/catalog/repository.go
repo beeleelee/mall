@@ -15,12 +15,13 @@ type SearchResult struct {
 }
 
 type SearchOptions struct {
-	Category string
-	MinPrice int64
-	MaxPrice int64
-	Status   ProductStatus
-	Cursor   Cursor
-	Limit    int
+	Category      string
+	MinPrice      int64
+	MaxPrice      int64
+	Status        ProductStatus
+	Cursor        Cursor
+	Limit         int
+	FulltextQuery string
 }
 
 type ProductRepository interface {

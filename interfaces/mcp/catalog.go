@@ -27,7 +27,7 @@ var catalogTools = []ToolDefinition{
 		InputSchema: InputSchema{
 			Type: "object",
 			Properties: map[string]PropertySchema{
-				"query":     {Type: "string", Description: "Search query (matches name, description, SKU)"},
+				"query":     {Type: "string", Description: "Full-text search query (matches name, description, category)"},
 				"category":  {Type: "string", Description: "Filter by category"},
 				"min_price": {Type: "number", Description: "Minimum price in cents"},
 				"max_price": {Type: "number", Description: "Maximum price in cents"},
@@ -91,9 +91,10 @@ func (h *CatalogMCPHandler) callSearch(ctx context.Context, raw json.RawMessage)
 	}
 
 	opts := domain.SearchOptions{
-		Category: args.Category,
-		Cursor:   domain.Cursor(args.Cursor),
-		Limit:    args.Limit,
+		Category:      args.Category,
+		Cursor:        domain.Cursor(args.Cursor),
+		Limit:         args.Limit,
+		FulltextQuery: args.Query,
 	}
 	if args.MinPrice != nil {
 		opts.MinPrice = *args.MinPrice
@@ -102,7 +103,7 @@ func (h *CatalogMCPHandler) callSearch(ctx context.Context, raw json.RawMessage)
 		opts.MaxPrice = *args.MaxPrice
 	}
 
-	result, err := h.svc.Search(ctx, args.Query, opts)
+	result, err := h.svc.Search(ctx, "", opts)
 	if err != nil {
 		return nil, err
 	}

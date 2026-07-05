@@ -46,11 +46,10 @@ type searchResultResponse struct {
 func (h *CatalogHandler) Search(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 
-	query := q.Get("q")
-
 	opts := domain.SearchOptions{
-		Category: q.Get("category"),
-		Cursor:   domain.Cursor(q.Get("cursor")),
+		Category:      q.Get("category"),
+		Cursor:        domain.Cursor(q.Get("cursor")),
+		FulltextQuery: q.Get("q"),
 	}
 
 	if v := q.Get("min_price"); v != "" {
@@ -72,7 +71,7 @@ func (h *CatalogHandler) Search(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	result, err := h.svc.Search(r.Context(), query, opts)
+	result, err := h.svc.Search(r.Context(), "", opts)
 	if err != nil {
 		writeDomainError(w, err)
 		return
