@@ -253,10 +253,10 @@ func DefaultProfile() *Profile {
 						Endpoint:      "/mcp",
 					},
 					REST: &RESTBinding{
-						BaseURL: "/api/v1/auth",
+						BaseURL: "/api/v1",
 						Endpoints: map[string]string{
-							"register": "POST /register",
-							"login":    "POST /login",
+							"register": "POST /auth/register",
+							"login":    "POST /auth/login",
 							"get_user": "GET /users/{id}",
 							"suspend":  "POST /users/{id}/suspend",
 						},
