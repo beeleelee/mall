@@ -441,6 +441,16 @@ func main() {
 		Path:    "/mcp",
 		Handler: mcpRouter.ServeHTTP,
 	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodGet,
+		Path:    "/mcp",
+		Handler: mcpRouter.ServeHTTP,
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPost,
+		Path:    "/mcp/:sessionId",
+		Handler: mcpRouter.ServeHTTP,
+	})
 
 	srv.AddRoute(gozerorest.Route{
 		Method:  http.MethodPost,
