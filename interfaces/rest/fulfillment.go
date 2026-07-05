@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/zeromicro/go-zero/rest/httpx"
 
 	domain "github.com/beeleelee/mall/domain/fulfillment"
 )
@@ -32,7 +31,7 @@ type rateItemInput struct {
 func (h *FulfillmentHandler) CalculateRates(w http.ResponseWriter, r *http.Request) {
 	var req rateInputRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpx.Error(w, err)
+		writeDomainError(w, err)
 		return
 	}
 

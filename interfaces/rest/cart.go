@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/zeromicro/go-zero/rest/httpx"
 	"github.com/zeromicro/go-zero/rest/pathvar"
 
 	domain "github.com/beeleelee/mall/domain/cart"
@@ -61,7 +60,7 @@ func (h *CartHandler) CreateOrGet(w http.ResponseWriter, r *http.Request) {
 
 	var req createCartRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpx.Error(w, err)
+		writeDomainError(w, err)
 		return
 	}
 
@@ -133,7 +132,7 @@ func (h *CartHandler) AddItem(w http.ResponseWriter, r *http.Request) {
 
 	var req addItemRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpx.Error(w, err)
+		writeDomainError(w, err)
 		return
 	}
 
@@ -172,7 +171,7 @@ func (h *CartHandler) UpdateQuantity(w http.ResponseWriter, r *http.Request) {
 
 	var req updateQuantityRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpx.Error(w, err)
+		writeDomainError(w, err)
 		return
 	}
 

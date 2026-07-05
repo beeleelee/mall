@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/zeromicro/go-zero/rest/httpx"
 
 	domain "github.com/beeleelee/mall/domain/discount"
 	"github.com/beeleelee/mall/domain/kernel"
@@ -47,7 +46,7 @@ type deactivateDiscountRequest struct {
 func (h *DiscountHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var req createDiscountRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpx.Error(w, err)
+		writeDomainError(w, err)
 		return
 	}
 
@@ -75,7 +74,7 @@ func (h *DiscountHandler) Create(w http.ResponseWriter, r *http.Request) {
 func (h *DiscountHandler) Validate(w http.ResponseWriter, r *http.Request) {
 	var req validateDiscountRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpx.Error(w, err)
+		writeDomainError(w, err)
 		return
 	}
 
@@ -94,7 +93,7 @@ func (h *DiscountHandler) Validate(w http.ResponseWriter, r *http.Request) {
 func (h *DiscountHandler) Apply(w http.ResponseWriter, r *http.Request) {
 	var req applyDiscountRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpx.Error(w, err)
+		writeDomainError(w, err)
 		return
 	}
 
@@ -115,7 +114,7 @@ func (h *DiscountHandler) Apply(w http.ResponseWriter, r *http.Request) {
 func (h *DiscountHandler) Deactivate(w http.ResponseWriter, r *http.Request) {
 	var req deactivateDiscountRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpx.Error(w, err)
+		writeDomainError(w, err)
 		return
 	}
 

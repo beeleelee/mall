@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/zeromicro/go-zero/rest/httpx"
 	"github.com/zeromicro/go-zero/rest/pathvar"
 
 	"github.com/beeleelee/mall/domain/kernel"
@@ -57,7 +56,7 @@ type updateProductRequest struct {
 func (h *AdminHandler) CreateProduct(w http.ResponseWriter, r *http.Request) {
 	var req createProductRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpx.Error(w, err)
+		writeDomainError(w, err)
 		return
 	}
 
@@ -92,7 +91,7 @@ func (h *AdminHandler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 
 	var req updateProductRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpx.Error(w, err)
+		writeDomainError(w, err)
 		return
 	}
 
@@ -192,7 +191,7 @@ type setStockRequest struct {
 func (h *AdminHandler) SetStock(w http.ResponseWriter, r *http.Request) {
 	var req setStockRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpx.Error(w, err)
+		writeDomainError(w, err)
 		return
 	}
 

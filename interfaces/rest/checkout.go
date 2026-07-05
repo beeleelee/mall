@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/zeromicro/go-zero/rest/httpx"
 	"github.com/zeromicro/go-zero/rest/pathvar"
 
 	domain "github.com/beeleelee/mall/domain/checkout"
@@ -65,7 +64,7 @@ func (h *CheckoutHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	var req createCheckoutRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpx.Error(w, err)
+		writeDomainError(w, err)
 		return
 	}
 
@@ -161,7 +160,7 @@ func (h *CheckoutHandler) SetShippingAddress(w http.ResponseWriter, r *http.Requ
 
 	var req addressInput
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpx.Error(w, err)
+		writeDomainError(w, err)
 		return
 	}
 
@@ -208,7 +207,7 @@ func (h *CheckoutHandler) SetBillingAddress(w http.ResponseWriter, r *http.Reque
 
 	var req addressInput
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpx.Error(w, err)
+		writeDomainError(w, err)
 		return
 	}
 
@@ -255,7 +254,7 @@ func (h *CheckoutHandler) SelectShippingOption(w http.ResponseWriter, r *http.Re
 
 	var req shippingOptionInput
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpx.Error(w, err)
+		writeDomainError(w, err)
 		return
 	}
 
@@ -300,7 +299,7 @@ func (h *CheckoutHandler) SelectPaymentHandler(w http.ResponseWriter, r *http.Re
 
 	var req paymentHandlerInput
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpx.Error(w, err)
+		writeDomainError(w, err)
 		return
 	}
 
@@ -345,7 +344,7 @@ func (h *CheckoutHandler) SubmitPaymentToken(w http.ResponseWriter, r *http.Requ
 
 	var req paymentTokenInput
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpx.Error(w, err)
+		writeDomainError(w, err)
 		return
 	}
 
@@ -389,7 +388,7 @@ func (h *CheckoutHandler) SelectMandate(w http.ResponseWriter, r *http.Request) 
 
 	var req selectMandateInput
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpx.Error(w, err)
+		writeDomainError(w, err)
 		return
 	}
 

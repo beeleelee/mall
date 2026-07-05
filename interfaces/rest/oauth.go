@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/zeromicro/go-zero/rest/httpx"
 
 	app "github.com/beeleelee/mall/application/oauth"
 	"github.com/beeleelee/mall/domain/kernel"
@@ -43,7 +42,7 @@ type revokeReq struct {
 func (h *OAuthHandler) Authorize(w http.ResponseWriter, r *http.Request) {
 	var req authorizeReq
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpx.Error(w, err)
+		writeDomainError(w, err)
 		return
 	}
 
@@ -66,7 +65,7 @@ func (h *OAuthHandler) Authorize(w http.ResponseWriter, r *http.Request) {
 func (h *OAuthHandler) Token(w http.ResponseWriter, r *http.Request) {
 	var req tokenReq
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpx.Error(w, err)
+		writeDomainError(w, err)
 		return
 	}
 
@@ -110,7 +109,7 @@ func (h *OAuthHandler) Token(w http.ResponseWriter, r *http.Request) {
 func (h *OAuthHandler) Revoke(w http.ResponseWriter, r *http.Request) {
 	var req revokeReq
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpx.Error(w, err)
+		writeDomainError(w, err)
 		return
 	}
 
