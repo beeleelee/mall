@@ -237,9 +237,10 @@ func DefaultProfile() *Profile {
 					REST: &RESTBinding{
 						BaseURL: "/api/v1/discounts",
 						Endpoints: map[string]string{
-							"create":   "POST /codes",
-							"validate": "POST /codes/validate",
-							"apply":    "POST /codes/apply",
+							"create":     "POST /",
+							"validate":   "POST /validate",
+							"apply":      "POST /apply",
+							"deactivate": "POST /deactivate",
 						},
 					},
 				},
