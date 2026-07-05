@@ -196,8 +196,8 @@ services:
     container_name: mall-nats-1
     restart: unless-stopped
     ports:
-      - "4222:4222"
-      - "8222:8222"
+      - "4225:4222"
+      - "8225:8222"
     command:
       - "--jetstream"
       - "--http_port=8222"
