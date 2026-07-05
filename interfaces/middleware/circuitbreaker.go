@@ -1,6 +1,8 @@
 package middleware
 
 import (
+	"encoding/json"
+	"net/http"
 	"sync"
 	"time"
 )
@@ -85,4 +87,37 @@ func (cb *CircuitBreaker) State() State {
 	cb.mu.RLock()
 	defer cb.mu.RUnlock()
 	return cb.state
+}
+
+func CircuitBreakerMiddleware(cb *CircuitBreaker, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !cb.Allow() {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusServiceUnavailable)
+			json.NewEncoder(w).Encode(map[string]string{
+				"error":             "service_unavailable",
+				"error_description": "circuit breaker open",
+			})
+			return
+		}
+
+		lw := &responseWriter{ResponseWriter: w, status: http.StatusOK}
+		next.ServeHTTP(lw, r)
+
+		if lw.status >= 500 {
+			cb.Failure()
+		} else {
+			cb.Success()
+		}
+	})
+}
+
+type responseWriter struct {
+	http.ResponseWriter
+	status int
+}
+
+func (rw *responseWriter) WriteHeader(code int) {
+	rw.status = code
+	rw.ResponseWriter.WriteHeader(code)
 }

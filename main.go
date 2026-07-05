@@ -318,6 +318,13 @@ func main() {
 	auth := middleware.AuthMiddleware(jwtSecret)
 	sagaAuth := middleware.SagaAuthMiddleware(sagaSecret)
 
+	catalogCB := middleware.NewCircuitBreaker(5, 2, 30*time.Second)
+	cartCB := middleware.NewCircuitBreaker(5, 2, 30*time.Second)
+	checkoutCB := middleware.NewCircuitBreaker(5, 2, 30*time.Second)
+	cb := func(cb *middleware.CircuitBreaker, h http.HandlerFunc) http.HandlerFunc {
+		return middleware.CircuitBreakerMiddleware(cb, http.HandlerFunc(h)).ServeHTTP
+	}
+
 	srv.AddRoute(gozerorest.Route{
 		Method:  http.MethodGet,
 		Path:    "/healthz",
@@ -377,17 +384,17 @@ func main() {
 	srv.AddRoute(gozerorest.Route{
 		Method:  http.MethodGet,
 		Path:    "/api/v1/catalog/search",
-		Handler: catalogHandler.Search,
+		Handler: cb(catalogCB, catalogHandler.Search),
 	})
 	srv.AddRoute(gozerorest.Route{
 		Method:  http.MethodGet,
 		Path:    "/api/v1/catalog/lookup",
-		Handler: catalogHandler.Lookup,
+		Handler: cb(catalogCB, catalogHandler.Lookup),
 	})
 	srv.AddRoute(gozerorest.Route{
 		Method:  http.MethodGet,
 		Path:    "/api/v1/catalog/products/:id",
-		Handler: catalogHandler.GetProduct,
+		Handler: cb(catalogCB, catalogHandler.GetProduct),
 	})
 
 	srv.AddRoute(gozerorest.Route{
@@ -399,89 +406,89 @@ func main() {
 	srv.AddRoute(gozerorest.Route{
 		Method:  http.MethodPost,
 		Path:    "/api/v1/carts",
-		Handler: auth(http.HandlerFunc(cartHandler.CreateOrGet)).ServeHTTP,
+		Handler: cb(cartCB, auth(http.HandlerFunc(cartHandler.CreateOrGet)).ServeHTTP),
 	})
 	srv.AddRoute(gozerorest.Route{
 		Method:  http.MethodGet,
 		Path:    "/api/v1/carts/:id",
-		Handler: auth(http.HandlerFunc(cartHandler.GetCart)).ServeHTTP,
+		Handler: cb(cartCB, auth(http.HandlerFunc(cartHandler.GetCart)).ServeHTTP),
 	})
 	srv.AddRoute(gozerorest.Route{
 		Method:  http.MethodPost,
 		Path:    "/api/v1/carts/:id/items",
-		Handler: auth(http.HandlerFunc(cartHandler.AddItem)).ServeHTTP,
+		Handler: cb(cartCB, auth(http.HandlerFunc(cartHandler.AddItem)).ServeHTTP),
 	})
 	srv.AddRoute(gozerorest.Route{
 		Method:  http.MethodPut,
 		Path:    "/api/v1/carts/:id/items/:productId",
-		Handler: auth(http.HandlerFunc(cartHandler.UpdateQuantity)).ServeHTTP,
+		Handler: cb(cartCB, auth(http.HandlerFunc(cartHandler.UpdateQuantity)).ServeHTTP),
 	})
 	srv.AddRoute(gozerorest.Route{
 		Method:  http.MethodDelete,
 		Path:    "/api/v1/carts/:id/items/:productId",
-		Handler: auth(http.HandlerFunc(cartHandler.RemoveItem)).ServeHTTP,
+		Handler: cb(cartCB, auth(http.HandlerFunc(cartHandler.RemoveItem)).ServeHTTP),
 	})
 	srv.AddRoute(gozerorest.Route{
 		Method:  http.MethodDelete,
 		Path:    "/api/v1/carts/:id",
-		Handler: auth(http.HandlerFunc(cartHandler.ClearCart)).ServeHTTP,
+		Handler: cb(cartCB, auth(http.HandlerFunc(cartHandler.ClearCart)).ServeHTTP),
 	})
 
 	srv.AddRoute(gozerorest.Route{
 		Method:  http.MethodPost,
 		Path:    "/api/v1/checkouts",
-		Handler: auth(http.HandlerFunc(checkoutHandler.Create)).ServeHTTP,
+		Handler: cb(checkoutCB, auth(http.HandlerFunc(checkoutHandler.Create)).ServeHTTP),
 	})
 	srv.AddRoute(gozerorest.Route{
 		Method:  http.MethodGet,
 		Path:    "/api/v1/checkouts/:id",
-		Handler: auth(http.HandlerFunc(checkoutHandler.GetCheckout)).ServeHTTP,
+		Handler: cb(checkoutCB, auth(http.HandlerFunc(checkoutHandler.GetCheckout)).ServeHTTP),
 	})
 	srv.AddRoute(gozerorest.Route{
 		Method:  http.MethodPost,
 		Path:    "/api/v1/checkouts/:id/shipping-address",
-		Handler: auth(http.HandlerFunc(checkoutHandler.SetShippingAddress)).ServeHTTP,
+		Handler: cb(checkoutCB, auth(http.HandlerFunc(checkoutHandler.SetShippingAddress)).ServeHTTP),
 	})
 	srv.AddRoute(gozerorest.Route{
 		Method:  http.MethodPost,
 		Path:    "/api/v1/checkouts/:id/billing-address",
-		Handler: auth(http.HandlerFunc(checkoutHandler.SetBillingAddress)).ServeHTTP,
+		Handler: cb(checkoutCB, auth(http.HandlerFunc(checkoutHandler.SetBillingAddress)).ServeHTTP),
 	})
 	srv.AddRoute(gozerorest.Route{
 		Method:  http.MethodPost,
 		Path:    "/api/v1/checkouts/:id/shipping-option",
-		Handler: auth(http.HandlerFunc(checkoutHandler.SelectShippingOption)).ServeHTTP,
+		Handler: cb(checkoutCB, auth(http.HandlerFunc(checkoutHandler.SelectShippingOption)).ServeHTTP),
 	})
 	srv.AddRoute(gozerorest.Route{
 		Method:  http.MethodPost,
 		Path:    "/api/v1/checkouts/:id/payment-handler",
-		Handler: auth(http.HandlerFunc(checkoutHandler.SelectPaymentHandler)).ServeHTTP,
+		Handler: cb(checkoutCB, auth(http.HandlerFunc(checkoutHandler.SelectPaymentHandler)).ServeHTTP),
 	})
 	srv.AddRoute(gozerorest.Route{
 		Method:  http.MethodPost,
 		Path:    "/api/v1/checkouts/:id/payment-token",
-		Handler: auth(http.HandlerFunc(checkoutHandler.SubmitPaymentToken)).ServeHTTP,
+		Handler: cb(checkoutCB, auth(http.HandlerFunc(checkoutHandler.SubmitPaymentToken)).ServeHTTP),
 	})
 	srv.AddRoute(gozerorest.Route{
 		Method:  http.MethodPost,
 		Path:    "/api/v1/checkouts/:id/mandate",
-		Handler: auth(http.HandlerFunc(checkoutHandler.SelectMandate)).ServeHTTP,
+		Handler: cb(checkoutCB, auth(http.HandlerFunc(checkoutHandler.SelectMandate)).ServeHTTP),
 	})
 	srv.AddRoute(gozerorest.Route{
 		Method:  http.MethodPost,
 		Path:    "/api/v1/checkouts/:id/complete",
-		Handler: auth(http.HandlerFunc(checkoutHandler.Complete)).ServeHTTP,
+		Handler: cb(checkoutCB, auth(http.HandlerFunc(checkoutHandler.Complete)).ServeHTTP),
 	})
 	srv.AddRoute(gozerorest.Route{
 		Method:  http.MethodPost,
 		Path:    "/api/v1/checkouts/:id/cancel",
-		Handler: auth(http.HandlerFunc(checkoutHandler.Cancel)).ServeHTTP,
+		Handler: cb(checkoutCB, auth(http.HandlerFunc(checkoutHandler.Cancel)).ServeHTTP),
 	})
 
 	srv.AddRoute(gozerorest.Route{
 		Method:  http.MethodGet,
 		Path:    "/ws/checkout/:id",
-		Handler: auth(http.HandlerFunc(checkoutWSHandler.ServeWS)).ServeHTTP,
+		Handler: cb(checkoutCB, auth(http.HandlerFunc(checkoutWSHandler.ServeWS)).ServeHTTP),
 	})
 
 	srv.AddRoute(gozerorest.Route{
