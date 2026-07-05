@@ -11,7 +11,7 @@ func validPrice() Money {
 }
 
 func TestNewProduct_Success(t *testing.T) {
-	p, err := NewProduct(1, "SKU-001", "Test Product", "A test product", "electronics", validPrice(), nil)
+	p, err := NewProduct(1, "SKU-001", "Test Product", "A test product", "electronics", 0, validPrice(), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -33,35 +33,35 @@ func TestNewProduct_Success(t *testing.T) {
 }
 
 func TestNewProduct_EmptySKU(t *testing.T) {
-	_, err := NewProduct(1, "", "Product", "desc", "cat", validPrice(), nil)
+	_, err := NewProduct(1, "", "Product", "desc", "cat", 0, validPrice(), nil)
 	if !kernel.IsInvalidArgument(err) {
 		t.Errorf("expected invalid argument error, got %v", err)
 	}
 }
 
 func TestNewProduct_EmptyName(t *testing.T) {
-	_, err := NewProduct(1, "SKU-002", "", "desc", "cat", validPrice(), nil)
+	_, err := NewProduct(1, "SKU-002", "", "desc", "cat", 0, validPrice(), nil)
 	if !kernel.IsInvalidArgument(err) {
 		t.Errorf("expected invalid argument error, got %v", err)
 	}
 }
 
 func TestNewProduct_NegativePrice(t *testing.T) {
-	_, err := NewProduct(1, "SKU-003", "Product", "desc", "cat", Money{Amount: -100, Currency: "USD"}, nil)
+	_, err := NewProduct(1, "SKU-003", "Product", "desc", "cat", 0, Money{Amount: -100, Currency: "USD"}, nil)
 	if !kernel.IsInvalidArgument(err) {
 		t.Errorf("expected invalid argument error, got %v", err)
 	}
 }
 
 func TestNewProduct_EmptyCurrency(t *testing.T) {
-	_, err := NewProduct(1, "SKU-004", "Product", "desc", "cat", Money{Amount: 1000, Currency: ""}, nil)
+	_, err := NewProduct(1, "SKU-004", "Product", "desc", "cat", 0, Money{Amount: 1000, Currency: ""}, nil)
 	if !kernel.IsInvalidArgument(err) {
 		t.Errorf("expected invalid argument error, got %v", err)
 	}
 }
 
 func TestNewProduct_EmitsCreatedEvent(t *testing.T) {
-	p, err := NewProduct(1, "SKU-005", "Product", "desc", "cat", validPrice(), nil)
+	p, err := NewProduct(1, "SKU-005", "Product", "desc", "cat", 0, validPrice(), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -80,7 +80,7 @@ func TestNewProduct_EmitsCreatedEvent(t *testing.T) {
 
 func TestNewProduct_InitializesAttributes(t *testing.T) {
 	attrs := map[string]any{"color": "red", "weight": "1kg"}
-	p, err := NewProduct(1, "SKU-006", "Product", "desc", "cat", validPrice(), attrs)
+	p, err := NewProduct(1, "SKU-006", "Product", "desc", "cat", 0, validPrice(), attrs)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -93,7 +93,7 @@ func TestNewProduct_InitializesAttributes(t *testing.T) {
 }
 
 func TestNewProduct_DefaultsAttributes(t *testing.T) {
-	p, err := NewProduct(1, "SKU-007", "Product", "desc", "cat", validPrice(), nil)
+	p, err := NewProduct(1, "SKU-007", "Product", "desc", "cat", 0, validPrice(), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -103,7 +103,7 @@ func TestNewProduct_DefaultsAttributes(t *testing.T) {
 }
 
 func TestChangePrice_Success(t *testing.T) {
-	p, _ := NewProduct(1, "SKU-008", "Product", "desc", "cat", validPrice(), nil)
+	p, _ := NewProduct(1, "SKU-008", "Product", "desc", "cat", 0, validPrice(), nil)
 	p.ClearEvents()
 
 	newPrice := Money{Amount: 1999, Currency: "USD"}
@@ -125,7 +125,7 @@ func TestChangePrice_Success(t *testing.T) {
 }
 
 func TestChangePrice_Negative(t *testing.T) {
-	p, _ := NewProduct(1, "SKU-009", "Product", "desc", "cat", validPrice(), nil)
+	p, _ := NewProduct(1, "SKU-009", "Product", "desc", "cat", 0, validPrice(), nil)
 	p.ClearEvents()
 
 	err := p.ChangePrice(Money{Amount: -1, Currency: "USD"})
@@ -135,7 +135,7 @@ func TestChangePrice_Negative(t *testing.T) {
 }
 
 func TestChangePrice_EmptyCurrency(t *testing.T) {
-	p, _ := NewProduct(1, "SKU-010", "Product", "desc", "cat", validPrice(), nil)
+	p, _ := NewProduct(1, "SKU-010", "Product", "desc", "cat", 0, validPrice(), nil)
 	p.ClearEvents()
 
 	err := p.ChangePrice(Money{Amount: 100, Currency: ""})
@@ -145,7 +145,7 @@ func TestChangePrice_EmptyCurrency(t *testing.T) {
 }
 
 func TestChangeStatus_Success(t *testing.T) {
-	p, _ := NewProduct(1, "SKU-011", "Product", "desc", "cat", validPrice(), nil)
+	p, _ := NewProduct(1, "SKU-011", "Product", "desc", "cat", 0, validPrice(), nil)
 	p.ClearEvents()
 
 	err := p.ChangeStatus(ProductStatusInactive)
@@ -166,7 +166,7 @@ func TestChangeStatus_Success(t *testing.T) {
 }
 
 func TestChangeStatus_Empty(t *testing.T) {
-	p, _ := NewProduct(1, "SKU-012", "Product", "desc", "cat", validPrice(), nil)
+	p, _ := NewProduct(1, "SKU-012", "Product", "desc", "cat", 0, validPrice(), nil)
 	p.ClearEvents()
 
 	err := p.ChangeStatus("")
@@ -176,10 +176,10 @@ func TestChangeStatus_Empty(t *testing.T) {
 }
 
 func TestUpdateDetails_Success(t *testing.T) {
-	p, _ := NewProduct(1, "SKU-013", "Old Name", "Old desc", "old cat", validPrice(), nil)
+	p, _ := NewProduct(1, "SKU-013", "Old Name", "Old desc", "old cat", 0, validPrice(), nil)
 	p.ClearEvents()
 
-	err := p.UpdateDetails("New Name", "New desc", "new cat")
+	err := p.UpdateDetails("New Name", "New desc", "new cat", 0)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -203,18 +203,18 @@ func TestUpdateDetails_Success(t *testing.T) {
 }
 
 func TestUpdateDetails_EmptyName(t *testing.T) {
-	p, _ := NewProduct(1, "SKU-014", "Name", "desc", "cat", validPrice(), nil)
+	p, _ := NewProduct(1, "SKU-014", "Name", "desc", "cat", 0, validPrice(), nil)
 	p.ClearEvents()
 
-	err := p.UpdateDetails("", "desc", "cat")
+	err := p.UpdateDetails("", "desc", "cat", 0)
 	if !kernel.IsInvalidArgument(err) {
 		t.Errorf("expected invalid argument error, got %v", err)
 	}
 }
 
 func TestProduct_Equals(t *testing.T) {
-	p1, _ := NewProduct(1, "SKU-015", "A", "desc", "cat", validPrice(), nil)
-	p2, _ := NewProduct(1, "SKU-016", "B", "desc", "cat", validPrice(), nil)
+	p1, _ := NewProduct(1, "SKU-015", "A", "desc", "cat", 0, validPrice(), nil)
+	p2, _ := NewProduct(1, "SKU-016", "B", "desc", "cat", 0, validPrice(), nil)
 	if !p1.Equals(p2.Entity) {
 		t.Error("products with same ID should be equal")
 	}

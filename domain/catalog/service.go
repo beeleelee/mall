@@ -88,13 +88,13 @@ func (s *CatalogService) GetProduct(ctx context.Context, id kernel.ID) (*Product
 	return product, nil
 }
 
-func (s *CatalogService) CreateProduct(ctx context.Context, id kernel.ID, sku SKU, name, description, category string, price Money, attributes map[string]any) (*Product, error) {
+func (s *CatalogService) CreateProduct(ctx context.Context, id kernel.ID, sku SKU, name, description, category string, categoryID kernel.ID, price Money, attributes map[string]any) (*Product, error) {
 	ctx, span := catalogTracer.Start(ctx, "catalog.create_product")
 	defer span.End()
 
 	s.logger.Info(ctx, "catalog.create_product", kernel.Field("sku", sku), kernel.Field("id", id))
 
-	product, err := NewProduct(id, sku, name, description, category, price, attributes)
+	product, err := NewProduct(id, sku, name, description, category, categoryID, price, attributes)
 	if err != nil {
 		return nil, err
 	}
@@ -106,7 +106,7 @@ func (s *CatalogService) CreateProduct(ctx context.Context, id kernel.ID, sku SK
 	return product, nil
 }
 
-func (s *CatalogService) UpdateProduct(ctx context.Context, id kernel.ID, name, description, category string, price Money, status ProductStatus, attributes map[string]any) (*Product, error) {
+func (s *CatalogService) UpdateProduct(ctx context.Context, id kernel.ID, name, description, category string, categoryID kernel.ID, price Money, status ProductStatus, attributes map[string]any) (*Product, error) {
 	ctx, span := catalogTracer.Start(ctx, "catalog.update_product",
 		trace.WithAttributes(attribute.Int64("product_id", id.Int64())),
 	)
@@ -117,7 +117,7 @@ func (s *CatalogService) UpdateProduct(ctx context.Context, id kernel.ID, name, 
 		return nil, err
 	}
 
-	if err := product.UpdateDetails(name, description, category); err != nil {
+	if err := product.UpdateDetails(name, description, category, categoryID); err != nil {
 		return nil, err
 	}
 	if err := product.ChangePrice(price); err != nil {

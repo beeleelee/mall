@@ -117,7 +117,7 @@ func TestMCP_CallTool(t *testing.T) {
 
 	sf, _ := kernel.NewSnowflake(1)
 	id, _ := sf.NextID()
-	p, err := domain.NewProduct(id, "SKU-MCP-001", "MCP Product", "test", "cat", domain.Money{Amount: 1000, Currency: "USD"}, nil)
+	p, err := domain.NewProduct(id, "SKU-MCP-001", "MCP Product", "test", "cat", 0, domain.Money{Amount: 1000, Currency: "USD"}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

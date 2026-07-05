@@ -155,7 +155,7 @@ func (fakeLoggerCatalog) Error(_ context.Context, _ string, _ error, _ ...kernel
 func seedProduct(t *testing.T, repo *fakeCatalogRepo, sf *kernel.Snowflake, sku string, name string, amount int64) kernel.ID {
 	t.Helper()
 	id, _ := sf.NextID()
-	p, err := domain.NewProduct(id, domain.SKU(sku), name, "desc", "cat", domain.Money{Amount: amount, Currency: "USD"}, nil)
+	p, err := domain.NewProduct(id, domain.SKU(sku), name, "desc", "cat", 0, domain.Money{Amount: amount, Currency: "USD"}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

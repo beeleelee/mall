@@ -105,12 +105,12 @@ func seedProducts(t *testing.T, repo *PostgresProductRepository, n int) {
 	t.Helper()
 	ctx := context.Background()
 	for i := int64(1); i <= int64(n); i++ {
-		p, err := domain.NewProduct(
-			kernel.ID(i),
+		p, err := domain.NewProduct(kernel.ID(i),
 			domain.SKU(fmt.Sprintf("SKU-%03d", i)),
 			fmt.Sprintf("Product %d", i),
 			fmt.Sprintf("Description for product %d", i),
 			"category-a",
+			0,
 			domain.Money{Amount: i * 1000, Currency: "USD"},
 			nil,
 		)
@@ -129,7 +129,7 @@ func TestIntegration_SaveAndFindByID(t *testing.T) {
 	f := newIntegrationFixture(t)
 	defer f.cleanup()
 
-	p, _ := domain.NewProduct(1, "INT-SKU-001", "Integration T-Shirt", "A test tee", "clothing", domain.Money{Amount: 1999, Currency: "USD"}, nil)
+	p, _ := domain.NewProduct(1, "INT-SKU-001", "Integration T-Shirt", "A test tee", "clothing", 0, domain.Money{Amount: 1999, Currency: "USD"}, nil)
 	if err := f.repo.Save(ctx, p); err != nil {
 		t.Fatalf("save: %v", err)
 	}
@@ -153,7 +153,7 @@ func TestIntegration_SaveAndFindBySKU(t *testing.T) {
 	f := newIntegrationFixture(t)
 	defer f.cleanup()
 
-	p, _ := domain.NewProduct(1, "INT-SKU-002", "SKU Lookup", "desc", "cat", domain.Money{Amount: 999, Currency: "USD"}, nil)
+	p, _ := domain.NewProduct(1, "INT-SKU-002", "SKU Lookup", "desc", "cat", 0, domain.Money{Amount: 999, Currency: "USD"}, nil)
 	_ = f.repo.Save(ctx, p)
 
 	got, err := f.repo.FindBySKU(ctx, "INT-SKU-002")
@@ -206,8 +206,8 @@ func TestIntegration_SearchByCategory(t *testing.T) {
 	f := newIntegrationFixture(t)
 	defer f.cleanup()
 
-	p1, _ := domain.NewProduct(1, "CAT-A", "A", "desc", "electronics", domain.Money{Amount: 100, Currency: "USD"}, nil)
-	p2, _ := domain.NewProduct(2, "CAT-B", "B", "desc", "clothing", domain.Money{Amount: 200, Currency: "USD"}, nil)
+	p1, _ := domain.NewProduct(1, "CAT-A", "A", "desc", "electronics", 0, domain.Money{Amount: 100, Currency: "USD"}, nil)
+	p2, _ := domain.NewProduct(2, "CAT-B", "B", "desc", "clothing", 0, domain.Money{Amount: 200, Currency: "USD"}, nil)
 	_ = f.repo.Save(ctx, p1)
 	_ = f.repo.Save(ctx, p2)
 
@@ -241,10 +241,10 @@ func TestIntegration_SearchWithStatusFilter(t *testing.T) {
 	f := newIntegrationFixture(t)
 	defer f.cleanup()
 
-	p1, _ := domain.NewProduct(1, "STA-A", "Active", "desc", "cat", domain.Money{Amount: 100, Currency: "USD"}, nil)
-	p2, _ := domain.NewProduct(2, "STA-B", "Inactive", "desc", "cat", domain.Money{Amount: 200, Currency: "USD"}, nil)
+	p1, _ := domain.NewProduct(1, "STA-A", "Active", "desc", "cat", 0, domain.Money{Amount: 100, Currency: "USD"}, nil)
+	p2, _ := domain.NewProduct(2, "STA-B", "Inactive", "desc", "cat", 0, domain.Money{Amount: 200, Currency: "USD"}, nil)
 	_ = p2.ChangeStatus(domain.ProductStatusInactive)
-	p3, _ := domain.NewProduct(3, "STA-C", "Discontinued", "desc", "cat", domain.Money{Amount: 300, Currency: "USD"}, nil)
+	p3, _ := domain.NewProduct(3, "STA-C", "Discontinued", "desc", "cat", 0, domain.Money{Amount: 300, Currency: "USD"}, nil)
 	_ = p3.ChangeStatus(domain.ProductStatusDiscontinued)
 	_ = f.repo.Save(ctx, p1)
 	_ = f.repo.Save(ctx, p2)
@@ -364,7 +364,7 @@ func TestIntegration_DeleteProduct(t *testing.T) {
 	f := newIntegrationFixture(t)
 	defer f.cleanup()
 
-	p, _ := domain.NewProduct(1, "INT-DEL", "To Delete", "desc", "cat", domain.Money{Amount: 100, Currency: "USD"}, nil)
+	p, _ := domain.NewProduct(1, "INT-DEL", "To Delete", "desc", "cat", 0, domain.Money{Amount: 100, Currency: "USD"}, nil)
 	_ = f.repo.Save(ctx, p)
 
 	if err := f.repo.Delete(ctx, 1); err != nil {
@@ -391,7 +391,7 @@ func TestIntegration_CachePopulation(t *testing.T) {
 	f := newIntegrationFixture(t)
 	defer f.cleanup()
 
-	p, _ := domain.NewProduct(1, "INT-CACHE", "Cache Test", "desc", "cat", domain.Money{Amount: 500, Currency: "USD"}, nil)
+	p, _ := domain.NewProduct(1, "INT-CACHE", "Cache Test", "desc", "cat", 0, domain.Money{Amount: 500, Currency: "USD"}, nil)
 	_ = f.repo.Save(ctx, p)
 
 	// Clear product from any cached state and do a fresh read
@@ -420,7 +420,7 @@ func TestIntegration_CacheInvalidationOnSave(t *testing.T) {
 	f := newIntegrationFixture(t)
 	defer f.cleanup()
 
-	p, _ := domain.NewProduct(1, "INT-INV", "Before", "desc", "cat", domain.Money{Amount: 100, Currency: "USD"}, nil)
+	p, _ := domain.NewProduct(1, "INT-INV", "Before", "desc", "cat", 0, domain.Money{Amount: 100, Currency: "USD"}, nil)
 	_ = f.repo.Save(ctx, p)
 
 	// Populate cache
@@ -444,7 +444,7 @@ func TestIntegration_CacheInvalidationOnDelete(t *testing.T) {
 	f := newIntegrationFixture(t)
 	defer f.cleanup()
 
-	p, _ := domain.NewProduct(1, "INT-DELC", "Del Cache", "desc", "cat", domain.Money{Amount: 100, Currency: "USD"}, nil)
+	p, _ := domain.NewProduct(1, "INT-DELC", "Del Cache", "desc", "cat", 0, domain.Money{Amount: 100, Currency: "USD"}, nil)
 	_ = f.repo.Save(ctx, p)
 
 	_, _ = f.repo.FindByID(ctx, 1)
@@ -464,7 +464,7 @@ func TestIntegration_CacheTTL(t *testing.T) {
 	f := newIntegrationFixture(t)
 	defer f.cleanup()
 
-	p, _ := domain.NewProduct(1, "INT-TTL", "TTL Test", "desc", "cat", domain.Money{Amount: 100, Currency: "USD"}, nil)
+	p, _ := domain.NewProduct(1, "INT-TTL", "TTL Test", "desc", "cat", 0, domain.Money{Amount: 100, Currency: "USD"}, nil)
 	_ = f.repo.Save(ctx, p)
 	_, _ = f.repo.FindByID(ctx, 1)
 
@@ -484,11 +484,11 @@ func TestIntegration_UpdateThenFind(t *testing.T) {
 	f := newIntegrationFixture(t)
 	defer f.cleanup()
 
-	p, _ := domain.NewProduct(1, "INT-UPD", "Original", "original desc", "original cat", domain.Money{Amount: 1000, Currency: "USD"}, nil)
+	p, _ := domain.NewProduct(1, "INT-UPD", "Original", "original desc", "original cat", 0, domain.Money{Amount: 1000, Currency: "USD"}, nil)
 	_ = f.repo.Save(ctx, p)
 
 	_ = p.ChangePrice(domain.Money{Amount: 2500, Currency: "USD"})
-	_ = p.UpdateDetails("Updated", "updated desc", "updated cat")
+	_ = p.UpdateDetails("Updated", "updated desc", "updated cat", 0)
 	_ = f.repo.Save(ctx, p)
 
 	got, err := f.repo.FindByID(ctx, 1)
@@ -514,7 +514,7 @@ func TestIntegration_AttributesRoundTrip(t *testing.T) {
 	defer f.cleanup()
 
 	attrs := map[string]any{"color": "navy", "size": "L", "weight_kg": 0.5}
-	p, _ := domain.NewProduct(1, "INT-ATTR", "Attr Test", "desc", "cat", domain.Money{Amount: 4999, Currency: "USD"}, attrs)
+	p, _ := domain.NewProduct(1, "INT-ATTR", "Attr Test", "desc", "cat", 0, domain.Money{Amount: 4999, Currency: "USD"}, attrs)
 	_ = f.repo.Save(ctx, p)
 
 	got, err := f.repo.FindByID(ctx, 1)

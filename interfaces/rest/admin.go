@@ -46,6 +46,7 @@ type createProductRequest struct {
 	Name        string         `json:"name"`
 	Description string         `json:"description"`
 	Category    string         `json:"category"`
+	CategoryID  int64          `json:"category_id,omitempty"`
 	PriceAmount int64          `json:"price_amount"`
 	Currency    string         `json:"currency"`
 	Attributes  map[string]any `json:"attributes,omitempty"`
@@ -55,6 +56,7 @@ type updateProductRequest struct {
 	Name        string         `json:"name"`
 	Description string         `json:"description"`
 	Category    string         `json:"category"`
+	CategoryID  int64          `json:"category_id,omitempty"`
 	PriceAmount int64          `json:"price_amount"`
 	Currency    string         `json:"currency"`
 	Status      string         `json:"status,omitempty"`
@@ -76,6 +78,7 @@ func (h *AdminHandler) CreateProduct(w http.ResponseWriter, r *http.Request) {
 
 	product, err := h.catalogSvc.CreateProduct(r.Context(), pid,
 		catalogdomain.SKU(req.SKU), req.Name, req.Description, req.Category,
+		kernel.ID(req.CategoryID),
 		catalogdomain.Money{Amount: req.PriceAmount, Currency: req.Currency},
 		req.Attributes)
 	if err != nil {
@@ -104,7 +107,7 @@ func (h *AdminHandler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 	}
 
 	product, err := h.catalogSvc.UpdateProduct(r.Context(), kernel.ID(id),
-		req.Name, req.Description, req.Category,
+		req.Name, req.Description, req.Category, kernel.ID(req.CategoryID),
 		catalogdomain.Money{Amount: req.PriceAmount, Currency: req.Currency},
 		catalogdomain.ProductStatus(req.Status), req.Attributes)
 	if err != nil {

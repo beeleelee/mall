@@ -17,7 +17,7 @@ func newService() *CatalogService {
 
 func createProduct(t *testing.T, svc *CatalogService, id int64, sku SKU, name string, price Money) *Product {
 	t.Helper()
-	p, err := svc.CreateProduct(context.Background(), kernel.ID(id), sku, name, "desc", "cat", price, nil)
+	p, err := svc.CreateProduct(context.Background(), kernel.ID(id), sku, name, "desc", "cat", 0, price, nil)
 	if err != nil {
 		t.Fatalf("CreateProduct(%d, %s, %s) failed: %v", id, sku, name, err)
 	}
@@ -78,7 +78,7 @@ func TestCatalogService_SearchByCategory(t *testing.T) {
 	svc := newService()
 	createProduct(t, svc, 1, "SKU-C1", "Laptop", usdPrice(99900))
 	createProduct(t, svc, 2, "SKU-C2", "Monitor", usdPrice(29900))
-	p3, _ := NewProduct(3, "SKU-C3", "Mouse Pad", "desc", "accessories", usdPrice(1500), nil)
+	p3, _ := NewProduct(3, "SKU-C3", "Mouse Pad", "desc", "accessories", 0, usdPrice(1500), nil)
 	svc.repo.Save(context.Background(), p3)
 
 	result, err := svc.Search(context.Background(), "", SearchOptions{Category: "cat"})
@@ -111,7 +111,7 @@ func TestCatalogService_SearchByPriceRange(t *testing.T) {
 func TestCatalogService_SearchDefaultStatus(t *testing.T) {
 	svc := newService()
 	createProduct(t, svc, 1, "SKU-D1", "Active Item", usdPrice(1000))
-	p2, _ := NewProduct(2, "SKU-D2", "Inactive Item", "desc", "cat", usdPrice(2000), nil)
+	p2, _ := NewProduct(2, "SKU-D2", "Inactive Item", "desc", "cat", 0, usdPrice(2000), nil)
 	p2.ChangeStatus(ProductStatusInactive)
 	svc.repo.Save(context.Background(), p2)
 
@@ -280,9 +280,9 @@ func TestCatalogService_DeleteNotFound(t *testing.T) {
 
 func TestCatalogService_SearchWithExplicitStatus(t *testing.T) {
 	svc := newService()
-	p1, _ := NewProduct(1, "SKU-E1", "Active", "desc", "cat", usdPrice(1000), nil)
+	p1, _ := NewProduct(1, "SKU-E1", "Active", "desc", "cat", 0, usdPrice(1000), nil)
 	svc.repo.Save(context.Background(), p1)
-	p2, _ := NewProduct(2, "SKU-E2", "Inactive", "desc", "cat", usdPrice(2000), nil)
+	p2, _ := NewProduct(2, "SKU-E2", "Inactive", "desc", "cat", 0, usdPrice(2000), nil)
 	p2.ChangeStatus(ProductStatusInactive)
 	svc.repo.Save(context.Background(), p2)
 
@@ -337,7 +337,7 @@ func TestCatalogService_SearchOrderByIDDesc(t *testing.T) {
 func TestCatalogService_CreateProductWithAttributes(t *testing.T) {
 	svc := newService()
 	attrs := map[string]any{"color": "black", "size": "XL"}
-	p, err := svc.CreateProduct(context.Background(), 1, "SKU-ATTR", "T-Shirt", "Cotton tee", "clothing", usdPrice(2999), attrs)
+	p, err := svc.CreateProduct(context.Background(), 1, "SKU-ATTR", "T-Shirt", "Cotton tee", "clothing", 0, usdPrice(2999), attrs)
 	if err != nil {
 		t.Fatalf("CreateProduct failed: %v", err)
 	}
@@ -361,7 +361,7 @@ func TestCatalogService_UpdateThenGet(t *testing.T) {
 	if err := p.ChangePrice(usdPrice(2000)); err != nil {
 		t.Fatalf("ChangePrice failed: %v", err)
 	}
-	if err := p.UpdateDetails("New Name", "new desc", "new cat"); err != nil {
+	if err := p.UpdateDetails("New Name", "new desc", "new cat", 0); err != nil {
 		t.Fatalf("UpdateDetails failed: %v", err)
 	}
 	if err := svc.repo.Save(context.Background(), p); err != nil {

@@ -16,6 +16,7 @@ type SearchResult struct {
 
 type SearchOptions struct {
 	Category      string
+	CategoryID    kernel.ID
 	MinPrice      int64
 	MaxPrice      int64
 	Status        ProductStatus

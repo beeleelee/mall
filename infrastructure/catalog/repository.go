@@ -23,6 +23,7 @@ type productRow struct {
 	Name          string          `db:"name"`
 	Description   string          `db:"description"`
 	Category      string          `db:"category"`
+	CategoryID    *int64          `db:"category_id"`
 	PriceAmount   int64           `db:"price_amount"`
 	PriceCurrency string          `db:"price_currency"`
 	Status        string          `db:"status"`
@@ -52,21 +53,28 @@ func (r *PostgresProductRepository) Save(ctx context.Context, product *domain.Pr
 		return kernel.NewDomainErrorWithCause(kernel.ErrInternal, "marshal attributes", err)
 	}
 
+	categoryID := (*int64)(nil)
+	if product.CategoryID > 0 {
+		v := product.CategoryID.Int64()
+		categoryID = &v
+	}
+
 	_, err = r.db.ExecContext(ctx, `
-		INSERT INTO products (id, sku, name, description, category, price_amount, price_currency, status, attributes, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+		INSERT INTO products (id, sku, name, description, category, category_id, price_amount, price_currency, status, attributes, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 		ON CONFLICT (id) DO UPDATE SET
 			sku = EXCLUDED.sku,
 			name = EXCLUDED.name,
 			description = EXCLUDED.description,
 			category = EXCLUDED.category,
+			category_id = EXCLUDED.category_id,
 			price_amount = EXCLUDED.price_amount,
 			price_currency = EXCLUDED.price_currency,
 			status = EXCLUDED.status,
 			attributes = EXCLUDED.attributes,
 			updated_at = EXCLUDED.updated_at
 	`, product.ID.Int64(), string(product.SKU), product.Name, product.Description,
-		product.Category, product.Price.Amount, product.Price.Currency,
+		product.Category, categoryID, product.Price.Amount, product.Price.Currency,
 		string(product.Status), attrs, product.CreatedAt, product.UpdatedAt)
 	if err != nil {
 		return kernel.NewDomainErrorWithCause(kernel.ErrInternal, "save product", err)
@@ -119,6 +127,7 @@ func (r *PostgresProductRepository) Search(ctx context.Context, query string, op
 
 	where, args = addFilter(where, args, &argIdx, "status", string(opts.Status))
 	where, args = addFilter(where, args, &argIdx, "category", opts.Category)
+	where, args = addIntFilter(where, args, &argIdx, "category_id", int64(opts.CategoryID), "=")
 	where, args = addIntFilter(where, args, &argIdx, "price_amount", opts.MinPrice, ">=")
 	where, args = addIntFilter(where, args, &argIdx, "price_amount", opts.MaxPrice, "<=")
 
@@ -303,12 +312,18 @@ func (r productRow) toDomain() (*domain.Product, error) {
 		}
 	}
 
+	categoryID := kernel.ID(0)
+	if r.CategoryID != nil {
+		categoryID = kernel.ID(*r.CategoryID)
+	}
+
 	p := &domain.Product{
 		AggregateRoot: kernel.NewAggregateRoot(kernel.ID(r.ID)),
 		SKU:           domain.SKU(r.SKU),
 		Name:          r.Name,
 		Description:   r.Description,
 		Category:      r.Category,
+		CategoryID:    categoryID,
 		Price: domain.Money{
 			Amount:   r.PriceAmount,
 			Currency: r.PriceCurrency,
@@ -326,12 +341,19 @@ func (r productRow) toDomain() (*domain.Product, error) {
 func fromDomain(p *domain.Product) productRow {
 	attrs, _ := json.Marshal(p.Attributes)
 
+	var categoryID *int64
+	if p.CategoryID > 0 {
+		v := p.CategoryID.Int64()
+		categoryID = &v
+	}
+
 	return productRow{
 		ID:            p.ID.Int64(),
 		SKU:           string(p.SKU),
 		Name:          p.Name,
 		Description:   p.Description,
 		Category:      p.Category,
+		CategoryID:    categoryID,
 		PriceAmount:   p.Price.Amount,
 		PriceCurrency: p.Price.Currency,
 		Status:        string(p.Status),

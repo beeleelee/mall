@@ -30,6 +30,7 @@ type productResponse struct {
 	Name        string         `json:"name"`
 	Description string         `json:"description"`
 	Category    string         `json:"category"`
+	CategoryID  int64          `json:"category_id"`
 	Price       moneyResponse  `json:"price"`
 	Status      string         `json:"status"`
 	Attributes  map[string]any `json:"attributes"`
@@ -136,6 +137,7 @@ func buildProductResponse(p *domain.Product) productResponse {
 		Name:        p.Name,
 		Description: p.Description,
 		Category:    p.Category,
+		CategoryID:  p.CategoryID.Int64(),
 		Price: moneyResponse{
 			Amount:   p.Price.Amount,
 			Currency: p.Price.Currency,

@@ -219,6 +219,7 @@ type createProductArgs struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
 	Category    string `json:"category"`
+	CategoryID  int64  `json:"category_id,omitempty"`
 	PriceAmount int64  `json:"price_amount"`
 	Currency    string `json:"currency"`
 	Attributes  string `json:"attributes,omitempty"`
@@ -252,7 +253,7 @@ func (h *AdminMCPHandler) callCreateProduct(ctx context.Context, raw json.RawMes
 	}
 
 	product, err := h.catalogSvc.CreateProduct(ctx, id,
-		catalog.SKU(args.SKU), args.Name, args.Description, args.Category,
+		catalog.SKU(args.SKU), args.Name, args.Description, args.Category, kernel.ID(args.CategoryID),
 		catalog.Money{Amount: args.PriceAmount, Currency: args.Currency},
 		attrs)
 	if err != nil {
@@ -270,6 +271,7 @@ type updateProductArgs struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
 	Category    string `json:"category"`
+	CategoryID  int64  `json:"category_id,omitempty"`
 	PriceAmount int64  `json:"price_amount"`
 	Currency    string `json:"currency"`
 	Status      string `json:"status,omitempty"`
@@ -296,7 +298,7 @@ func (h *AdminMCPHandler) callUpdateProduct(ctx context.Context, raw json.RawMes
 	}
 
 	product, err := h.catalogSvc.UpdateProduct(ctx, kernel.ID(args.ID),
-		args.Name, args.Description, args.Category,
+		args.Name, args.Description, args.Category, kernel.ID(args.CategoryID),
 		catalog.Money{Amount: args.PriceAmount, Currency: args.Currency},
 		catalog.ProductStatus(args.Status), attrs)
 	if err != nil {
@@ -510,6 +512,7 @@ func adminProductToMap(p *catalog.Product) map[string]any {
 		"name":        p.Name,
 		"description": p.Description,
 		"category":    p.Category,
+		"category_id": p.CategoryID.Int64(),
 		"price":       p.Price.Amount,
 		"currency":    p.Price.Currency,
 		"status":      string(p.Status),

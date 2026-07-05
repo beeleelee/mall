@@ -28,12 +28,13 @@ type Product struct {
 	Name        string
 	Description string
 	Category    string
+	CategoryID  kernel.ID
 	Price       Money
 	Status      ProductStatus
 	Attributes  map[string]any
 }
 
-func NewProduct(id kernel.ID, sku SKU, name, description, category string, price Money, attributes map[string]any) (*Product, error) {
+func NewProduct(id kernel.ID, sku SKU, name, description, category string, categoryID kernel.ID, price Money, attributes map[string]any) (*Product, error) {
 	if sku == "" {
 		return nil, kernel.NewDomainError(kernel.ErrInvalidArgument, "sku must not be empty")
 	}
@@ -56,6 +57,7 @@ func NewProduct(id kernel.ID, sku SKU, name, description, category string, price
 		Name:          name,
 		Description:   description,
 		Category:      category,
+		CategoryID:    categoryID,
 		Price:         price,
 		Status:        ProductStatusActive,
 		Attributes:    attributes,
@@ -102,13 +104,14 @@ func (p *Product) ChangeStatus(status ProductStatus) error {
 	return nil
 }
 
-func (p *Product) UpdateDetails(name, description, category string) error {
+func (p *Product) UpdateDetails(name, description, category string, categoryID kernel.ID) error {
 	if name == "" {
 		return kernel.NewDomainError(kernel.ErrInvalidArgument, "product name must not be empty")
 	}
 	p.Name = name
 	p.Description = description
 	p.Category = category
+	p.CategoryID = categoryID
 	p.UpdatedAt = time.Now()
 	p.AddEvent(&ProductUpdated{
 		ProductID: p.ID,
