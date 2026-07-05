@@ -305,6 +305,8 @@ func main() {
 	})
 
 	supportedCaps := []string{"dev.ucp.shopping.catalog", "dev.ucp.shopping.cart", "dev.ucp.shopping.checkout", "dev.ucp.shopping.order", "dev.ucp.shopping.ecp", "dev.ucp.shopping.ap2_mandate", "dev.ucp.shopping.payment_token_exchange", "dev.ucp.shopping.fulfillment", "dev.ucp.shopping.discount", "dev.ucp.shopping.admin", "dev.a2a.agent"}
+	srv.Use(gozerorest.ToMiddleware(middleware.CORSMiddleware))
+	srv.Use(gozerorest.ToMiddleware(middleware.RecoveryMiddleware))
 	srv.Use(gozerorest.ToMiddleware(middleware.UCPAgentMiddleware))
 	srv.Use(gozerorest.ToMiddleware(middleware.NegotiationMiddleware(supportedCaps)))
 	srv.Use(gozerorest.ToMiddleware(metricsMW.Wrap))
