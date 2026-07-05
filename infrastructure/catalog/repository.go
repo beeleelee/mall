@@ -27,6 +27,7 @@ type productRow struct {
 	PriceCurrency string          `db:"price_currency"`
 	Status        string          `db:"status"`
 	Attributes    json.RawMessage `db:"attributes"`
+	SearchVector  *string         `db:"search_vector"`
 	CreatedAt     time.Time       `db:"created_at"`
 	UpdatedAt     time.Time       `db:"updated_at"`
 }
@@ -117,10 +118,19 @@ func (r *PostgresProductRepository) Search(ctx context.Context, query string, op
 	argIdx := 1
 
 	where, args = addFilter(where, args, &argIdx, "status", string(opts.Status))
-	where, args = addLikeFilter(where, args, &argIdx, "name", query)
 	where, args = addFilter(where, args, &argIdx, "category", opts.Category)
 	where, args = addIntFilter(where, args, &argIdx, "price_amount", opts.MinPrice, ">=")
 	where, args = addIntFilter(where, args, &argIdx, "price_amount", opts.MaxPrice, "<=")
+
+	if opts.FulltextQuery != "" {
+		where = append(where, fmt.Sprintf("search_vector @@ plainto_tsquery('english', $%d)", argIdx))
+		args = append(args, opts.FulltextQuery)
+		argIdx++
+	} else if query != "" {
+		where = append(where, fmt.Sprintf("name ILIKE '%%' || $%d || '%%'", argIdx))
+		args = append(args, query)
+		argIdx++
+	}
 
 	if cursorID > 0 {
 		where = append(where, fmt.Sprintf("id < $%d", argIdx))
@@ -128,12 +138,19 @@ func (r *PostgresProductRepository) Search(ctx context.Context, query string, op
 		argIdx++
 	}
 
+	orderBy := "id DESC"
+	if opts.FulltextQuery != "" {
+		orderBy = fmt.Sprintf("ts_rank(search_vector, plainto_tsquery('english', $%d)) DESC", argIdx)
+		args = append(args, opts.FulltextQuery)
+		argIdx++
+	}
+
 	sqlQuery := fmt.Sprintf(`
 		SELECT * FROM products
 		WHERE %s
-		ORDER BY id DESC
+		ORDER BY %s
 		LIMIT $%d
-	`, strings.Join(where, " AND "), argIdx)
+	`, strings.Join(where, " AND "), orderBy, argIdx)
 	args = append(args, limit+1)
 
 	rows, err := r.db.QueryxContext(ctx, sqlQuery, args...)
