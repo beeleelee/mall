@@ -174,7 +174,8 @@ func main() {
 
 	dtmServer := envOrDefault("DTM_SERVER", "http://localhost:36789/api/dtmsvr")
 	callbackURL := envOrDefault("SAGA_CALLBACK_URL", "http://localhost:8080")
-	mandateSaga := appPayment.NewDTMMandateSaga(dtmServer, callbackURL, logger)
+	sagaSecret := envOrDefault("SAGA_SECRET", "")
+	mandateSaga := appPayment.NewDTMMandateSaga(dtmServer, callbackURL, logger, sagaSecret)
 	mandateVerifier := infraCheckout.NewCheckoutMandateVerifier(paymentSvc, mandateSaga, tokenValidator)
 	checkoutSvc := domainCheckout.NewCheckoutService(checkoutRepo, defaultTaxSvc, defaultPriceCalc, checkoutPub, logger, mandateVerifier)
 	checkoutHandler := rest.NewCheckoutHandler(checkoutSvc, sf)
@@ -230,7 +231,7 @@ func main() {
 
 	a2aHandler := rest.NewA2AHandler(a2aSvc, fmt.Sprintf("http://localhost:%s", port))
 
-	dtmSaga := appOrder.NewDTMCheckoutSaga(orderSvc, dtmServer, callbackURL, sf, logger)
+	dtmSaga := appOrder.NewDTMCheckoutSaga(orderSvc, dtmServer, callbackURL, sf, logger, sagaSecret)
 
 	go func() {
 		cons, err := js.CreateOrUpdateConsumer(context.Background(), "checkout", jetstream.ConsumerConfig{
@@ -310,6 +311,7 @@ func main() {
 	srv.Use(gozerorest.ToMiddleware(middleware.RateLimitMiddleware(rateLimiter)))
 
 	auth := middleware.AuthMiddleware(jwtSecret)
+	sagaAuth := middleware.SagaAuthMiddleware(sagaSecret)
 
 	srv.AddRoute(gozerorest.Route{
 		Method:  http.MethodGet,
@@ -642,56 +644,28 @@ func main() {
 		Handler: adminAuth(adminHandler.ListLowStock),
 	})
 
-	srv.AddRoute(gozerorest.Route{
-		Method:  http.MethodPost,
-		Path:    "/api/v1/saga/inventory/reserve",
-		Handler: sagaHandler.ReserveInventory,
-	})
-	srv.AddRoute(gozerorest.Route{
-		Method:  http.MethodPost,
-		Path:    "/api/v1/saga/inventory/release",
-		Handler: sagaHandler.ReleaseInventory,
-	})
-	srv.AddRoute(gozerorest.Route{
-		Method:  http.MethodPost,
-		Path:    "/api/v1/saga/inventory/confirm",
-		Handler: sagaHandler.ConfirmInventory,
-	})
-	srv.AddRoute(gozerorest.Route{
-		Method:  http.MethodPost,
-		Path:    "/api/v1/saga/payment/verify",
-		Handler: sagaHandler.VerifyPayment,
-	})
-	srv.AddRoute(gozerorest.Route{
-		Method:  http.MethodPost,
-		Path:    "/api/v1/saga/payment/cancel",
-		Handler: sagaHandler.CancelPayment,
-	})
-	srv.AddRoute(gozerorest.Route{
-		Method:  http.MethodPost,
-		Path:    "/api/v1/saga/order/create",
-		Handler: sagaHandler.CreateOrder,
-	})
-	srv.AddRoute(gozerorest.Route{
-		Method:  http.MethodPost,
-		Path:    "/api/v1/saga/order/cancel",
-		Handler: sagaHandler.CancelOrder,
-	})
-	srv.AddRoute(gozerorest.Route{
-		Method:  http.MethodPost,
-		Path:    "/api/v1/saga/mandate/execute",
-		Handler: sagaHandler.ExecuteMandate,
-	})
-	srv.AddRoute(gozerorest.Route{
-		Method:  http.MethodPost,
-		Path:    "/api/v1/saga/mandate/settle",
-		Handler: sagaHandler.SettleMandate,
-	})
-	srv.AddRoute(gozerorest.Route{
-		Method:  http.MethodPost,
-		Path:    "/api/v1/saga/mandate/rollback",
-		Handler: sagaHandler.RollbackMandateSettle,
-	})
+	type sagaRoute struct {
+		path    string
+		handler http.HandlerFunc
+	}
+	for _, r := range []sagaRoute{
+		{"/api/v1/saga/inventory/reserve", sagaHandler.ReserveInventory},
+		{"/api/v1/saga/inventory/release", sagaHandler.ReleaseInventory},
+		{"/api/v1/saga/inventory/confirm", sagaHandler.ConfirmInventory},
+		{"/api/v1/saga/payment/verify", sagaHandler.VerifyPayment},
+		{"/api/v1/saga/payment/cancel", sagaHandler.CancelPayment},
+		{"/api/v1/saga/order/create", sagaHandler.CreateOrder},
+		{"/api/v1/saga/order/cancel", sagaHandler.CancelOrder},
+		{"/api/v1/saga/mandate/execute", sagaHandler.ExecuteMandate},
+		{"/api/v1/saga/mandate/settle", sagaHandler.SettleMandate},
+		{"/api/v1/saga/mandate/rollback", sagaHandler.RollbackMandateSettle},
+	} {
+		srv.AddRoute(gozerorest.Route{
+			Method:  http.MethodPost,
+			Path:    r.path,
+			Handler: sagaAuth(r.handler).ServeHTTP,
+		})
+	}
 
 	srv.AddRoute(gozerorest.Route{
 		Method:  http.MethodGet,

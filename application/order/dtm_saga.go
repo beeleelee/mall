@@ -41,10 +41,11 @@ func NewDTMCheckoutSaga(
 	callbackURL string,
 	sf *kernel.Snowflake,
 	logger kernel.Logger,
+	sagaSecret string,
 ) *DTMCheckoutSaga {
 	return &DTMCheckoutSaga{
 		orderSvc:  orderSvc,
-		submitFn:  submitSaga,
+		submitFn:  makeSubmitSaga(sagaSecret),
 		dtmServer: dtmServer,
 		cbURL:     callbackURL,
 		idGen:     sf.NextID,
@@ -52,26 +53,31 @@ func NewDTMCheckoutSaga(
 	}
 }
 
-func submitSaga(dtmServer, gid, cbURL string, items []sagaItem, mandateID int64, order sagaOrderCreatePayload) error {
-	saga := dtmcli.NewSaga(dtmServer, gid)
-	saga.Add(
-		cbURL+"/api/v1/saga/inventory/reserve",
-		cbURL+"/api/v1/saga/inventory/release",
-		map[string]any{"items": items},
-	)
-	if mandateID > 0 {
+func makeSubmitSaga(secret string) sagaSubmitFn {
+	return func(dtmServer, gid, cbURL string, items []sagaItem, mandateID int64, order sagaOrderCreatePayload) error {
+		saga := dtmcli.NewSaga(dtmServer, gid)
+		if secret != "" {
+			saga.BranchHeaders = map[string]string{"X-Saga-Secret": secret}
+		}
 		saga.Add(
-			cbURL+"/api/v1/saga/payment/verify",
-			cbURL+"/api/v1/saga/payment/cancel",
-			map[string]any{"mandate_id": mandateID, "token": ""},
+			cbURL+"/api/v1/saga/inventory/reserve",
+			cbURL+"/api/v1/saga/inventory/release",
+			map[string]any{"items": items},
 		)
+		if mandateID > 0 {
+			saga.Add(
+				cbURL+"/api/v1/saga/payment/verify",
+				cbURL+"/api/v1/saga/payment/cancel",
+				map[string]any{"mandate_id": mandateID, "token": ""},
+			)
+		}
+		saga.Add(
+			cbURL+"/api/v1/saga/order/create",
+			cbURL+"/api/v1/saga/order/cancel",
+			order,
+		)
+		return saga.Submit()
 	}
-	saga.Add(
-		cbURL+"/api/v1/saga/order/create",
-		cbURL+"/api/v1/saga/order/cancel",
-		order,
-	)
-	return saga.Submit()
 }
 
 func (s *DTMCheckoutSaga) Handle(ctx context.Context, data []byte) error {

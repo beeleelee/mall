@@ -27,9 +27,10 @@ func NewDTMMandateSaga(
 	dtmServer string,
 	callbackURL string,
 	logger kernel.Logger,
+	sagaSecret string,
 ) *DTMMandateSaga {
 	return &DTMMandateSaga{
-		submitFn:  defaultMandateSubmit,
+		submitFn:  makeMandateSubmit(sagaSecret),
 		dtmServer: dtmServer,
 		cbURL:     callbackURL,
 		logger:    logger,
@@ -46,23 +47,24 @@ func NewDTMMandateSagaWithSubmit(
 	}
 }
 
-func defaultMandateSubmit(dtmServer, gid, cbURL string, payload mandateSagaPayload) error {
-	return submitMandateSaga(dtmServer, gid, cbURL, payload)
-}
-
-func submitMandateSaga(dtmServer, gid, cbURL string, payload mandateSagaPayload) error {
-	saga := dtmcli.NewSaga(dtmServer, gid)
-	saga.Add(
-		cbURL+"/api/v1/saga/mandate/execute",
-		cbURL+"/api/v1/saga/payment/cancel",
-		payload,
-	)
-	saga.Add(
-		cbURL+"/api/v1/saga/mandate/settle",
-		cbURL+"/api/v1/saga/mandate/rollback",
-		map[string]any{"mandate_id": payload.MandateID},
-	)
-	return saga.Submit()
+func makeMandateSubmit(secret string) sagaSubmitFn {
+	return func(dtmServer, gid, cbURL string, payload mandateSagaPayload) error {
+		saga := dtmcli.NewSaga(dtmServer, gid)
+		if secret != "" {
+			saga.BranchHeaders = map[string]string{"X-Saga-Secret": secret}
+		}
+		saga.Add(
+			cbURL+"/api/v1/saga/mandate/execute",
+			cbURL+"/api/v1/saga/payment/cancel",
+			payload,
+		)
+		saga.Add(
+			cbURL+"/api/v1/saga/mandate/settle",
+			cbURL+"/api/v1/saga/mandate/rollback",
+			map[string]any{"mandate_id": payload.MandateID},
+		)
+		return saga.Submit()
+	}
 }
 
 func (s *DTMMandateSaga) Execute(ctx context.Context, mandateID kernel.ID, token string) error {
