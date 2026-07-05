@@ -1,10 +1,14 @@
 package rest
 
 import (
+	"bytes"
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/zeromicro/go-zero/rest/pathvar"
 
 	"github.com/beeleelee/mall/domain/kernel"
@@ -20,16 +24,20 @@ type AdminHandler struct {
 	orderSvc     *orderdomain.OrderService
 	identitySvc  *appidentity.IdentityAppService
 	inventorySvc *inventorydomain.InventoryService
+	storageSvc   kernel.StorageService
 	sf           *kernel.Snowflake
+	db           *sqlx.DB
 }
 
-func NewAdminHandler(catalogSvc *catalogdomain.CatalogService, orderSvc *orderdomain.OrderService, identitySvc *appidentity.IdentityAppService, inventorySvc *inventorydomain.InventoryService, sf *kernel.Snowflake) *AdminHandler {
+func NewAdminHandler(catalogSvc *catalogdomain.CatalogService, orderSvc *orderdomain.OrderService, identitySvc *appidentity.IdentityAppService, inventorySvc *inventorydomain.InventoryService, storageSvc kernel.StorageService, sf *kernel.Snowflake, db *sqlx.DB) *AdminHandler {
 	return &AdminHandler{
 		catalogSvc:   catalogSvc,
 		orderSvc:     orderSvc,
 		identitySvc:  identitySvc,
 		inventorySvc: inventorySvc,
+		storageSvc:   storageSvc,
 		sf:           sf,
+		db:           db,
 	}
 }
 
@@ -263,3 +271,93 @@ func (h *AdminHandler) ListLowStock(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(items)
 }
+
+func (h *AdminHandler) UploadImage(w http.ResponseWriter, r *http.Request) {
+	vars := pathvar.Vars(r)
+	pidStr := vars["id"]
+	pid, err := strconv.ParseInt(pidStr, 10, 64)
+	if err != nil {
+		writeDomainError(w, kernel.NewDomainError(kernel.ErrInvalidArgument, "invalid product id"))
+		return
+	}
+
+	if err := r.ParseMultipartForm(10 << 20); err != nil {
+		writeDomainError(w, kernel.NewDomainError(kernel.ErrInvalidArgument, "failed to parse multipart form"))
+		return
+	}
+
+	file, header, err := r.FormFile("image")
+	if err != nil {
+		writeDomainError(w, kernel.NewDomainError(kernel.ErrInvalidArgument, "missing image file"))
+		return
+	}
+	defer file.Close()
+
+	data, err := io.ReadAll(file)
+	if err != nil {
+		writeDomainError(w, kernel.NewDomainError(kernel.ErrInvalidArgument, "failed to read image"))
+		return
+	}
+
+	imgID, err := h.sf.NextID()
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+
+	contentType := header.Header.Get("Content-Type")
+	if contentType == "" {
+		contentType = "application/octet-stream"
+	}
+
+	key := fmt.Sprintf("products/%d/%d", pid, imgID.Int64())
+	url, err := h.storageSvc.Upload(r.Context(), key, bytes.NewReader(data), contentType)
+	if err != nil {
+		writeDomainError(w, kernel.NewDomainError(kernel.ErrInternal, "upload failed: "+err.Error()))
+		return
+	}
+
+	_, err = h.db.ExecContext(r.Context(),
+		"INSERT INTO product_images (id, product_id, url, sort_order) VALUES ($1, $2, $3, $4)",
+		imgID.Int64(), pid, url, 0)
+	if err != nil {
+		writeDomainError(w, kernel.NewDomainError(kernel.ErrInternal, "save image record: "+err.Error()))
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(map[string]any{
+		"id":  imgID.Int64(),
+		"url": url,
+	})
+}
+
+func (h *AdminHandler) DeleteImage(w http.ResponseWriter, r *http.Request) {
+	vars := pathvar.Vars(r)
+	idStr := vars["imageId"]
+	imgID, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		writeDomainError(w, kernel.NewDomainError(kernel.ErrInvalidArgument, "invalid image id"))
+		return
+	}
+
+	var url string
+	err = h.db.GetContext(r.Context(), &url, "SELECT url FROM product_images WHERE id = $1", imgID)
+	if err != nil {
+		writeDomainError(w, kernel.NewDomainError(kernel.ErrNotFound, "image not found"))
+		return
+	}
+
+	_, err = h.db.ExecContext(r.Context(), "DELETE FROM product_images WHERE id = $1", imgID)
+	if err != nil {
+		writeDomainError(w, kernel.NewDomainError(kernel.ErrInternal, "delete image: "+err.Error()))
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"status": "deleted"})
+}
+
+

@@ -51,6 +51,7 @@ import (
 	infraOAuth "github.com/beeleelee/mall/infrastructure/oauth"
 	infraOrder "github.com/beeleelee/mall/infrastructure/order"
 	infraPayment "github.com/beeleelee/mall/infrastructure/payment"
+	infraStorage "github.com/beeleelee/mall/infrastructure/storage"
 	"github.com/beeleelee/mall/infrastructure/tracing"
 	"github.com/beeleelee/mall/interfaces/mcp"
 	"github.com/beeleelee/mall/interfaces/middleware"
@@ -216,7 +217,16 @@ func main() {
 
 	sagaHandler := rest.NewSagaHandler(inventorySvc, paymentSvc, checkoutSvc, orderSvc)
 
-	adminHandler := rest.NewAdminHandler(catalogSvc, orderSvc, appSvc, inventorySvc, sf)
+	minioEndpoint := envOrDefault("MINIO_ENDPOINT", "localhost:9000")
+	minioAccessKey := envOrDefault("MINIO_ACCESS_KEY", "minioadmin")
+	minioSecretKey := envOrDefault("MINIO_SECRET_KEY", "minioadmin")
+	minioBucket := envOrDefault("MINIO_BUCKET", "mall")
+	storageSvc, storErr := infraStorage.NewMinIOStorage(minioEndpoint, minioAccessKey, minioSecretKey, minioBucket, "", false)
+	if storErr != nil {
+		log.Printf("warning: minio not available, images disabled: %v", storErr)
+	}
+
+	adminHandler := rest.NewAdminHandler(catalogSvc, orderSvc, appSvc, inventorySvc, storageSvc, sf, db)
 	adminMW := middleware.AdminMiddleware(userRepo)
 
 	a2aTaskRepo := infraA2A.NewPostgresTaskRepository(db)
@@ -655,6 +665,17 @@ func main() {
 		Method:  http.MethodGet,
 		Path:    "/api/v1/admin/inventory/low-stock",
 		Handler: adminAuth(adminHandler.ListLowStock),
+	})
+
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPost,
+		Path:    "/api/v1/admin/products/:id/images",
+		Handler: adminAuth(adminHandler.UploadImage),
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodDelete,
+		Path:    "/api/v1/admin/products/:id/images/:imageId",
+		Handler: adminAuth(adminHandler.DeleteImage),
 	})
 
 	type sagaRoute struct {
