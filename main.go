@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -37,6 +38,7 @@ import (
 	domainOAuth "github.com/beeleelee/mall/domain/oauth"
 	domainOrder "github.com/beeleelee/mall/domain/order"
 	domainPayment "github.com/beeleelee/mall/domain/payment"
+	domainNotification "github.com/beeleelee/mall/domain/notification"
 	infraA2A "github.com/beeleelee/mall/infrastructure/a2a"
 	infraCart "github.com/beeleelee/mall/infrastructure/cart"
 	infraCatalog "github.com/beeleelee/mall/infrastructure/catalog"
@@ -52,6 +54,7 @@ import (
 	infraOrder "github.com/beeleelee/mall/infrastructure/order"
 	infraPayment "github.com/beeleelee/mall/infrastructure/payment"
 	infraStorage "github.com/beeleelee/mall/infrastructure/storage"
+	notificationInfra "github.com/beeleelee/mall/infrastructure/notification"
 	"github.com/beeleelee/mall/infrastructure/tracing"
 	"github.com/beeleelee/mall/interfaces/mcp"
 	"github.com/beeleelee/mall/interfaces/middleware"
@@ -299,6 +302,19 @@ func main() {
 			msg.Ack()
 		})
 	}()
+
+	if smtpHost := envOrDefault("SMTP_HOST", ""); smtpHost != "" {
+		smtpPort, _ := strconv.Atoi(envOrDefault("SMTP_PORT", "587"))
+		smtpSender := notificationInfra.NewSMTPEmailSender(notificationInfra.SMTPConfig{
+			Host:     smtpHost,
+			Port:     smtpPort,
+			Username: envOrDefault("SMTP_USERNAME", ""),
+			Password: envOrDefault("SMTP_PASSWORD", ""),
+			From:     envOrDefault("SMTP_FROM", "noreply@mall.example.com"),
+		})
+		notifSvc := domainNotification.NewNotificationService(smtpSender, logger)
+		notificationInfra.StartEmailConsumer(js, notifSvc, userRepo)
+	}
 
 	if otelEndpoint := envOrDefault("OTEL_ENDPOINT", ""); otelEndpoint != "" {
 		trace.StartAgent(trace.Config{
