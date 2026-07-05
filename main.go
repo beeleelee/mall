@@ -305,6 +305,7 @@ func main() {
 	})
 
 	supportedCaps := []string{"dev.ucp.shopping.catalog", "dev.ucp.shopping.cart", "dev.ucp.shopping.checkout", "dev.ucp.shopping.order", "dev.ucp.shopping.ecp", "dev.ucp.shopping.ap2_mandate", "dev.ucp.shopping.payment_token_exchange", "dev.ucp.shopping.fulfillment", "dev.ucp.shopping.discount", "dev.ucp.shopping.identity", "dev.ucp.shopping.webhook", "dev.ucp.shopping.oauth", "dev.ucp.shopping.inventory", "dev.ucp.shopping.admin", "dev.a2a.agent"}
+	srv.Use(gozerorest.ToMiddleware(middleware.RequestIDMiddleware))
 	srv.Use(gozerorest.ToMiddleware(middleware.CORSMiddleware))
 	srv.Use(gozerorest.ToMiddleware(middleware.RecoveryMiddleware))
 	srv.Use(gozerorest.ToMiddleware(middleware.UCPAgentMiddleware))
