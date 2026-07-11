@@ -304,6 +304,12 @@ func main() {
 		})
 	}()
 
+	retryCtx, retryCancel := context.WithCancel(context.Background())
+	defer retryCancel()
+
+	retryWorker := infraOrder.NewWebhookRetryWorker(webhookDLQ, webhookRepo, webhookDeliverer, 30*time.Second, logger)
+	go retryWorker.Start(retryCtx)
+
 	if smtpHost := envOrDefault("SMTP_HOST", ""); smtpHost != "" {
 		smtpPort, _ := strconv.Atoi(envOrDefault("SMTP_PORT", "587"))
 		smtpSender := notificationInfra.NewSMTPEmailSender(notificationInfra.SMTPConfig{
