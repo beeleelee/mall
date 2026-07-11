@@ -249,6 +249,22 @@ func (r *PostgresWebhookDeliveryLogRepository) ListFailed(ctx context.Context, l
 	return result, nil
 }
 
+func (r *PostgresWebhookDeliveryLogRepository) ListFailedDueForRetry(ctx context.Context, limit int) ([]domain.DeliveryLogEntry, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+	var rows []deliveryLogRow
+	err := r.db.SelectContext(ctx, &rows, "SELECT * FROM webhook_delivery_log WHERE status = 'failed' AND (next_retry IS NULL OR next_retry <= NOW()) ORDER BY created_at ASC LIMIT $1", limit)
+	if err != nil {
+		return nil, kernel.NewDomainErrorWithCause(kernel.ErrInternal, "list failed deliveries due for retry", err)
+	}
+	result := make([]domain.DeliveryLogEntry, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, row.toDomain())
+	}
+	return result, nil
+}
+
 type WebhookDeliverer struct {
 	client  *http.Client
 	logRepo domain.DeliveryLogRepository

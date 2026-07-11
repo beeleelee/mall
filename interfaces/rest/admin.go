@@ -619,5 +619,3 @@ func (h *AdminHandler) RetryDelivery(w http.ResponseWriter, r *http.Request) {
 		writeDomainError(w, kernel.NewDomainError(kernel.ErrUnavailable, errMsg))
 	}
 }
-
-

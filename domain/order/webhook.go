@@ -28,6 +28,7 @@ type DeliveryLogRepository interface {
 	MarkRetried(ctx context.Context, logID int64) error
 	MarkDelivered(ctx context.Context, logID int64) error
 	ListFailed(ctx context.Context, limit int) ([]DeliveryLogEntry, error)
+	ListFailedDueForRetry(ctx context.Context, limit int) ([]DeliveryLogEntry, error)
 }
 
 func SignWebhookPayload(secret string, payload []byte) string {
