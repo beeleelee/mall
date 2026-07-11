@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/zeromicro/go-zero/rest/pathvar"
@@ -20,26 +21,28 @@ import (
 )
 
 type AdminHandler struct {
-	catalogSvc   *catalogdomain.CatalogService
-	orderSvc     *orderdomain.OrderService
-	identitySvc  *appidentity.IdentityAppService
-	inventorySvc *inventorydomain.InventoryService
-	storageSvc   kernel.StorageService
-	categoryRepo catalogdomain.CategoryRepository
-	sf           *kernel.Snowflake
-	db           *sqlx.DB
+	catalogSvc      *catalogdomain.CatalogService
+	orderSvc        *orderdomain.OrderService
+	identitySvc     *appidentity.IdentityAppService
+	inventorySvc    *inventorydomain.InventoryService
+	storageSvc      kernel.StorageService
+	categoryRepo    catalogdomain.CategoryRepository
+	sf              *kernel.Snowflake
+	db              *sqlx.DB
+	deliveryLogRepo orderdomain.DeliveryLogRepository
 }
 
-func NewAdminHandler(catalogSvc *catalogdomain.CatalogService, orderSvc *orderdomain.OrderService, identitySvc *appidentity.IdentityAppService, inventorySvc *inventorydomain.InventoryService, storageSvc kernel.StorageService, categoryRepo catalogdomain.CategoryRepository, sf *kernel.Snowflake, db *sqlx.DB) *AdminHandler {
+func NewAdminHandler(catalogSvc *catalogdomain.CatalogService, orderSvc *orderdomain.OrderService, identitySvc *appidentity.IdentityAppService, inventorySvc *inventorydomain.InventoryService, storageSvc kernel.StorageService, categoryRepo catalogdomain.CategoryRepository, sf *kernel.Snowflake, db *sqlx.DB, deliveryLogRepo orderdomain.DeliveryLogRepository) *AdminHandler {
 	return &AdminHandler{
-		catalogSvc:   catalogSvc,
-		orderSvc:     orderSvc,
-		identitySvc:  identitySvc,
-		inventorySvc: inventorySvc,
-		storageSvc:   storageSvc,
-		categoryRepo: categoryRepo,
-		sf:           sf,
-		db:           db,
+		catalogSvc:      catalogSvc,
+		orderSvc:        orderSvc,
+		identitySvc:     identitySvc,
+		inventorySvc:    inventorySvc,
+		storageSvc:      storageSvc,
+		categoryRepo:    categoryRepo,
+		sf:              sf,
+		db:              db,
+		deliveryLogRepo: deliveryLogRepo,
 	}
 }
 
@@ -494,6 +497,127 @@ func (h *AdminHandler) DeleteImage(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{"status": "deleted"})
+}
+
+type deliveryLogResponse struct {
+	ID        int64  `json:"id"`
+	WebhookID int64  `json:"webhook_id"`
+	Event     string `json:"event"`
+	Status    string `json:"status"`
+	Error     string `json:"error,omitempty"`
+	Attempts  int    `json:"attempts"`
+	CreatedAt string `json:"created_at"`
+}
+
+func (h *AdminHandler) ListFailedDeliveries(w http.ResponseWriter, r *http.Request) {
+	entries, err := h.deliveryLogRepo.ListFailed(r.Context(), 50)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+
+	result := make([]deliveryLogResponse, 0, len(entries))
+	for _, e := range entries {
+		result = append(result, deliveryLogResponse{
+			ID:        e.ID,
+			WebhookID: e.WebhookID,
+			Event:     e.Event,
+			Status:    e.Status,
+			Error:     e.Error,
+			Attempts:  e.Attempts,
+			CreatedAt: e.CreatedAt.Format(time.RFC3339),
+		})
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(result)
+}
+
+func (h *AdminHandler) RetryDelivery(w http.ResponseWriter, r *http.Request) {
+	vars := pathvar.Vars(r)
+	idStr := vars["id"]
+	logID, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		writeDomainError(w, kernel.NewDomainError(kernel.ErrInvalidArgument, "invalid delivery log id"))
+		return
+	}
+
+	var webhookID int64
+	var eventStr string
+	var payload []byte
+	err = h.db.QueryRowContext(r.Context(),
+		"SELECT webhook_id, event, payload FROM webhook_delivery_log WHERE id = $1 AND status = 'failed'", logID).
+		Scan(&webhookID, &eventStr, &payload)
+	if err != nil {
+		writeDomainError(w, kernel.NewDomainError(kernel.ErrNotFound, "failed delivery log not found"))
+		return
+	}
+
+	var url string
+	var secret string
+	err = h.db.QueryRowContext(r.Context(),
+		"SELECT url, secret FROM webhooks WHERE id = $1 AND active = true", webhookID).
+		Scan(&url, &secret)
+	if err != nil {
+		writeDomainError(w, kernel.NewDomainError(kernel.ErrNotFound, "webhook not found or inactive"))
+		return
+	}
+
+	signature := orderdomain.SignWebhookPayload(secret, payload)
+	timestamp := time.Now().UnixMilli()
+
+	body := map[string]any{
+		"event":     eventStr,
+		"timestamp": timestamp,
+		"payload":   json.RawMessage(payload),
+	}
+	data, _ := json.Marshal(body)
+
+	req, err := http.NewRequestWithContext(r.Context(), http.MethodPost, url, bytes.NewReader(data))
+	if err != nil {
+		writeDomainError(w, kernel.NewDomainError(kernel.ErrInternal, "create request: "+err.Error()))
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Signature-256", signature)
+	req.Header.Set("X-Signature-Timestamp", fmt.Sprintf("%d", timestamp))
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		h.deliveryLogRepo.Save(r.Context(), &orderdomain.DeliveryLogEntry{
+			ID:        logID,
+			WebhookID: webhookID,
+			Event:     eventStr,
+			Payload:   payload,
+			Status:    "failed",
+			Error:     err.Error(),
+			Attempts:  0,
+		})
+		writeDomainError(w, kernel.NewDomainError(kernel.ErrUnavailable, "retry failed: "+err.Error()))
+		return
+	}
+	resp.Body.Close()
+
+	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		h.deliveryLogRepo.MarkRetried(r.Context(), logID)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]string{"status": "retried"})
+	} else {
+		errMsg := fmt.Sprintf("webhook returned status %d", resp.StatusCode)
+		h.deliveryLogRepo.Save(r.Context(), &orderdomain.DeliveryLogEntry{
+			ID:        logID,
+			WebhookID: webhookID,
+			Event:     eventStr,
+			Payload:   payload,
+			Status:    "failed",
+			Error:     errMsg,
+			Attempts:  0,
+		})
+		writeDomainError(w, kernel.NewDomainError(kernel.ErrUnavailable, errMsg))
+	}
 }
 
 
