@@ -250,13 +250,26 @@ func (r *PostgresWebhookDeliveryLogRepository) ListFailed(ctx context.Context, l
 }
 
 type WebhookDeliverer struct {
-	client *http.Client
+	client  *http.Client
+	logRepo domain.DeliveryLogRepository
 }
 
-func NewWebhookDeliverer() *WebhookDeliverer {
-	return &WebhookDeliverer{
+type WebhookDelivererOption func(*WebhookDeliverer)
+
+func WithDeliveryLogRepo(repo domain.DeliveryLogRepository) WebhookDelivererOption {
+	return func(d *WebhookDeliverer) {
+		d.logRepo = repo
+	}
+}
+
+func NewWebhookDeliverer(opts ...WebhookDelivererOption) *WebhookDeliverer {
+	d := &WebhookDeliverer{
 		client: &http.Client{Timeout: 10 * time.Second},
 	}
+	for _, opt := range opts {
+		opt(d)
+	}
+	return d
 }
 
 func (d *WebhookDeliverer) Deliver(ctx context.Context, webhook *domain.Webhook, event string, payload []byte) error {
@@ -274,6 +287,20 @@ func (d *WebhookDeliverer) Deliver(ctx context.Context, webhook *domain.Webhook,
 		return kernel.NewDomainErrorWithCause(kernel.ErrInternal, "marshal webhook payload", err)
 	}
 
+	var logEntry *domain.DeliveryLogEntry
+	if d.logRepo != nil {
+		logEntry = &domain.DeliveryLogEntry{
+			WebhookID: webhook.ID.Int64(),
+			Event:     event,
+			Payload:   payload,
+			Status:    "pending",
+			Attempts:  0,
+		}
+		if err := d.logRepo.Save(ctx, logEntry); err != nil {
+			return kernel.NewDomainErrorWithCause(kernel.ErrInternal, "save delivery log", err)
+		}
+	}
+
 	maxRetries := 3
 	var lastErr error
 	for i := 0; i < maxRetries; i++ {
@@ -288,6 +315,12 @@ func (d *WebhookDeliverer) Deliver(ctx context.Context, webhook *domain.Webhook,
 		resp, err := d.client.Do(req)
 		if err != nil {
 			lastErr = err
+			if d.logRepo != nil && logEntry != nil {
+				logEntry.Attempts = i + 1
+				logEntry.Status = "failed"
+				logEntry.Error = err.Error()
+				d.logRepo.Save(ctx, logEntry)
+			}
 			if i < maxRetries-1 {
 				backoff := time.Duration(math.Pow(2, float64(i))) * time.Second
 				select {
@@ -301,10 +334,22 @@ func (d *WebhookDeliverer) Deliver(ctx context.Context, webhook *domain.Webhook,
 		resp.Body.Close()
 
 		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+			if d.logRepo != nil && logEntry != nil {
+				logEntry.Attempts = i + 1
+				logEntry.Status = "delivered"
+				logEntry.Error = ""
+				d.logRepo.Save(ctx, logEntry)
+			}
 			return nil
 		}
 
 		lastErr = kernel.NewDomainError(kernel.ErrUnavailable, fmt.Sprintf("webhook returned status %d", resp.StatusCode))
+		if d.logRepo != nil && logEntry != nil {
+			logEntry.Attempts = i + 1
+			logEntry.Status = "failed"
+			logEntry.Error = fmt.Sprintf("webhook returned status %d", resp.StatusCode)
+			d.logRepo.Save(ctx, logEntry)
+		}
 		if i < maxRetries-1 {
 			backoff := time.Duration(math.Pow(2, float64(i))) * time.Second
 			select {
@@ -313,6 +358,12 @@ func (d *WebhookDeliverer) Deliver(ctx context.Context, webhook *domain.Webhook,
 				return ctx.Err()
 			}
 		}
+	}
+
+	if d.logRepo != nil && logEntry != nil {
+		nextRetry := time.Now().Add(30 * time.Second)
+		logEntry.NextRetry = &nextRetry
+		d.logRepo.Save(ctx, logEntry)
 	}
 
 	return kernel.NewDomainErrorWithCause(kernel.ErrUnavailable, "webhook delivery failed after 3 retries", lastErr)
