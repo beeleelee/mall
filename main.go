@@ -230,8 +230,9 @@ func main() {
 		log.Printf("warning: minio not available, images disabled: %v", storErr)
 	}
 
+	webhookDLQ := infraOrder.NewPostgresWebhookDeliveryLogRepository(db, sf)
 	categoryRepo := infraCatalog.NewPostgresCategoryRepository(db)
-	adminHandler := rest.NewAdminHandler(catalogSvc, orderSvc, appSvc, inventorySvc, storageSvc, categoryRepo, sf, db)
+	adminHandler := rest.NewAdminHandler(catalogSvc, orderSvc, appSvc, inventorySvc, storageSvc, categoryRepo, sf, db, webhookDLQ)
 	adminMW := middleware.AdminMiddleware(userRepo)
 
 	a2aTaskRepo := infraA2A.NewPostgresTaskRepository(db)
@@ -269,7 +270,7 @@ func main() {
 		})
 	}()
 
-	webhookDeliverer := infraOrder.NewWebhookDeliverer()
+	webhookDeliverer := infraOrder.NewWebhookDeliverer(infraOrder.WithDeliveryLogRepo(webhookDLQ))
 
 	go func() {
 		cons, err := js.CreateOrUpdateConsumer(context.Background(), "orders", jetstream.ConsumerConfig{
@@ -740,6 +741,17 @@ func main() {
 		Method:  http.MethodDelete,
 		Path:    "/api/v1/admin/categories/:id",
 		Handler: adminAuth(adminHandler.DeleteCategory),
+	})
+
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodGet,
+		Path:    "/api/v1/admin/webhooks/failed",
+		Handler: adminAuth(adminHandler.ListFailedDeliveries),
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPost,
+		Path:    "/api/v1/admin/webhooks/retry/:id",
+		Handler: adminAuth(adminHandler.RetryDelivery),
 	})
 
 	type sagaRoute struct {
