@@ -2,9 +2,39 @@ package order
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
+	"time"
 
 	"github.com/beeleelee/mall/domain/kernel"
 )
+
+type DeliveryLogEntry struct {
+	ID        int64
+	WebhookID int64
+	Event     string
+	Payload   []byte
+	Status    string
+	Error     string
+	Attempts  int
+	NextRetry *time.Time
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+type DeliveryLogRepository interface {
+	Save(ctx context.Context, entry *DeliveryLogEntry) error
+	MarkRetried(ctx context.Context, logID int64) error
+	MarkDelivered(ctx context.Context, logID int64) error
+	ListFailed(ctx context.Context, limit int) ([]DeliveryLogEntry, error)
+}
+
+func SignWebhookPayload(secret string, payload []byte) string {
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write(payload)
+	return hex.EncodeToString(mac.Sum(nil))
+}
 
 type Webhook struct {
 	kernel.AggregateRoot
