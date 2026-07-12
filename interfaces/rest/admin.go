@@ -12,6 +12,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/zeromicro/go-zero/rest/pathvar"
 
+	"github.com/beeleelee/mall/domain/analytics"
 	"github.com/beeleelee/mall/domain/kernel"
 
 	appidentity "github.com/beeleelee/mall/application/identity"
@@ -27,12 +28,13 @@ type AdminHandler struct {
 	inventorySvc    *inventorydomain.InventoryService
 	storageSvc      kernel.StorageService
 	categoryRepo    catalogdomain.CategoryRepository
+	analyticsSvc    *analytics.AnalyticsService
 	sf              *kernel.Snowflake
 	db              *sqlx.DB
 	deliveryLogRepo orderdomain.DeliveryLogRepository
 }
 
-func NewAdminHandler(catalogSvc *catalogdomain.CatalogService, orderSvc *orderdomain.OrderService, identitySvc *appidentity.IdentityAppService, inventorySvc *inventorydomain.InventoryService, storageSvc kernel.StorageService, categoryRepo catalogdomain.CategoryRepository, sf *kernel.Snowflake, db *sqlx.DB, deliveryLogRepo orderdomain.DeliveryLogRepository) *AdminHandler {
+func NewAdminHandler(catalogSvc *catalogdomain.CatalogService, orderSvc *orderdomain.OrderService, identitySvc *appidentity.IdentityAppService, inventorySvc *inventorydomain.InventoryService, storageSvc kernel.StorageService, categoryRepo catalogdomain.CategoryRepository, analyticsSvc *analytics.AnalyticsService, sf *kernel.Snowflake, db *sqlx.DB, deliveryLogRepo orderdomain.DeliveryLogRepository) *AdminHandler {
 	return &AdminHandler{
 		catalogSvc:      catalogSvc,
 		orderSvc:        orderSvc,
@@ -40,6 +42,7 @@ func NewAdminHandler(catalogSvc *catalogdomain.CatalogService, orderSvc *orderdo
 		inventorySvc:    inventorySvc,
 		storageSvc:      storageSvc,
 		categoryRepo:    categoryRepo,
+		analyticsSvc:    analyticsSvc,
 		sf:              sf,
 		db:              db,
 		deliveryLogRepo: deliveryLogRepo,
