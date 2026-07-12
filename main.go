@@ -790,6 +790,32 @@ func main() {
 		Handler: adminAuth(adminHandler.ProductAnalytics),
 	})
 
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPost,
+		Path:    "/api/v1/admin/orders/:id/process",
+		Handler: adminAuth(adminHandler.ProcessOrder),
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPost,
+		Path:    "/api/v1/admin/orders/:id/ship",
+		Handler: adminAuth(adminHandler.ShipOrder),
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPost,
+		Path:    "/api/v1/admin/orders/:id/deliver",
+		Handler: adminAuth(adminHandler.DeliverOrder),
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPost,
+		Path:    "/api/v1/admin/orders/:id/return",
+		Handler: adminAuth(adminHandler.ReturnOrder),
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPost,
+		Path:    "/api/v1/admin/orders/:id/cancel",
+		Handler: adminAuth(adminHandler.CancelOrder),
+	})
+
 	type sagaRoute struct {
 		path    string
 		handler http.HandlerFunc
