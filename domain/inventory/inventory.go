@@ -118,6 +118,19 @@ func (i *InventoryItem) IsOutOfStock() bool {
 	return i.QuantityAvailable <= 0
 }
 
+func (i *InventoryItem) Restock(quantity int) error {
+	if quantity <= 0 {
+		return kernel.NewDomainError(kernel.ErrInvalidArgument, "restock quantity must be positive")
+	}
+	i.QuantityAvailable += quantity
+	i.UpdatedAt = time.Now()
+	i.AddEvent(&StockRestocked{
+		ProductID: i.ProductID,
+		Quantity:  quantity,
+	})
+	return nil
+}
+
 func (i *InventoryItem) checkLowStock() {
 	if i.IsLowStock() {
 		i.AddEvent(&StockLow{

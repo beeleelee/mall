@@ -106,6 +106,25 @@ func (s *InventoryService) ConfirmReservation(ctx context.Context, productID ker
 	return item, nil
 }
 
+func (s *InventoryService) Restock(ctx context.Context, productID kernel.ID, quantity int) (*InventoryItem, error) {
+	s.logger.Info(ctx, "inventory.restock", kernel.Field("product_id", productID.String()), kernel.Field("quantity", quantity))
+
+	item, err := s.repo.FindByProductID(ctx, productID)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := item.Restock(quantity); err != nil {
+		return nil, err
+	}
+
+	if err := s.repo.Save(ctx, item); err != nil {
+		return nil, err
+	}
+
+	return item, nil
+}
+
 func (s *InventoryService) GetStock(ctx context.Context, productID kernel.ID) (*InventoryItem, error) {
 	return s.repo.FindByProductID(ctx, productID)
 }

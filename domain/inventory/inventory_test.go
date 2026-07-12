@@ -145,6 +145,26 @@ func TestIsOutOfStock(t *testing.T) {
 	}
 }
 
+func TestRestock_Success(t *testing.T) {
+	item, _ := NewInventoryItem(1, 101, 50, 10)
+	if err := item.Restock(30); err != nil {
+		t.Fatalf("Restock failed: %v", err)
+	}
+	if item.QuantityAvailable != 80 {
+		t.Errorf("expected quantity 80, got %d", item.QuantityAvailable)
+	}
+}
+
+func TestRestock_Negative(t *testing.T) {
+	item, _ := NewInventoryItem(1, 101, 50, 10)
+	if err := item.Restock(0); err == nil {
+		t.Fatal("expected error for non-positive quantity")
+	}
+	if err := item.Restock(-1); err == nil {
+		t.Fatal("expected error for negative quantity")
+	}
+}
+
 func TestFullFlow(t *testing.T) {
 	item, _ := NewInventoryItem(1, 101, 50, 10)
 

@@ -60,3 +60,12 @@ type StockOutOfStock struct {
 func (e *StockOutOfStock) EventName() string      { return "inventory.stock.out_of_stock" }
 func (e *StockOutOfStock) OccurredAt() time.Time  { return time.Now() }
 func (e *StockOutOfStock) AggregateID() kernel.ID { return e.ProductID }
+
+type StockRestocked struct {
+	ProductID kernel.ID
+	Quantity  int
+}
+
+func (e *StockRestocked) EventName() string      { return "inventory.stock.restocked" }
+func (e *StockRestocked) OccurredAt() time.Time  { return time.Now() }
+func (e *StockRestocked) AggregateID() kernel.ID { return e.ProductID }

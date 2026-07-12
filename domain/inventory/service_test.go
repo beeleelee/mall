@@ -197,6 +197,32 @@ func TestInventoryService_ListLowStock(t *testing.T) {
 	}
 }
 
+func TestInventoryService_Restock(t *testing.T) {
+	repo := newFakeInventoryRepo()
+	logger := fakeLogger{}
+	svc := NewInventoryService(repo, logger)
+
+	_, _ = svc.SetStock(context.Background(), 1, 101, 100, 10)
+	item, err := svc.Restock(context.Background(), 101, 30)
+	if err != nil {
+		t.Fatalf("Restock failed: %v", err)
+	}
+	if item.QuantityAvailable != 130 {
+		t.Errorf("expected quantity 130, got %d", item.QuantityAvailable)
+	}
+}
+
+func TestInventoryService_Restock_NotFound(t *testing.T) {
+	repo := newFakeInventoryRepo()
+	logger := fakeLogger{}
+	svc := NewInventoryService(repo, logger)
+
+	_, err := svc.Restock(context.Background(), 999, 30)
+	if err == nil {
+		t.Fatal("expected error for not found")
+	}
+}
+
 func TestInventoryService_ReleaseAndConfirm(t *testing.T) {
 	repo := newFakeInventoryRepo()
 	logger := fakeLogger{}
