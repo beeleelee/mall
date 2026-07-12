@@ -385,16 +385,6 @@ func addFilter(where []string, args []any, idx *int, column, value string) ([]st
 	return where, args
 }
 
-func addLikeFilter(where []string, args []any, idx *int, column, value string) ([]string, []any) {
-	if value == "" {
-		return where, args
-	}
-	where = append(where, fmt.Sprintf("%s ILIKE '%%' || $%d || '%%'", column, *idx))
-	args = append(args, value)
-	*idx++
-	return where, args
-}
-
 func addIntFilter(where []string, args []any, idx *int, column string, value int64, op string) ([]string, []any) {
 	if value == 0 {
 		return where, args
