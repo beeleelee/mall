@@ -30,6 +30,7 @@ import (
 	domainA2A "github.com/beeleelee/mall/domain/a2a"
 	domainCart "github.com/beeleelee/mall/domain/cart"
 	domainCatalog "github.com/beeleelee/mall/domain/catalog"
+	domainAnalytics "github.com/beeleelee/mall/domain/analytics"
 	domainCheckout "github.com/beeleelee/mall/domain/checkout"
 	domainDiscount "github.com/beeleelee/mall/domain/discount"
 	domainIdentity "github.com/beeleelee/mall/domain/identity"
@@ -40,6 +41,7 @@ import (
 	domainOrder "github.com/beeleelee/mall/domain/order"
 	domainPayment "github.com/beeleelee/mall/domain/payment"
 	infraA2A "github.com/beeleelee/mall/infrastructure/a2a"
+	infraAnalytics "github.com/beeleelee/mall/infrastructure/analytics"
 	infraCart "github.com/beeleelee/mall/infrastructure/cart"
 	infraCatalog "github.com/beeleelee/mall/infrastructure/catalog"
 	infraCheckout "github.com/beeleelee/mall/infrastructure/checkout"
@@ -232,7 +234,9 @@ func main() {
 
 	webhookDLQ := infraOrder.NewPostgresWebhookDeliveryLogRepository(db, sf)
 	categoryRepo := infraCatalog.NewPostgresCategoryRepository(db)
-	adminHandler := rest.NewAdminHandler(catalogSvc, orderSvc, appSvc, inventorySvc, storageSvc, categoryRepo, sf, db, webhookDLQ)
+	analyticsRepo := infraAnalytics.NewPostgresAnalyticsRepository(db)
+	analyticsSvc := domainAnalytics.NewAnalyticsService(analyticsRepo)
+	adminHandler := rest.NewAdminHandler(catalogSvc, orderSvc, appSvc, inventorySvc, storageSvc, categoryRepo, analyticsSvc, sf, db, webhookDLQ)
 	adminMW := middleware.AdminMiddleware(userRepo)
 
 	a2aTaskRepo := infraA2A.NewPostgresTaskRepository(db)
@@ -758,6 +762,32 @@ func main() {
 		Method:  http.MethodPost,
 		Path:    "/api/v1/admin/webhooks/retry/:id",
 		Handler: adminAuth(adminHandler.RetryDelivery),
+	})
+
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodGet,
+		Path:    "/api/v1/admin/dashboard",
+		Handler: adminAuth(adminHandler.Dashboard),
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodGet,
+		Path:    "/api/v1/admin/analytics/revenue",
+		Handler: adminAuth(adminHandler.RevenueAnalytics),
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodGet,
+		Path:    "/api/v1/admin/analytics/orders",
+		Handler: adminAuth(adminHandler.OrderAnalytics),
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodGet,
+		Path:    "/api/v1/admin/analytics/users",
+		Handler: adminAuth(adminHandler.UserAnalytics),
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodGet,
+		Path:    "/api/v1/admin/analytics/products",
+		Handler: adminAuth(adminHandler.ProductAnalytics),
 	})
 
 	type sagaRoute struct {
