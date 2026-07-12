@@ -145,10 +145,10 @@ func (h *AdminHandler) ProductAnalytics(w http.ResponseWriter, r *http.Request) 
 	}
 
 	resp := map[string]any{
-		"top_sellers":        topSellers,
-		"by_category":        byCategory,
-		"zero_order_count":   zeroOrderCount,
-		"inventory_summary":  inventorySummary,
+		"top_sellers":       topSellers,
+		"by_category":       byCategory,
+		"zero_order_count":  zeroOrderCount,
+		"inventory_summary": inventorySummary,
 	}
 
 	w.Header().Set("Content-Type", "application/json")

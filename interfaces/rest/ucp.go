@@ -330,11 +330,11 @@ func DefaultProfile() *Profile {
 					REST: &RESTBinding{
 						BaseURL: "/api/v1/admin",
 						Endpoints: map[string]string{
-							"dashboard":          "GET /dashboard",
-							"revenue_analytics":  "GET /analytics/revenue",
-							"order_analytics":    "GET /analytics/orders",
-							"user_analytics":     "GET /analytics/users",
-							"product_analytics":  "GET /analytics/products",
+							"dashboard":         "GET /dashboard",
+							"revenue_analytics": "GET /analytics/revenue",
+							"order_analytics":   "GET /analytics/orders",
+							"user_analytics":    "GET /analytics/users",
+							"product_analytics": "GET /analytics/products",
 						},
 					},
 				},
