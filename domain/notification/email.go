@@ -9,10 +9,10 @@ import (
 type EmailAddress string
 
 type EmailMessage struct {
-	To         EmailAddress
-	Subject    string
-	PlainBody  string
-	HTMLBody   string
+	To        EmailAddress
+	Subject   string
+	PlainBody string
+	HTMLBody  string
 }
 
 type EmailSender interface {

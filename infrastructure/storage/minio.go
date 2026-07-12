@@ -12,9 +12,9 @@ import (
 )
 
 type MinIOStorage struct {
-	client *minio.Client
-	bucket string
-	prefix string
+	client   *minio.Client
+	bucket   string
+	prefix   string
 	endpoint string
 	useSSL   bool
 }

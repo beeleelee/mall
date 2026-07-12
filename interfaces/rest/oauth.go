@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"net/http"
 
-
 	app "github.com/beeleelee/mall/application/oauth"
 	"github.com/beeleelee/mall/domain/kernel"
 )

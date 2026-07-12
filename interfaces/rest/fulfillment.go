@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"net/http"
 
-
 	domain "github.com/beeleelee/mall/domain/fulfillment"
 )
 

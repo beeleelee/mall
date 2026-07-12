@@ -8,8 +8,8 @@ import (
 	"github.com/nats-io/nats.go/jetstream"
 
 	domainidentity "github.com/beeleelee/mall/domain/identity"
-	domainnotification "github.com/beeleelee/mall/domain/notification"
 	"github.com/beeleelee/mall/domain/kernel"
+	domainnotification "github.com/beeleelee/mall/domain/notification"
 	"github.com/beeleelee/mall/infrastructure/tracing"
 )
 
