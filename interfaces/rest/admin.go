@@ -589,7 +589,7 @@ func (h *AdminHandler) RetryDelivery(w http.ResponseWriter, r *http.Request) {
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
-		h.deliveryLogRepo.Save(r.Context(), &orderdomain.DeliveryLogEntry{
+		_ = h.deliveryLogRepo.Save(r.Context(), &orderdomain.DeliveryLogEntry{
 			ID:        logID,
 			WebhookID: webhookID,
 			Event:     eventStr,
@@ -604,13 +604,13 @@ func (h *AdminHandler) RetryDelivery(w http.ResponseWriter, r *http.Request) {
 	resp.Body.Close()
 
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-		h.deliveryLogRepo.MarkRetried(r.Context(), logID)
+		_ = h.deliveryLogRepo.MarkRetried(r.Context(), logID)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(map[string]string{"status": "retried"})
 	} else {
 		errMsg := fmt.Sprintf("webhook returned status %d", resp.StatusCode)
-		h.deliveryLogRepo.Save(r.Context(), &orderdomain.DeliveryLogEntry{
+		_ = h.deliveryLogRepo.Save(r.Context(), &orderdomain.DeliveryLogEntry{
 			ID:        logID,
 			WebhookID: webhookID,
 			Event:     eventStr,

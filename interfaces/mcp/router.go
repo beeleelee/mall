@@ -181,7 +181,7 @@ func (r *MCPRouter) handleSSE(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
 
-	fmt.Fprintf(w, "event: session_id\ndata: %s\n\n", sessionID)
+	_, _ = fmt.Fprintf(w, "event: session_id\ndata: %s\n\n", sessionID)
 	flusher.Flush()
 
 	ctx := req.Context()
@@ -197,7 +197,7 @@ func (r *MCPRouter) handleSSE(w http.ResponseWriter, req *http.Request) {
 			if !ok {
 				return
 			}
-			fmt.Fprintf(w, "data: %s\n\n", data)
+			_, _ = fmt.Fprintf(w, "data: %s\n\n", data)
 			flusher.Flush()
 		}
 	}

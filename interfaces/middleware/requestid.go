@@ -12,7 +12,7 @@ func RequestIDMiddleware(next http.Handler) http.Handler {
 		id := r.Header.Get("X-Request-Id")
 		if id == "" {
 			raw := make([]byte, 8)
-			rand.Read(raw)
+			_, _ = rand.Read(raw)
 			id = hex.EncodeToString(raw)
 		}
 		w.Header().Set("X-Request-Id", id)

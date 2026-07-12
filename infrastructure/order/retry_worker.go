@@ -65,7 +65,9 @@ func (w *WebhookRetryWorker) runOnce(ctx context.Context) {
 			continue
 		}
 		if !wh.Active {
-			w.logRepo.MarkRetried(ctx, entry.ID)
+			if err := w.logRepo.MarkRetried(ctx, entry.ID); err != nil {
+				log.Printf("webhook retry worker: mark retried %d: %v", entry.ID, err)
+			}
 			continue
 		}
 

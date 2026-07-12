@@ -267,7 +267,7 @@ func main() {
 			ctx := tracing.ExtractFromJetStream(msg)
 			if err := dtmSaga.Handle(ctx, msg.Data()); err != nil {
 				log.Printf("dtm-saga: handle failed: %v", err)
-				msg.Nak()
+				_ = msg.Nak()
 				return
 			}
 			msg.Ack()

@@ -335,7 +335,7 @@ func (d *WebhookDeliverer) Deliver(ctx context.Context, webhook *domain.Webhook,
 				logEntry.Attempts = i + 1
 				logEntry.Status = "failed"
 				logEntry.Error = err.Error()
-				d.logRepo.Save(ctx, logEntry)
+				_ = d.logRepo.Save(ctx, logEntry)
 			}
 			if i < maxRetries-1 {
 				backoff := time.Duration(math.Pow(2, float64(i))) * time.Second
@@ -354,7 +354,7 @@ func (d *WebhookDeliverer) Deliver(ctx context.Context, webhook *domain.Webhook,
 				logEntry.Attempts = i + 1
 				logEntry.Status = "delivered"
 				logEntry.Error = ""
-				d.logRepo.Save(ctx, logEntry)
+				_ = d.logRepo.Save(ctx, logEntry)
 			}
 			return nil
 		}
@@ -364,7 +364,7 @@ func (d *WebhookDeliverer) Deliver(ctx context.Context, webhook *domain.Webhook,
 			logEntry.Attempts = i + 1
 			logEntry.Status = "failed"
 			logEntry.Error = fmt.Sprintf("webhook returned status %d", resp.StatusCode)
-			d.logRepo.Save(ctx, logEntry)
+			_ = d.logRepo.Save(ctx, logEntry)
 		}
 		if i < maxRetries-1 {
 			backoff := time.Duration(math.Pow(2, float64(i))) * time.Second
@@ -379,7 +379,7 @@ func (d *WebhookDeliverer) Deliver(ctx context.Context, webhook *domain.Webhook,
 	if d.logRepo != nil && logEntry != nil {
 		nextRetry := time.Now().Add(30 * time.Second)
 		logEntry.NextRetry = &nextRetry
-		d.logRepo.Save(ctx, logEntry)
+		_ = d.logRepo.Save(ctx, logEntry)
 	}
 
 	return kernel.NewDomainErrorWithCause(kernel.ErrUnavailable, "webhook delivery failed after 3 retries", lastErr)
