@@ -82,7 +82,11 @@ func (f *fakeCatalogRepo) Search(_ context.Context, query string, opts domain.Se
 
 	var filtered []*domain.Product
 	for _, p := range f.products {
-		if query != "" && !matchQueryREST(p, query) {
+		q := query
+		if q == "" {
+			q = opts.FulltextQuery
+		}
+		if q != "" && !matchQueryREST(p, q) {
 			continue
 		}
 		if opts.Category != "" && p.Category != opts.Category {

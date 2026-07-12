@@ -75,7 +75,7 @@ func (h *CatalogHandler) Search(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	result, err := h.svc.Search(r.Context(), "", opts)
+	result, err := h.svc.Search(r.Context(), opts.FulltextQuery, opts)
 	if err != nil {
 		writeDomainError(w, err)
 		return

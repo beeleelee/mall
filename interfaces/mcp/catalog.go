@@ -103,7 +103,7 @@ func (h *CatalogMCPHandler) callSearch(ctx context.Context, raw json.RawMessage)
 		opts.MaxPrice = *args.MaxPrice
 	}
 
-	result, err := h.svc.Search(ctx, "", opts)
+	result, err := h.svc.Search(ctx, opts.FulltextQuery, opts)
 	if err != nil {
 		return nil, err
 	}
