@@ -144,6 +144,24 @@ func (s *PaymentService) SettleMandate(ctx context.Context, id kernel.ID) (*Mand
 	return m, nil
 }
 
+func (s *PaymentService) RefundMandate(ctx context.Context, id kernel.ID, amount int64) (*Mandate, error) {
+	m, err := s.repo.FindByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := m.Refund(amount); err != nil {
+		return nil, err
+	}
+
+	if err := s.repo.Save(ctx, m); err != nil {
+		return nil, err
+	}
+
+	s.logger.Info(ctx, "mandate.refunded", kernel.Field("mandate_id", m.ID.String()), kernel.Field("amount", amount))
+	return m, nil
+}
+
 func (s *PaymentService) CancelMandate(ctx context.Context, id kernel.ID) (*Mandate, error) {
 	m, err := s.repo.FindByID(ctx, id)
 	if err != nil {

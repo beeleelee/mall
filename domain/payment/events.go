@@ -53,3 +53,13 @@ type MandateCancelledEvent struct {
 func (e MandateCancelledEvent) EventName() string      { return "payment.mandate.cancelled" }
 func (e MandateCancelledEvent) OccurredAt() time.Time  { return time.Now() }
 func (e MandateCancelledEvent) AggregateID() kernel.ID { return e.MandateID }
+
+type MandateRefundedEvent struct {
+	MandateID kernel.ID
+	UserID    kernel.ID
+	Amount    int64
+}
+
+func (e MandateRefundedEvent) EventName() string      { return "payment.mandate.refunded" }
+func (e MandateRefundedEvent) OccurredAt() time.Time  { return time.Now() }
+func (e MandateRefundedEvent) AggregateID() kernel.ID { return e.MandateID }

@@ -13,6 +13,7 @@ const (
 	MandateStatusApproved  MandateStatus = "approved"
 	MandateStatusExecuted  MandateStatus = "executed"
 	MandateStatusSettled   MandateStatus = "settled"
+	MandateStatusRefunded  MandateStatus = "refunded"
 	MandateStatusCancelled MandateStatus = "cancelled"
 	MandateStatusExpired   MandateStatus = "expired"
 )
@@ -107,6 +108,25 @@ func (m *Mandate) Settle() error {
 	m.AddEvent(MandateSettledEvent{
 		MandateID: m.ID,
 		UserID:    m.UserID,
+	})
+	return nil
+}
+
+func (m *Mandate) Refund(amount int64) error {
+	if m.Status != MandateStatusSettled {
+		return kernel.NewDomainError(kernel.ErrInvalidArgument, "can only refund settled mandates")
+	}
+	if amount <= 0 {
+		return kernel.NewDomainError(kernel.ErrInvalidArgument, "refund amount must be positive")
+	}
+	if amount > m.Scope.MaxAmount {
+		return kernel.NewDomainError(kernel.ErrInvalidArgument, "refund amount exceeds mandate max amount")
+	}
+	m.Status = MandateStatusRefunded
+	m.AddEvent(MandateRefundedEvent{
+		MandateID: m.ID,
+		UserID:    m.UserID,
+		Amount:    amount,
 	})
 	return nil
 }

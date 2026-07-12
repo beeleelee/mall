@@ -165,6 +165,67 @@ func TestPaymentService_ExchangeWalletToken_ValidatorFailure(t *testing.T) {
 	}
 }
 
+func TestPaymentService_RefundMandate_Success(t *testing.T) {
+	repo := newFakeMandateRepo()
+	svc := NewPaymentService(repo, fakeLogger{})
+
+	scope := MandateScope{
+		MaxAmount:  10000,
+		MerchantID: 1,
+		Expiry:     time.Now().Add(24 * time.Hour),
+	}
+	svc.RequestMandate(context.Background(), 1, 42, scope)
+	svc.ApproveMandate(context.Background(), 1, "sig")
+	svc.ExecuteMandate(context.Background(), 1, "tok-1")
+	svc.SettleMandate(context.Background(), 1)
+
+	m, err := svc.RefundMandate(context.Background(), 1, 5000)
+	if err != nil {
+		t.Fatalf("RefundMandate: %v", err)
+	}
+	if m.Status != MandateStatusRefunded {
+		t.Fatalf("expected refunded, got %s", m.Status)
+	}
+}
+
+func TestPaymentService_RefundMandate_NotSettled(t *testing.T) {
+	repo := newFakeMandateRepo()
+	svc := NewPaymentService(repo, fakeLogger{})
+
+	scope := MandateScope{
+		MaxAmount:  10000,
+		MerchantID: 1,
+		Expiry:     time.Now().Add(24 * time.Hour),
+	}
+	svc.RequestMandate(context.Background(), 1, 42, scope)
+	svc.ApproveMandate(context.Background(), 1, "sig")
+
+	_, err := svc.RefundMandate(context.Background(), 1, 5000)
+	if err == nil {
+		t.Fatal("expected error for non-settled mandate")
+	}
+}
+
+func TestPaymentService_RefundMandate_ExceedsAmount(t *testing.T) {
+	repo := newFakeMandateRepo()
+	svc := NewPaymentService(repo, fakeLogger{})
+
+	scope := MandateScope{
+		MaxAmount:  10000,
+		MerchantID: 1,
+		Expiry:     time.Now().Add(24 * time.Hour),
+	}
+	svc.RequestMandate(context.Background(), 1, 42, scope)
+	svc.ApproveMandate(context.Background(), 1, "sig")
+	svc.ExecuteMandate(context.Background(), 1, "tok-1")
+	svc.SettleMandate(context.Background(), 1)
+
+	_, err := svc.RefundMandate(context.Background(), 1, 99999)
+	if err == nil {
+		t.Fatal("expected error for exceeding max amount")
+	}
+}
+
 func TestPaymentService_ListUserMandates(t *testing.T) {
 	repo := newFakeMandateRepo()
 	svc := NewPaymentService(repo, fakeLogger{})
