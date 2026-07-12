@@ -32,9 +32,10 @@ type AdminHandler struct {
 	sf              *kernel.Snowflake
 	db              *sqlx.DB
 	deliveryLogRepo orderdomain.DeliveryLogRepository
+	refundSvc       *orderdomain.RefundService
 }
 
-func NewAdminHandler(catalogSvc *catalogdomain.CatalogService, orderSvc *orderdomain.OrderService, identitySvc *appidentity.IdentityAppService, inventorySvc *inventorydomain.InventoryService, storageSvc kernel.StorageService, categoryRepo catalogdomain.CategoryRepository, analyticsSvc *analytics.AnalyticsService, sf *kernel.Snowflake, db *sqlx.DB, deliveryLogRepo orderdomain.DeliveryLogRepository) *AdminHandler {
+func NewAdminHandler(catalogSvc *catalogdomain.CatalogService, orderSvc *orderdomain.OrderService, identitySvc *appidentity.IdentityAppService, inventorySvc *inventorydomain.InventoryService, storageSvc kernel.StorageService, categoryRepo catalogdomain.CategoryRepository, analyticsSvc *analytics.AnalyticsService, sf *kernel.Snowflake, db *sqlx.DB, deliveryLogRepo orderdomain.DeliveryLogRepository, refundSvc *orderdomain.RefundService) *AdminHandler {
 	return &AdminHandler{
 		catalogSvc:      catalogSvc,
 		orderSvc:        orderSvc,
@@ -46,6 +47,7 @@ func NewAdminHandler(catalogSvc *catalogdomain.CatalogService, orderSvc *orderdo
 		sf:              sf,
 		db:              db,
 		deliveryLogRepo: deliveryLogRepo,
+		refundSvc:       refundSvc,
 	}
 }
 

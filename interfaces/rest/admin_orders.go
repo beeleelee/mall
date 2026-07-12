@@ -106,4 +106,47 @@ func (h *AdminHandler) CancelOrder(w http.ResponseWriter, r *http.Request) {
 	writeOrderResponse(w, http.StatusOK, order)
 }
 
+type processRefundRequest struct {
+	MandateID int64  `json:"mandate_id,omitempty"`
+	Reason    string `json:"reason"`
+}
+
+func (h *AdminHandler) ProcessRefund(w http.ResponseWriter, r *http.Request) {
+	vars := pathvar.Vars(r)
+	idStr := vars["id"]
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		writeDomainError(w, kernel.NewDomainError(kernel.ErrInvalidArgument, "invalid order id"))
+		return
+	}
+
+	var req processRefundRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeDomainError(w, err)
+		return
+	}
+
+	order, err := h.orderSvc.ReturnOrder(r.Context(), kernel.ID(id))
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+
+	refundID, err := h.sf.NextID()
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+
+	refund, err := h.refundSvc.ProcessRefund(r.Context(), refundID, order, kernel.ID(req.MandateID), req.Reason)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(refund)
+}
+
 

@@ -236,7 +236,9 @@ func main() {
 	categoryRepo := infraCatalog.NewPostgresCategoryRepository(db)
 	analyticsRepo := infraAnalytics.NewPostgresAnalyticsRepository(db)
 	analyticsSvc := domainAnalytics.NewAnalyticsService(analyticsRepo)
-	adminHandler := rest.NewAdminHandler(catalogSvc, orderSvc, appSvc, inventorySvc, storageSvc, categoryRepo, analyticsSvc, sf, db, webhookDLQ)
+	refundRepo := infraOrder.NewPostgresRefundRepository(db)
+	refundSvc := domainOrder.NewRefundService(refundRepo, paymentSvc, inventorySvc, orderSvc, logger)
+	adminHandler := rest.NewAdminHandler(catalogSvc, orderSvc, appSvc, inventorySvc, storageSvc, categoryRepo, analyticsSvc, sf, db, webhookDLQ, refundSvc)
 	adminMW := middleware.AdminMiddleware(userRepo)
 
 	a2aTaskRepo := infraA2A.NewPostgresTaskRepository(db)
@@ -814,6 +816,11 @@ func main() {
 		Method:  http.MethodPost,
 		Path:    "/api/v1/admin/orders/:id/cancel",
 		Handler: adminAuth(adminHandler.CancelOrder),
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPost,
+		Path:    "/api/v1/admin/orders/:id/refund",
+		Handler: adminAuth(adminHandler.ProcessRefund),
 	})
 
 	type sagaRoute struct {
