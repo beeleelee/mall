@@ -59,3 +59,33 @@ type OrderCancelledEvent struct {
 func (e OrderCancelledEvent) EventName() string      { return "order.cancelled" }
 func (e OrderCancelledEvent) OccurredAt() time.Time  { return time.Now() }
 func (e OrderCancelledEvent) AggregateID() kernel.ID { return e.OrderID }
+
+type RefundInitiatedEvent struct {
+	RefundID kernel.ID
+	OrderID  kernel.ID
+	Amount   int64
+}
+
+func (e RefundInitiatedEvent) EventName() string      { return "order.refund.initiated" }
+func (e RefundInitiatedEvent) OccurredAt() time.Time  { return time.Now() }
+func (e RefundInitiatedEvent) AggregateID() kernel.ID { return e.RefundID }
+
+type RefundProcessedEvent struct {
+	RefundID kernel.ID
+	OrderID  kernel.ID
+	Amount   int64
+}
+
+func (e RefundProcessedEvent) EventName() string      { return "order.refund.processed" }
+func (e RefundProcessedEvent) OccurredAt() time.Time  { return time.Now() }
+func (e RefundProcessedEvent) AggregateID() kernel.ID { return e.RefundID }
+
+type RefundFailedEvent struct {
+	RefundID kernel.ID
+	OrderID  kernel.ID
+	Reason   string
+}
+
+func (e RefundFailedEvent) EventName() string      { return "order.refund.failed" }
+func (e RefundFailedEvent) OccurredAt() time.Time  { return time.Now() }
+func (e RefundFailedEvent) AggregateID() kernel.ID { return e.RefundID }
