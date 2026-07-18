@@ -17,13 +17,25 @@ type MandateVerifier interface {
 	VerifyAndExecuteWithToken(ctx context.Context, mandateID, userID kernel.ID, amount int64, token, provider string) error
 }
 
+type StripeResult struct {
+	ContinueURL  string
+	ClientSecret string
+}
+
+type StripePaymentProcessor interface {
+	CreateCheckoutSession(ctx context.Context, checkout *CheckoutSession) (stripeURL, sessionID string, err error)
+	CreatePaymentIntent(ctx context.Context, checkoutID kernel.ID, amount int64) (clientSecret, intentID string, err error)
+	GetPaymentIntentStatus(ctx context.Context, paymentIntentID string) (status string, err error)
+}
+
 type CheckoutService struct {
-	repo            CheckoutRepository
-	taxSvc          TaxService
-	priceCalc       PriceCalculator
-	publisher       CheckoutEventPublisher
-	logger          kernel.Logger
-	mandateVerifier MandateVerifier
+	repo              CheckoutRepository
+	taxSvc            TaxService
+	priceCalc         PriceCalculator
+	publisher         CheckoutEventPublisher
+	logger            kernel.Logger
+	mandateVerifier   MandateVerifier
+	stripeProcessor   StripePaymentProcessor
 }
 
 func NewCheckoutService(
@@ -33,6 +45,7 @@ func NewCheckoutService(
 	publisher CheckoutEventPublisher,
 	logger kernel.Logger,
 	mandateVerifier MandateVerifier,
+	stripeProcessor StripePaymentProcessor,
 ) *CheckoutService {
 	return &CheckoutService{
 		repo:            repo,
@@ -41,6 +54,7 @@ func NewCheckoutService(
 		publisher:       publisher,
 		logger:          logger,
 		mandateVerifier: mandateVerifier,
+		stripeProcessor: stripeProcessor,
 	}
 }
 
@@ -294,6 +308,38 @@ func (s *CheckoutService) StartComplete(ctx context.Context, id kernel.ID, conti
 		return session, true, nil
 	}
 
+	// Stripe Checkout mode (no PI yet): create Checkout Session, escalate
+	if session.PaymentHandler == "stripe" && s.stripeProcessor != nil && session.StripePaymentIntentID == "" {
+		stripeURL, stripeSessionID, err := s.stripeProcessor.CreateCheckoutSession(ctx, session)
+		if err != nil {
+			return nil, false, err
+		}
+		if err := session.SetStripeSessionID(stripeSessionID); err != nil {
+			return nil, false, err
+		}
+		if err := session.Escalate(stripeURL); err != nil {
+			return nil, false, err
+		}
+		if err := s.repo.Save(ctx, session); err != nil {
+			return nil, false, err
+		}
+		s.publishEvents(ctx, session)
+		s.logger.Info(ctx, "checkout.stripe_escalated", kernel.Field("checkout_id", session.ID.String()), kernel.Field("stripe_session_id", stripeSessionID))
+		return session, true, nil
+	}
+
+	// Stripe PI mode: verify PaymentIntent succeeded
+	if session.PaymentHandler == "stripe" && s.stripeProcessor != nil && session.StripePaymentIntentID != "" {
+		status, err := s.stripeProcessor.GetPaymentIntentStatus(ctx, session.StripePaymentIntentID)
+		if err != nil {
+			return nil, false, err
+		}
+		if status != "succeeded" {
+			return nil, false, kernel.NewDomainError(kernel.ErrInvalidArgument, "stripe payment intent not succeeded, status: "+status)
+		}
+		session.SetStripePaymentStatus(status)
+	}
+
 	if session.PaymentHandler == "ap2_mandate" && s.mandateVerifier != nil && session.MandateID > 0 {
 		if err := s.verifyMandate(ctx, session); err != nil {
 			return nil, false, err
@@ -332,6 +378,17 @@ func (s *CheckoutService) Complete(ctx context.Context, id kernel.ID) (*Checkout
 		}
 	}
 
+	if session.PaymentHandler == "stripe" && s.stripeProcessor != nil && session.StripePaymentIntentID != "" {
+		status, err := s.stripeProcessor.GetPaymentIntentStatus(ctx, session.StripePaymentIntentID)
+		if err != nil {
+			return nil, err
+		}
+		if status != "succeeded" {
+			return nil, kernel.NewDomainError(kernel.ErrInvalidArgument, "stripe payment intent not succeeded, status: "+status)
+		}
+		session.SetStripePaymentStatus(status)
+	}
+
 	if err := session.Complete(); err != nil {
 		return nil, err
 	}
@@ -366,6 +423,75 @@ func (s *CheckoutService) Cancel(ctx context.Context, id kernel.ID) (*CheckoutSe
 
 	s.publishEvents(ctx, session)
 	return session, nil
+}
+
+func (s *CheckoutService) ConfirmStripePayment(ctx context.Context, id kernel.ID, stripeSessionID string) (*CheckoutSession, error) {
+	ctx, span := tracer.Start(ctx, "checkout.confirm_stripe",
+		trace.WithAttributes(attribute.Int64("checkout_id", id.Int64())),
+	)
+	defer span.End()
+
+	session, err := s.repo.FindByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	if session.StripeSessionID != stripeSessionID {
+		return nil, kernel.NewDomainError(kernel.ErrInvalidArgument, "stripe session id mismatch")
+	}
+
+	if session.Status != CheckoutStatusRequiresEscalation {
+		return nil, kernel.NewDomainError(kernel.ErrInvalidArgument, "cannot confirm stripe payment in current state: "+string(session.Status))
+	}
+
+	if err := session.MarkReady(); err != nil {
+		return nil, err
+	}
+	if err := session.Complete(); err != nil {
+		return nil, err
+	}
+
+	if err := s.repo.Save(ctx, session); err != nil {
+		return nil, err
+	}
+	s.publishEvents(ctx, session)
+	s.logger.Info(ctx, "checkout.stripe_confirmed", kernel.Field("checkout_id", session.ID.String()), kernel.Field("stripe_session_id", stripeSessionID))
+	return session, nil
+}
+
+func (s *CheckoutService) CreateStripePaymentIntent(ctx context.Context, id kernel.ID) (string, string, error) {
+	session, err := s.repo.FindByID(ctx, id)
+	if err != nil {
+		return "", "", err
+	}
+
+	if session.Status != CheckoutStatusIncomplete {
+		return "", "", kernel.NewDomainError(kernel.ErrInvalidArgument, "cannot create payment intent in current state: "+string(session.Status))
+	}
+
+	if session.PaymentHandler != "stripe" {
+		return "", "", kernel.NewDomainError(kernel.ErrInvalidArgument, "payment handler must be stripe")
+	}
+
+	if s.stripeProcessor == nil {
+		return "", "", kernel.NewDomainError(kernel.ErrInternal, "stripe processor not configured")
+	}
+
+	clientSecret, intentID, err := s.stripeProcessor.CreatePaymentIntent(ctx, session.ID, session.GrandTotal)
+	if err != nil {
+		return "", "", err
+	}
+
+	if err := session.SetStripePaymentIntentID(intentID); err != nil {
+		return "", "", err
+	}
+
+	if err := s.repo.Save(ctx, session); err != nil {
+		return "", "", err
+	}
+
+	s.logger.Info(ctx, "checkout.stripe_pi_created", kernel.Field("checkout_id", session.ID.String()), kernel.Field("payment_intent_id", intentID))
+	return clientSecret, intentID, nil
 }
 
 func (s *CheckoutService) verifyMandate(ctx context.Context, session *CheckoutSession) error {
