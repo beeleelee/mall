@@ -448,6 +448,62 @@ func (h *CheckoutHandler) Complete(w http.ResponseWriter, r *http.Request) {
 	writeCheckoutResponse(w, http.StatusOK, session)
 }
 
+type createPaymentIntentResponse struct {
+	ClientSecret string `json:"client_secret"`
+	IntentID     string `json:"intent_id"`
+	Amount       int64  `json:"amount"`
+}
+
+func (h *CheckoutHandler) CreateStripePaymentIntent(w http.ResponseWriter, r *http.Request) {
+	userID, err := userIDFromContext(r)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+
+	vars := pathvar.Vars(r)
+	idStr := vars["id"]
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		writeDomainError(w, kernel.NewDomainError(kernel.ErrInvalidArgument, "invalid checkout id"))
+		return
+	}
+
+	session, err := h.svc.GetCheckout(r.Context(), kernel.ID(id))
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+	if session.UserID != userID {
+		writeDomainError(w, kernel.NewDomainError(kernel.ErrPermissionDenied, "checkout does not belong to user"))
+		return
+	}
+
+	clientSecret, intentID, err := h.svc.CreateStripePaymentIntent(r.Context(), kernel.ID(id))
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(createPaymentIntentResponse{
+		ClientSecret: clientSecret,
+		IntentID:     intentID,
+		Amount:       session.GrandTotal,
+	})
+}
+
+func (h *CheckoutHandler) CheckoutSuccess(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "payment_completed", "message": "payment completed successfully"})
+}
+
+func (h *CheckoutHandler) CheckoutCancel(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "payment_cancelled", "message": "payment was cancelled"})
+}
+
 func (h *CheckoutHandler) Cancel(w http.ResponseWriter, r *http.Request) {
 	userID, err := userIDFromContext(r)
 	if err != nil {
