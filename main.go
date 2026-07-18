@@ -184,7 +184,15 @@ func main() {
 	sagaSecret := envOrDefault("SAGA_SECRET", "")
 	mandateSaga := appPayment.NewDTMMandateSaga(dtmServer, callbackURL, logger, sagaSecret)
 	mandateVerifier := infraCheckout.NewCheckoutMandateVerifier(paymentSvc, mandateSaga, tokenValidator)
-	checkoutSvc := domainCheckout.NewCheckoutService(checkoutRepo, defaultTaxSvc, defaultPriceCalc, checkoutPub, logger, mandateVerifier)
+	stripeCfg := infraPayment.StripeConfigFromEnv()
+	var stripeProcessor domainCheckout.StripePaymentProcessor
+	if stripeCfg.IsEnabled() {
+		stripeClient := infraPayment.NewStripeClient(stripeCfg)
+		stripeCheckoutHandler := infraPayment.NewStripeCheckoutHandler(stripeClient)
+		stripeIntentHandler := infraPayment.NewStripePaymentIntentHandler(stripeClient)
+		stripeProcessor = infraCheckout.NewStripeProcessor(stripeCheckoutHandler, stripeIntentHandler)
+	}
+	checkoutSvc := domainCheckout.NewCheckoutService(checkoutRepo, defaultTaxSvc, defaultPriceCalc, checkoutPub, logger, mandateVerifier, stripeProcessor)
 	checkoutHandler := rest.NewCheckoutHandler(checkoutSvc, sf)
 	checkoutWSHandler := rest.NewCheckoutWSHandler(checkoutSvc, logger)
 
@@ -548,6 +556,24 @@ func main() {
 	})
 
 	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPost,
+		Path:    "/api/v1/checkouts/:id/stripe/payment-intent",
+		Handler: cb(checkoutCB, auth(http.HandlerFunc(checkoutHandler.CreateStripePaymentIntent)).ServeHTTP),
+	})
+
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodGet,
+		Path:    "/api/v1/checkouts/:id/success",
+		Handler: checkoutHandler.CheckoutSuccess,
+	})
+
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodGet,
+		Path:    "/api/v1/checkouts/:id/cancel",
+		Handler: checkoutHandler.CheckoutCancel,
+	})
+
+	srv.AddRoute(gozerorest.Route{
 		Method:  http.MethodGet,
 		Path:    "/ws/checkout/:id",
 		Handler: cb(checkoutCB, auth(http.HandlerFunc(checkoutWSHandler.ServeWS)).ServeHTTP),
@@ -604,6 +630,15 @@ func main() {
 		Path:    "/api/v1/webhooks/:id",
 		Handler: auth(http.HandlerFunc(webhookHandler.Delete)).ServeHTTP,
 	})
+
+	if stripeCfg.IsEnabled() {
+		stripeWebhookHandler := rest.NewStripeWebhookHandler(checkoutSvc, stripeCfg.WebhookSecret)
+		srv.AddRoute(gozerorest.Route{
+			Method:  http.MethodPost,
+			Path:    "/api/v1/stripe/webhook",
+			Handler: stripeWebhookHandler.HandleWebhook,
+		})
+	}
 
 	srv.AddRoute(gozerorest.Route{
 		Method:  http.MethodPost,
