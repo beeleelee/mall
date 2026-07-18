@@ -63,6 +63,7 @@ require (
 	github.com/prometheus/procfs v0.16.1 // indirect
 	github.com/rs/xid v1.6.0 // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
+	github.com/stripe/stripe-go/v74 v74.30.0 // indirect
 	github.com/tinylib/msgp v1.6.1 // indirect
 	github.com/titanous/json5 v1.0.0 // indirect
 	github.com/xdg-go/pbkdf2 v1.0.0 // indirect
