@@ -46,6 +46,15 @@ func (f *fakeCheckoutRepo) FindByUserID(_ context.Context, userID kernel.ID) (*d
 	return nil, kernel.NewDomainError(kernel.ErrNotFound, "checkout not found")
 }
 
+func (f *fakeCheckoutRepo) FindByStripeSessionID(_ context.Context, stripeSessionID string) (*domain.CheckoutSession, error) {
+	for _, s := range f.sessions {
+		if s.StripeSessionID == stripeSessionID {
+			return s, nil
+		}
+	}
+	return nil, kernel.NewDomainError(kernel.ErrNotFound, "checkout not found")
+}
+
 func (f *fakeCheckoutRepo) Delete(_ context.Context, id kernel.ID) error {
 	delete(f.sessions, id)
 	return nil
@@ -85,7 +94,7 @@ func newTestCheckoutHandler(t *testing.T) *CheckoutHandler {
 	logger := fakeLog{}
 	taxSvc := fakeTaxService{}
 	priceCalc := fakePriceCalculator{}
-	svc := domain.NewCheckoutService(repo, taxSvc, priceCalc, pub, logger, nil)
+	svc := domain.NewCheckoutService(repo, taxSvc, priceCalc, pub, logger, nil, nil)
 	sf, err := kernel.NewSnowflake(1)
 	if err != nil {
 		t.Fatalf("NewSnowflake failed: %v", err)

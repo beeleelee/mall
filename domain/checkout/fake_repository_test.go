@@ -52,6 +52,17 @@ func (f *fakeCheckoutRepo) FindByUserID(_ context.Context, userID kernel.ID) (*C
 	return s, nil
 }
 
+func (f *fakeCheckoutRepo) FindByStripeSessionID(_ context.Context, stripeSessionID string) (*CheckoutSession, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for _, s := range f.sessions {
+		if s.StripeSessionID == stripeSessionID {
+			return s, nil
+		}
+	}
+	return nil, kernel.NewDomainError(kernel.ErrNotFound, "checkout session not found")
+}
+
 func (f *fakeCheckoutRepo) Delete(_ context.Context, id kernel.ID) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()

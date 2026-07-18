@@ -168,6 +168,14 @@ func (f *fakeCheckoutRepo) FindByUserID(_ context.Context, uid kernel.ID) (*doma
 	}
 	return f.sessions[cid], nil
 }
+func (f *fakeCheckoutRepo) FindByStripeSessionID(_ context.Context, stripeSessionID string) (*domainCheckout.CheckoutSession, error) {
+	for _, s := range f.sessions {
+		if s.StripeSessionID == stripeSessionID {
+			return s, nil
+		}
+	}
+	return nil, kernel.NewDomainError(kernel.ErrNotFound, "not found")
+}
 func (f *fakeCheckoutRepo) Delete(_ context.Context, _ kernel.ID) error { return nil }
 
 type fakeCheckoutPub struct{}
@@ -431,7 +439,7 @@ func TestMCP_CheckoutTools(t *testing.T) {
 	sf, _ := kernel.NewSnowflake(1)
 	repo := newFakeCheckoutRepo()
 	svc := domainCheckout.NewCheckoutService(
-		repo, fakeTaxSvc{}, fakePriceCalc{}, fakeCheckoutPub{}, fakeLoggerMCP{}, fakeMandateVerifier{},
+		repo, fakeTaxSvc{}, fakePriceCalc{}, fakeCheckoutPub{}, fakeLoggerMCP{}, fakeMandateVerifier{}, nil,
 	)
 	router := NewMCPRouter()
 	router.Register(NewCheckoutMCPHandler(svc, sf))
@@ -757,7 +765,7 @@ func TestMCP_ToolsList_AllDomains(t *testing.T) {
 
 	checkoutRepo := newFakeCheckoutRepo()
 	checkoutSvc := domainCheckout.NewCheckoutService(
-		checkoutRepo, fakeTaxSvc{}, fakePriceCalc{}, fakeCheckoutPub{}, fakeLoggerMCP{}, fakeMandateVerifier{},
+		checkoutRepo, fakeTaxSvc{}, fakePriceCalc{}, fakeCheckoutPub{}, fakeLoggerMCP{}, fakeMandateVerifier{}, nil,
 	)
 	router.Register(NewCheckoutMCPHandler(checkoutSvc, sf))
 
@@ -1010,7 +1018,7 @@ func TestMCP_CheckoutSelectMandate(t *testing.T) {
 	sf, _ := kernel.NewSnowflake(1)
 	repo := newFakeCheckoutRepo()
 	svc := domainCheckout.NewCheckoutService(
-		repo, fakeTaxSvc{}, fakePriceCalc{}, fakeCheckoutPub{}, fakeLoggerMCP{}, fakeMandateVerifier{},
+		repo, fakeTaxSvc{}, fakePriceCalc{}, fakeCheckoutPub{}, fakeLoggerMCP{}, fakeMandateVerifier{}, nil,
 	)
 	router := NewMCPRouter()
 	router.Register(NewCheckoutMCPHandler(svc, sf))

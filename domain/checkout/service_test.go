@@ -15,6 +15,7 @@ func checkoutTestService() *CheckoutService {
 		newFakePublisher(),
 		fakeLoggerCheckout{},
 		nil,
+		nil,
 	)
 }
 

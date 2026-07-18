@@ -113,7 +113,7 @@ func TestE2E_FullPurchaseFlow(t *testing.T) {
 	checkoutPub := infraCheckout.NewNATSCheckoutEventPublisher(js)
 	taxSvc := domainCheckout.NewDefaultTaxService()
 	priceCalc := domainCheckout.NewDefaultPriceCalculator()
-	checkoutSvc := domainCheckout.NewCheckoutService(checkoutRepo, taxSvc, priceCalc, checkoutPub, logger, nil)
+	checkoutSvc := domainCheckout.NewCheckoutService(checkoutRepo, taxSvc, priceCalc, checkoutPub, logger, nil, nil)
 
 	checkoutID, err := idSeq()
 	if err != nil {
