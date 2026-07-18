@@ -8,23 +8,26 @@ import (
 
 type CheckoutSession struct {
 	kernel.AggregateRoot
-	UserID          kernel.ID
-	CartID          kernel.ID
-	CartSnapshot    CartSnapshot
-	ShippingAddress *Address
-	BillingAddress  *Address
-	ShippingOption  *ShippingOption
-	PaymentHandler  string
-	MandateID       kernel.ID
-	WalletProvider  string
-	WalletToken     string
-	Subtotal        int64
-	ShippingCost    int64
-	TaxAmount       int64
-	GrandTotal      int64
-	Status          CheckoutStatus
-	ContinueURL     string
-	CompletedAt     *time.Time
+	UserID               kernel.ID
+	CartID               kernel.ID
+	CartSnapshot         CartSnapshot
+	ShippingAddress      *Address
+	BillingAddress       *Address
+	ShippingOption       *ShippingOption
+	PaymentHandler       string
+	MandateID            kernel.ID
+	WalletProvider       string
+	WalletToken          string
+	Subtotal             int64
+	ShippingCost         int64
+	TaxAmount            int64
+	GrandTotal           int64
+	Status               CheckoutStatus
+	ContinueURL          string
+	StripeSessionID      string
+	StripePaymentIntentID string
+	StripePaymentStatus  string
+	CompletedAt          *time.Time
 }
 
 func NewCheckoutSession(id, userID, cartID kernel.ID, snapshot CartSnapshot) (*CheckoutSession, error) {
@@ -61,28 +64,32 @@ func NewCheckoutSessionFromSnapshot(
 	subtotal, shippingCost, taxAmount, grandTotal int64,
 	status CheckoutStatus,
 	continueURL string,
+	stripeSessionID, stripePaymentIntentID, stripePaymentStatus string,
 	completedAt *time.Time,
 	createdAt, updatedAt time.Time,
 ) *CheckoutSession {
 	s := &CheckoutSession{
-		AggregateRoot:   kernel.NewAggregateRoot(id),
-		UserID:          userID,
-		CartID:          cartID,
-		CartSnapshot:    snapshot,
-		ShippingAddress: shippingAddress,
-		BillingAddress:  billingAddress,
-		ShippingOption:  shippingOption,
-		PaymentHandler:  paymentHandler,
-		MandateID:       mandateID,
-		WalletProvider:  walletProvider,
-		WalletToken:     walletToken,
-		Subtotal:        subtotal,
-		ShippingCost:    shippingCost,
-		TaxAmount:       taxAmount,
-		GrandTotal:      grandTotal,
-		Status:          status,
-		ContinueURL:     continueURL,
-		CompletedAt:     completedAt,
+		AggregateRoot:         kernel.NewAggregateRoot(id),
+		UserID:                userID,
+		CartID:                cartID,
+		CartSnapshot:          snapshot,
+		ShippingAddress:       shippingAddress,
+		BillingAddress:        billingAddress,
+		ShippingOption:        shippingOption,
+		PaymentHandler:        paymentHandler,
+		MandateID:             mandateID,
+		WalletProvider:        walletProvider,
+		WalletToken:           walletToken,
+		Subtotal:              subtotal,
+		ShippingCost:          shippingCost,
+		TaxAmount:             taxAmount,
+		GrandTotal:            grandTotal,
+		Status:                status,
+		ContinueURL:           continueURL,
+		StripeSessionID:       stripeSessionID,
+		StripePaymentIntentID: stripePaymentIntentID,
+		StripePaymentStatus:   stripePaymentStatus,
+		CompletedAt:           completedAt,
 	}
 	s.CreatedAt = createdAt
 	s.UpdatedAt = updatedAt
@@ -213,6 +220,35 @@ func (s *CheckoutSession) SubmitPaymentToken(provider, token string) error {
 	s.touch()
 	s.AddEvent(CheckoutUpdatedEvent{CheckoutID: s.ID, UserID: s.UserID})
 	return nil
+}
+
+func (s *CheckoutSession) SetStripeSessionID(sessionID string) error {
+	if s.Status != CheckoutStatusIncomplete {
+		return kernel.NewDomainError(kernel.ErrInvalidArgument, "can only set stripe session id when incomplete")
+	}
+	if sessionID == "" {
+		return kernel.NewDomainError(kernel.ErrInvalidArgument, "stripe session id must not be empty")
+	}
+	s.StripeSessionID = sessionID
+	s.touch()
+	return nil
+}
+
+func (s *CheckoutSession) SetStripePaymentIntentID(paymentIntentID string) error {
+	if s.Status != CheckoutStatusIncomplete {
+		return kernel.NewDomainError(kernel.ErrInvalidArgument, "can only set stripe payment intent id when incomplete")
+	}
+	if paymentIntentID == "" {
+		return kernel.NewDomainError(kernel.ErrInvalidArgument, "stripe payment intent id must not be empty")
+	}
+	s.StripePaymentIntentID = paymentIntentID
+	s.touch()
+	return nil
+}
+
+func (s *CheckoutSession) SetStripePaymentStatus(status string) {
+	s.StripePaymentStatus = status
+	s.touch()
 }
 
 func (s *CheckoutSession) Complete() error {

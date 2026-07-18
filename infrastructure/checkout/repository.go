@@ -42,26 +42,29 @@ func (m *nullRawMessage) UnmarshalJSON(data []byte) error {
 }
 
 type sessionRow struct {
-	ID              int64          `db:"id"`
-	UserID          int64          `db:"user_id"`
-	CartID          int64          `db:"cart_id"`
-	CartSnapshot    nullRawMessage `db:"cart_snapshot"`
-	ShippingAddress nullRawMessage `db:"shipping_address"`
-	BillingAddress  nullRawMessage `db:"billing_address"`
-	ShippingOption  nullRawMessage `db:"shipping_option"`
-	PaymentHandler  string         `db:"payment_handler"`
-	MandateID       int64          `db:"mandate_id"`
-	WalletProvider  string         `db:"wallet_provider"`
-	WalletToken     string         `db:"wallet_token"`
-	Subtotal        int64          `db:"subtotal"`
-	ShippingCost    int64          `db:"shipping_cost"`
-	TaxAmount       int64          `db:"tax_amount"`
-	GrandTotal      int64          `db:"grand_total"`
-	Status          string         `db:"status"`
-	ContinueURL     string         `db:"continue_url"`
-	CompletedAt     *time.Time     `db:"completed_at"`
-	CreatedAt       time.Time      `db:"created_at"`
-	UpdatedAt       time.Time      `db:"updated_at"`
+	ID                  int64          `db:"id"`
+	UserID              int64          `db:"user_id"`
+	CartID              int64          `db:"cart_id"`
+	CartSnapshot        nullRawMessage `db:"cart_snapshot"`
+	ShippingAddress     nullRawMessage `db:"shipping_address"`
+	BillingAddress      nullRawMessage `db:"billing_address"`
+	ShippingOption      nullRawMessage `db:"shipping_option"`
+	PaymentHandler      string         `db:"payment_handler"`
+	MandateID           int64          `db:"mandate_id"`
+	WalletProvider      string         `db:"wallet_provider"`
+	WalletToken         string         `db:"wallet_token"`
+	Subtotal            int64          `db:"subtotal"`
+	ShippingCost        int64          `db:"shipping_cost"`
+	TaxAmount           int64          `db:"tax_amount"`
+	GrandTotal          int64          `db:"grand_total"`
+	Status              string         `db:"status"`
+	ContinueURL         string         `db:"continue_url"`
+	StripeSessionID     string         `db:"stripe_session_id"`
+	StripePaymentIntentID string      `db:"stripe_payment_intent_id"`
+	StripePaymentStatus string         `db:"stripe_payment_status"`
+	CompletedAt         *time.Time     `db:"completed_at"`
+	CreatedAt           time.Time      `db:"created_at"`
+	UpdatedAt           time.Time      `db:"updated_at"`
 }
 
 func (r sessionRow) toDomain() (*domain.CheckoutSession, error) {
@@ -117,6 +120,9 @@ func (r sessionRow) toDomain() (*domain.CheckoutSession, error) {
 		r.GrandTotal,
 		domain.CheckoutStatus(r.Status),
 		r.ContinueURL,
+		r.StripeSessionID,
+		r.StripePaymentIntentID,
+		r.StripePaymentStatus,
 		r.CompletedAt,
 		r.CreatedAt,
 		r.UpdatedAt,
@@ -155,26 +161,29 @@ func fromDomain(s *domain.CheckoutSession) (sessionRow, error) {
 	}
 
 	return sessionRow{
-		ID:              s.ID.Int64(),
-		UserID:          s.UserID.Int64(),
-		CartID:          s.CartID.Int64(),
-		CartSnapshot:    cartSnapshot,
-		ShippingAddress: shippingAddr,
-		BillingAddress:  billingAddr,
-		ShippingOption:  shippingOpt,
-		PaymentHandler:  s.PaymentHandler,
-		MandateID:       s.MandateID.Int64(),
-		WalletProvider:  s.WalletProvider,
-		WalletToken:     s.WalletToken,
-		Subtotal:        s.Subtotal,
-		ShippingCost:    s.ShippingCost,
-		TaxAmount:       s.TaxAmount,
-		GrandTotal:      s.GrandTotal,
-		Status:          string(s.Status),
-		ContinueURL:     s.ContinueURL,
-		CompletedAt:     s.CompletedAt,
-		CreatedAt:       s.CreatedAt,
-		UpdatedAt:       s.UpdatedAt,
+		ID:                  s.ID.Int64(),
+		UserID:              s.UserID.Int64(),
+		CartID:              s.CartID.Int64(),
+		CartSnapshot:        cartSnapshot,
+		ShippingAddress:     shippingAddr,
+		BillingAddress:      billingAddr,
+		ShippingOption:      shippingOpt,
+		PaymentHandler:      s.PaymentHandler,
+		MandateID:           s.MandateID.Int64(),
+		WalletProvider:      s.WalletProvider,
+		WalletToken:         s.WalletToken,
+		Subtotal:            s.Subtotal,
+		ShippingCost:        s.ShippingCost,
+		TaxAmount:           s.TaxAmount,
+		GrandTotal:          s.GrandTotal,
+		Status:              string(s.Status),
+		ContinueURL:         s.ContinueURL,
+		StripeSessionID:     s.StripeSessionID,
+		StripePaymentIntentID: s.StripePaymentIntentID,
+		StripePaymentStatus: s.StripePaymentStatus,
+		CompletedAt:         s.CompletedAt,
+		CreatedAt:           s.CreatedAt,
+		UpdatedAt:           s.UpdatedAt,
 	}, nil
 }
 
@@ -199,8 +208,8 @@ func (r *PostgresCheckoutRepository) Save(ctx context.Context, session *domain.C
 	}
 
 	_, err = r.db.ExecContext(ctx, `
-		INSERT INTO checkout_sessions (id, user_id, cart_id, cart_snapshot, shipping_address, billing_address, shipping_option, payment_handler, mandate_id, wallet_provider, wallet_token, subtotal, shipping_cost, tax_amount, grand_total, status, continue_url, completed_at, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
+		INSERT INTO checkout_sessions (id, user_id, cart_id, cart_snapshot, shipping_address, billing_address, shipping_option, payment_handler, mandate_id, wallet_provider, wallet_token, subtotal, shipping_cost, tax_amount, grand_total, status, continue_url, stripe_session_id, stripe_payment_intent_id, stripe_payment_status, completed_at, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)
 		ON CONFLICT (id) DO UPDATE SET
 			user_id = EXCLUDED.user_id,
 			cart_id = EXCLUDED.cart_id,
@@ -218,9 +227,12 @@ func (r *PostgresCheckoutRepository) Save(ctx context.Context, session *domain.C
 			grand_total = EXCLUDED.grand_total,
 			status = EXCLUDED.status,
 			continue_url = EXCLUDED.continue_url,
+			stripe_session_id = EXCLUDED.stripe_session_id,
+			stripe_payment_intent_id = EXCLUDED.stripe_payment_intent_id,
+			stripe_payment_status = EXCLUDED.stripe_payment_status,
 			completed_at = EXCLUDED.completed_at,
 			updated_at = EXCLUDED.updated_at
-	`, row.ID, row.UserID, row.CartID, row.CartSnapshot, row.ShippingAddress, row.BillingAddress, row.ShippingOption, row.PaymentHandler, row.MandateID, row.WalletProvider, row.WalletToken, row.Subtotal, row.ShippingCost, row.TaxAmount, row.GrandTotal, row.Status, row.ContinueURL, row.CompletedAt, row.CreatedAt, row.UpdatedAt)
+	`, row.ID, row.UserID, row.CartID, row.CartSnapshot, row.ShippingAddress, row.BillingAddress, row.ShippingOption, row.PaymentHandler, row.MandateID, row.WalletProvider, row.WalletToken, row.Subtotal, row.ShippingCost, row.TaxAmount, row.GrandTotal, row.Status, row.ContinueURL, row.StripeSessionID, row.StripePaymentIntentID, row.StripePaymentStatus, row.CompletedAt, row.CreatedAt, row.UpdatedAt)
 	if err != nil {
 		return kernel.NewDomainErrorWithCause(kernel.ErrInternal, "save checkout session", err)
 	}
@@ -273,6 +285,23 @@ func (r *PostgresCheckoutRepository) FindByUserID(ctx context.Context, userID ke
 	}
 	r.writeCache(ctx, r.idCacheKey(session.ID), session)
 	r.writeCache(ctx, cacheKey, session)
+	return session, nil
+}
+
+func (r *PostgresCheckoutRepository) FindByStripeSessionID(ctx context.Context, stripeSessionID string) (*domain.CheckoutSession, error) {
+	var row sessionRow
+	err := r.db.GetContext(ctx, &row, `SELECT * FROM checkout_sessions WHERE stripe_session_id = $1`, stripeSessionID)
+	if err == sql.ErrNoRows {
+		return nil, kernel.NewDomainError(kernel.ErrNotFound, "checkout session not found")
+	}
+	if err != nil {
+		return nil, kernel.NewDomainErrorWithCause(kernel.ErrInternal, "find checkout by stripe session id", err)
+	}
+
+	session, err := row.toDomain()
+	if err != nil {
+		return nil, err
+	}
 	return session, nil
 }
 

@@ -10,6 +10,7 @@ type CheckoutRepository interface {
 	Save(ctx context.Context, session *CheckoutSession) error
 	FindByID(ctx context.Context, id kernel.ID) (*CheckoutSession, error)
 	FindByUserID(ctx context.Context, userID kernel.ID) (*CheckoutSession, error)
+	FindByStripeSessionID(ctx context.Context, stripeSessionID string) (*CheckoutSession, error)
 	Delete(ctx context.Context, id kernel.ID) error
 }
 
