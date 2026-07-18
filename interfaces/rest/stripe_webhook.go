@@ -13,15 +13,28 @@ import (
 )
 
 type StripeWebhookHandler struct {
-	svc           *domain.CheckoutService
-	webhookSecret string
+	svc             *domain.CheckoutService
+	webhookSecret   string
+	skipVerification bool
 }
 
-func NewStripeWebhookHandler(svc *domain.CheckoutService, webhookSecret string) *StripeWebhookHandler {
-	return &StripeWebhookHandler{
+type StripeWebhookOption func(*StripeWebhookHandler)
+
+func WithSkipVerification() StripeWebhookOption {
+	return func(h *StripeWebhookHandler) {
+		h.skipVerification = true
+	}
+}
+
+func NewStripeWebhookHandler(svc *domain.CheckoutService, webhookSecret string, opts ...StripeWebhookOption) *StripeWebhookHandler {
+	h := &StripeWebhookHandler{
 		svc:           svc,
 		webhookSecret: webhookSecret,
 	}
+	for _, opt := range opts {
+		opt(h)
+	}
+	return h
 }
 
 type stripeCheckoutSession struct {
@@ -40,13 +53,26 @@ func (h *StripeWebhookHandler) HandleWebhook(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	event, err := webhook.ConstructEvent(body, r.Header.Get("Stripe-Signature"), h.webhookSecret)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("webhook signature verification failed: %v", err), http.StatusBadRequest)
-		return
+	eventType := ""
+	if h.skipVerification {
+		var ev struct {
+			Type string `json:"type"`
+		}
+		if err := json.Unmarshal(body, &ev); err != nil {
+			http.Error(w, "failed to parse webhook event", http.StatusBadRequest)
+			return
+		}
+		eventType = ev.Type
+	} else {
+		event, err := webhook.ConstructEvent(body, r.Header.Get("Stripe-Signature"), h.webhookSecret)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("webhook signature verification failed: %v", err), http.StatusBadRequest)
+			return
+		}
+		eventType = event.Type
 	}
 
-	switch event.Type {
+	switch eventType {
 	case "checkout.session.completed":
 		h.handleCheckoutSessionCompleted(w, r, body)
 	case "payment_intent.succeeded":

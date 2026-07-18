@@ -164,6 +164,206 @@ func TestCheckoutService_GetCheckout_NotFound(t *testing.T) {
 	}
 }
 
+type fakeStripeProcessor struct {
+	createCheckoutSessionFn func(ctx context.Context, checkout *CheckoutSession) (string, string, error)
+	createPaymentIntentFn   func(ctx context.Context, checkoutID kernel.ID, amount int64) (string, string, error)
+	getPaymentIntentStatusFn func(ctx context.Context, paymentIntentID string) (string, error)
+}
+
+func (f *fakeStripeProcessor) CreateCheckoutSession(ctx context.Context, checkout *CheckoutSession) (string, string, error) {
+	return f.createCheckoutSessionFn(ctx, checkout)
+}
+
+func (f *fakeStripeProcessor) CreatePaymentIntent(ctx context.Context, checkoutID kernel.ID, amount int64) (string, string, error) {
+	return f.createPaymentIntentFn(ctx, checkoutID, amount)
+}
+
+func (f *fakeStripeProcessor) GetPaymentIntentStatus(ctx context.Context, paymentIntentID string) (string, error) {
+	return f.getPaymentIntentStatusFn(ctx, paymentIntentID)
+}
+
+func TestCheckoutService_CreateStripePaymentIntent_Success(t *testing.T) {
+	svc := checkoutTestServiceWithStripe()
+	ctx := context.Background()
+
+	setupFullCheckout(ctx, t, svc)
+
+	clientSecret, intentID, err := svc.CreateStripePaymentIntent(ctx, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if clientSecret != "secret_pi_1" {
+		t.Errorf("expected secret_pi_1, got %s", clientSecret)
+	}
+	if intentID != "pi_1" {
+		t.Errorf("expected pi_1, got %s", intentID)
+	}
+}
+
+func TestCheckoutService_CreateStripePaymentIntent_WrongHandler(t *testing.T) {
+	svc := checkoutTestServiceWithStripe()
+	ctx := context.Background()
+
+	setupFullCheckout(ctx, t, svc)
+	svc.SelectPaymentHandler(ctx, 1, "mock")
+
+	_, _, err := svc.CreateStripePaymentIntent(ctx, 1)
+	if !kernel.IsInvalidArgument(err) {
+		t.Errorf("expected invalid argument, got %v", err)
+	}
+}
+
+func TestCheckoutService_CreateStripePaymentIntent_NoProcessor(t *testing.T) {
+	svc := checkoutTestService()
+	ctx := context.Background()
+
+	setupFullCheckout(ctx, t, svc)
+
+	_, _, err := svc.CreateStripePaymentIntent(ctx, 1)
+	if !kernel.IsInternal(err) {
+		t.Errorf("expected internal error, got %v", err)
+	}
+}
+
+func TestCheckoutService_ConfirmStripePayment_Success(t *testing.T) {
+	svc := checkoutTestServiceWithStripe()
+	ctx := context.Background()
+
+	setupFullCheckout(ctx, t, svc)
+
+	// First escalate via StartComplete to get into requires_escalation
+	svc.StartComplete(ctx, 1, "")
+
+	_, err := svc.ConfirmStripePayment(ctx, 1, "cs_test_123")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	session, _ := svc.GetCheckout(ctx, 1)
+	if session.Status != CheckoutStatusCompleted {
+		t.Errorf("expected completed, got %s", session.Status)
+	}
+}
+
+func TestCheckoutService_ConfirmStripePayment_SessionIDMismatch(t *testing.T) {
+	svc := checkoutTestServiceWithStripe()
+	ctx := context.Background()
+
+	setupFullCheckout(ctx, t, svc)
+
+	svc.StartComplete(ctx, 1, "")
+
+	_, err := svc.ConfirmStripePayment(ctx, 1, "wrong_session_id")
+	if !kernel.IsInvalidArgument(err) {
+		t.Errorf("expected invalid argument, got %v", err)
+	}
+}
+
+func TestCheckoutService_StartComplete_StripeCheckoutMode(t *testing.T) {
+	svc := checkoutTestServiceWithStripe()
+	ctx := context.Background()
+
+	setupFullCheckout(ctx, t, svc)
+
+	session, escalated, err := svc.StartComplete(ctx, 1, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !escalated {
+		t.Errorf("expected escalated=true for stripe checkout mode")
+	}
+	if session.Status != CheckoutStatusRequiresEscalation {
+		t.Errorf("expected requires_escalation, got %s", session.Status)
+	}
+	if session.StripeSessionID != "cs_test_123" {
+		t.Errorf("expected stripe_session_id cs_test_123, got %s", session.StripeSessionID)
+	}
+	if session.ContinueURL != "https://checkout.stripe.com/cs_test_123" {
+		t.Errorf("expected stripe checkout URL, got %s", session.ContinueURL)
+	}
+}
+
+func TestCheckoutService_StartComplete_StripePIMode(t *testing.T) {
+	svc := checkoutTestServiceWithStripe()
+	ctx := context.Background()
+
+	setupFullCheckout(ctx, t, svc)
+
+	// Create a PI first
+	_, _, err := svc.CreateStripePaymentIntent(ctx, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	session, escalated, err := svc.StartComplete(ctx, 1, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if escalated {
+		t.Errorf("expected escalated=false for stripe PI mode")
+	}
+	if session.Status != CheckoutStatusCompleted {
+		t.Errorf("expected completed, got %s", session.Status)
+	}
+	if session.StripePaymentStatus != "succeeded" {
+		t.Errorf("expected stripe_payment_status succeeded, got %s", session.StripePaymentStatus)
+	}
+}
+
+func TestCheckoutService_Complete_StripePIMode(t *testing.T) {
+	svc := checkoutTestServiceWithStripe()
+	ctx := context.Background()
+
+	setupFullCheckout(ctx, t, svc)
+
+	svc.CreateStripePaymentIntent(ctx, 1)
+	svc.MarkReady(ctx, 1)
+
+	session, err := svc.Complete(ctx, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if session.Status != CheckoutStatusCompleted {
+		t.Errorf("expected completed, got %s", session.Status)
+	}
+}
+
+func setupFullCheckout(ctx context.Context, t *testing.T, svc *CheckoutService) {
+	t.Helper()
+	_, err := svc.CreateCheckout(ctx, CreateCheckoutInput{
+		CheckoutID: 1, UserID: 42, CartID: 10, CartItems: sampleSnapshot().Items,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc.SetShippingAddress(ctx, 1, sampleAddress())
+	svc.SetBillingAddress(ctx, 1, sampleAddress())
+	svc.SelectShippingOption(ctx, 1, sampleShippingOption())
+	svc.SelectPaymentHandler(ctx, 1, "stripe")
+}
+
+func checkoutTestServiceWithStripe() *CheckoutService {
+	return NewCheckoutService(
+		newFakeCheckoutRepo(),
+		fakeTaxService{},
+		fakePriceCalculator{},
+		newFakePublisher(),
+		fakeLoggerCheckout{},
+		nil,
+		&fakeStripeProcessor{
+			createCheckoutSessionFn: func(_ context.Context, _ *CheckoutSession) (string, string, error) {
+				return "https://checkout.stripe.com/cs_test_123", "cs_test_123", nil
+			},
+			createPaymentIntentFn: func(_ context.Context, _ kernel.ID, _ int64) (string, string, error) {
+				return "secret_pi_1", "pi_1", nil
+			},
+			getPaymentIntentStatusFn: func(_ context.Context, _ string) (string, error) {
+				return "succeeded", nil
+			},
+		},
+	)
+}
+
 func TestCheckoutService_Cancel(t *testing.T) {
 	svc := checkoutTestService()
 	ctx := context.Background()

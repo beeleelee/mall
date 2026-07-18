@@ -66,6 +66,24 @@ func (fakeCheckoutPub) PublishCheckoutUpdated(_ context.Context, _ *domain.Check
 	return nil
 }
 
+type fakeStripeProcessor struct {
+	createCheckoutSessionFn  func(ctx context.Context, checkout *domain.CheckoutSession) (string, string, error)
+	createPaymentIntentFn    func(ctx context.Context, checkoutID kernel.ID, amount int64) (string, string, error)
+	getPaymentIntentStatusFn func(ctx context.Context, paymentIntentID string) (string, error)
+}
+
+func (f *fakeStripeProcessor) CreateCheckoutSession(ctx context.Context, checkout *domain.CheckoutSession) (string, string, error) {
+	return f.createCheckoutSessionFn(ctx, checkout)
+}
+
+func (f *fakeStripeProcessor) CreatePaymentIntent(ctx context.Context, checkoutID kernel.ID, amount int64) (string, string, error) {
+	return f.createPaymentIntentFn(ctx, checkoutID, amount)
+}
+
+func (f *fakeStripeProcessor) GetPaymentIntentStatus(ctx context.Context, paymentIntentID string) (string, error) {
+	return f.getPaymentIntentStatusFn(ctx, paymentIntentID)
+}
+
 type fakeTaxService struct{}
 
 func (fakeTaxService) CalculateTax(_ context.Context, _ domain.TaxInput) (*domain.TaxResult, error) {
@@ -85,6 +103,31 @@ func (fakePriceCalculator) Calculate(_ context.Context, input domain.PriceInput)
 		Tax:        input.TaxAmount,
 		GrandTotal: itemsTotal + input.ShippingCost + input.TaxAmount,
 	}, nil
+}
+
+func newTestCheckoutHandlerWithStripe(t *testing.T) *CheckoutHandler {
+	t.Helper()
+	repo := newFakeCheckoutRepo()
+	pub := fakeCheckoutPub{}
+	logger := fakeLog{}
+	taxSvc := fakeTaxService{}
+	priceCalc := fakePriceCalculator{}
+	svc := domain.NewCheckoutService(repo, taxSvc, priceCalc, pub, logger, nil, &fakeStripeProcessor{
+		createCheckoutSessionFn: func(_ context.Context, _ *domain.CheckoutSession) (string, string, error) {
+			return "https://checkout.stripe.com/cs_test_123", "cs_test_123", nil
+		},
+		createPaymentIntentFn: func(_ context.Context, _ kernel.ID, _ int64) (string, string, error) {
+			return "secret_pi_1", "pi_1", nil
+		},
+		getPaymentIntentStatusFn: func(_ context.Context, _ string) (string, error) {
+			return "succeeded", nil
+		},
+	})
+	sf, err := kernel.NewSnowflake(1)
+	if err != nil {
+		t.Fatalf("NewSnowflake failed: %v", err)
+	}
+	return NewCheckoutHandler(svc, sf)
 }
 
 func newTestCheckoutHandler(t *testing.T) *CheckoutHandler {
@@ -380,5 +423,94 @@ func TestCheckoutHandler_SubmitPaymentToken_WrongUser(t *testing.T) {
 
 	if rec2.Code != http.StatusForbidden {
 		t.Errorf("expected 403, got %d", rec2.Code)
+	}
+}
+
+func setupCheckoutForTest(t *testing.T, h *CheckoutHandler) int64 {
+	t.Helper()
+
+	body := map[string]any{
+		"cart_id": 10,
+		"items": []map[string]any{
+			{"product_id": 1, "sku": "SKU001", "name": "Test", "quantity": 1, "unit_price": 1000},
+		},
+	}
+	bodyBytes, _ := json.Marshal(body)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/checkouts", bytes.NewReader(bodyBytes))
+	req = req.WithContext(middleware.ContextWithUser(req.Context(), middleware.UserInfo{UserID: 99}))
+	rec := httptest.NewRecorder()
+	h.Create(rec, req)
+
+	var resp checkoutResponse
+	json.NewDecoder(rec.Body).Decode(&resp)
+
+	addr, _ := json.Marshal(map[string]string{"line1": "123 Main", "city": "Portland", "state": "OR", "postal_code": "97201", "country": "US"})
+	req2 := httptest.NewRequest(http.MethodPost, "/api/v1/checkouts/"+strconv.FormatInt(resp.ID, 10)+"/shipping-address", bytes.NewReader(addr))
+	req2 = req2.WithContext(middleware.ContextWithUser(req2.Context(), middleware.UserInfo{UserID: 99}))
+	req2 = pathvar.WithVars(req2, map[string]string{"id": strconv.FormatInt(resp.ID, 10)})
+	httptest.NewRecorder()
+	h.SetShippingAddress(httptest.NewRecorder(), req2)
+
+	req3 := httptest.NewRequest(http.MethodPost, "/api/v1/checkouts/"+strconv.FormatInt(resp.ID, 10)+"/billing-address", bytes.NewReader(addr))
+	req3 = req3.WithContext(middleware.ContextWithUser(req3.Context(), middleware.UserInfo{UserID: 99}))
+	req3 = pathvar.WithVars(req3, map[string]string{"id": strconv.FormatInt(resp.ID, 10)})
+	h.SetBillingAddress(httptest.NewRecorder(), req3)
+
+	shipOpt, _ := json.Marshal(map[string]any{"id": "std", "name": "Standard", "cost": 500})
+	req4 := httptest.NewRequest(http.MethodPost, "/api/v1/checkouts/"+strconv.FormatInt(resp.ID, 10)+"/shipping-option", bytes.NewReader(shipOpt))
+	req4 = req4.WithContext(middleware.ContextWithUser(req4.Context(), middleware.UserInfo{UserID: 99}))
+	req4 = pathvar.WithVars(req4, map[string]string{"id": strconv.FormatInt(resp.ID, 10)})
+	h.SelectShippingOption(httptest.NewRecorder(), req4)
+
+	handlerReq, _ := json.Marshal(map[string]string{"handler": "stripe"})
+	req5 := httptest.NewRequest(http.MethodPost, "/api/v1/checkouts/"+strconv.FormatInt(resp.ID, 10)+"/payment-handler", bytes.NewReader(handlerReq))
+	req5 = req5.WithContext(middleware.ContextWithUser(req5.Context(), middleware.UserInfo{UserID: 99}))
+	req5 = pathvar.WithVars(req5, map[string]string{"id": strconv.FormatInt(resp.ID, 10)})
+	h.SelectPaymentHandler(httptest.NewRecorder(), req5)
+
+	return resp.ID
+}
+
+func TestCheckoutHandler_CreateStripePaymentIntent_Success(t *testing.T) {
+	h := newTestCheckoutHandlerWithStripe(t)
+	checkoutID := setupCheckoutForTest(t, h)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/checkouts/"+strconv.FormatInt(checkoutID, 10)+"/stripe/payment-intent", nil)
+	req = req.WithContext(middleware.ContextWithUser(req.Context(), middleware.UserInfo{UserID: 99}))
+	req = pathvar.WithVars(req, map[string]string{"id": strconv.FormatInt(checkoutID, 10)})
+	rec := httptest.NewRecorder()
+	h.CreateStripePaymentIntent(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Errorf("expected 201, got %d", rec.Code)
+	}
+
+	var resp createPaymentIntentResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatal(err)
+	}
+	if resp.ClientSecret != "secret_pi_1" {
+		t.Errorf("expected secret_pi_1, got %s", resp.ClientSecret)
+	}
+	if resp.IntentID != "pi_1" {
+		t.Errorf("expected pi_1, got %s", resp.IntentID)
+	}
+	if resp.Amount == 0 {
+		t.Errorf("expected non-zero amount")
+	}
+}
+
+func TestCheckoutHandler_CreateStripePaymentIntent_WrongUser(t *testing.T) {
+	h := newTestCheckoutHandlerWithStripe(t)
+	checkoutID := setupCheckoutForTest(t, h)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/checkouts/"+strconv.FormatInt(checkoutID, 10)+"/stripe/payment-intent", nil)
+	req = req.WithContext(middleware.ContextWithUser(req.Context(), middleware.UserInfo{UserID: 1}))
+	req = pathvar.WithVars(req, map[string]string{"id": strconv.FormatInt(checkoutID, 10)})
+	rec := httptest.NewRecorder()
+	h.CreateStripePaymentIntent(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("expected 403, got %d", rec.Code)
 	}
 }
