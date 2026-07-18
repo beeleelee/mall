@@ -25,9 +25,9 @@ func (h *StripePaymentIntentHandler) CreatePaymentIntent(ctx context.Context, ch
 		AutomaticPaymentMethods: &stripe.PaymentIntentAutomaticPaymentMethodsParams{
 			Enabled: stripe.Bool(true),
 		},
-		Metadata: map[string]string{
-			"checkout_id": checkoutID.String(),
-		},
+	}
+	params.Metadata = map[string]string{
+		"checkout_id": checkoutID.String(),
 	}
 
 	pi, err := paymentintent.New(params)

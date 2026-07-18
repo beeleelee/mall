@@ -36,15 +36,15 @@ func (h *StripeCheckoutHandler) CreateCheckoutSession(ctx context.Context, check
 
 	baseURL := h.client.Config.BaseURL
 	params := &stripe.CheckoutSessionParams{
-		Mode:            stripe.String(string(stripe.CheckoutSessionModePayment)),
-		SuccessURL:      stripe.String(fmt.Sprintf("%s/api/v1/checkouts/%d/success", baseURL, checkout.ID.Int64())),
-		CancelURL:       stripe.String(fmt.Sprintf("%s/api/v1/checkouts/%d/cancel", baseURL, checkout.ID.Int64())),
-		LineItems:       lineItems,
+		Mode:              stripe.String(string(stripe.CheckoutSessionModePayment)),
+		SuccessURL:        stripe.String(fmt.Sprintf("%s/api/v1/checkouts/%d/success", baseURL, checkout.ID.Int64())),
+		CancelURL:         stripe.String(fmt.Sprintf("%s/api/v1/checkouts/%d/cancel", baseURL, checkout.ID.Int64())),
+		LineItems:         lineItems,
 		ClientReferenceID: stripe.String(checkout.ID.String()),
-		PaymentIntentData: &stripe.CheckoutSessionPaymentIntentDataParams{
-			Metadata: map[string]string{
-				"checkout_id": checkout.ID.String(),
-			},
+	}
+	params.PaymentIntentData = &stripe.CheckoutSessionPaymentIntentDataParams{
+		Metadata: map[string]string{
+			"checkout_id": checkout.ID.String(),
 		},
 	}
 

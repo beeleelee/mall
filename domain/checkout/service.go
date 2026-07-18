@@ -444,9 +444,6 @@ func (s *CheckoutService) ConfirmStripePayment(ctx context.Context, id kernel.ID
 		return nil, kernel.NewDomainError(kernel.ErrInvalidArgument, "cannot confirm stripe payment in current state: "+string(session.Status))
 	}
 
-	if err := session.MarkReady(); err != nil {
-		return nil, err
-	}
 	if err := session.Complete(); err != nil {
 		return nil, err
 	}
