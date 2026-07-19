@@ -14,6 +14,7 @@ import (
 
 	"github.com/beeleelee/mall/domain/analytics"
 	"github.com/beeleelee/mall/domain/kernel"
+	reviewdomain "github.com/beeleelee/mall/domain/review"
 
 	appidentity "github.com/beeleelee/mall/application/identity"
 	catalogdomain "github.com/beeleelee/mall/domain/catalog"
@@ -29,13 +30,14 @@ type AdminHandler struct {
 	storageSvc      kernel.StorageService
 	categoryRepo    catalogdomain.CategoryRepository
 	analyticsSvc    *analytics.AnalyticsService
+	reviewSvc       *reviewdomain.ReviewService
 	sf              *kernel.Snowflake
 	db              *sqlx.DB
 	deliveryLogRepo orderdomain.DeliveryLogRepository
 	refundSvc       *orderdomain.RefundService
 }
 
-func NewAdminHandler(catalogSvc *catalogdomain.CatalogService, orderSvc *orderdomain.OrderService, identitySvc *appidentity.IdentityAppService, inventorySvc *inventorydomain.InventoryService, storageSvc kernel.StorageService, categoryRepo catalogdomain.CategoryRepository, analyticsSvc *analytics.AnalyticsService, sf *kernel.Snowflake, db *sqlx.DB, deliveryLogRepo orderdomain.DeliveryLogRepository, refundSvc *orderdomain.RefundService) *AdminHandler {
+func NewAdminHandler(catalogSvc *catalogdomain.CatalogService, orderSvc *orderdomain.OrderService, identitySvc *appidentity.IdentityAppService, inventorySvc *inventorydomain.InventoryService, storageSvc kernel.StorageService, categoryRepo catalogdomain.CategoryRepository, analyticsSvc *analytics.AnalyticsService, reviewSvc *reviewdomain.ReviewService, sf *kernel.Snowflake, db *sqlx.DB, deliveryLogRepo orderdomain.DeliveryLogRepository, refundSvc *orderdomain.RefundService) *AdminHandler {
 	return &AdminHandler{
 		catalogSvc:      catalogSvc,
 		orderSvc:        orderSvc,
@@ -44,6 +46,7 @@ func NewAdminHandler(catalogSvc *catalogdomain.CatalogService, orderSvc *orderdo
 		storageSvc:      storageSvc,
 		categoryRepo:    categoryRepo,
 		analyticsSvc:    analyticsSvc,
+		reviewSvc:       reviewSvc,
 		sf:              sf,
 		db:              db,
 		deliveryLogRepo: deliveryLogRepo,

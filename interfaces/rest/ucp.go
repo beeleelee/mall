@@ -339,6 +339,20 @@ func DefaultProfile() *Profile {
 					},
 				},
 			},
+			"dev.ucp.shopping.reviews": {
+				Version: "1.0.0",
+				Bindings: CapabilityBindings{
+					REST: &RESTBinding{
+						BaseURL: "/api/v1",
+						Endpoints: map[string]string{
+							"create_review": "POST /products/{id}/reviews",
+							"list_reviews":  "GET /products/{id}/reviews",
+							"get_review":    "GET /reviews/{id}",
+							"delete_review": "DELETE /reviews/{id}",
+						},
+					},
+				},
+			},
 			"dev.a2a.agent": {
 				Version: "1.0.0",
 				Bindings: CapabilityBindings{
