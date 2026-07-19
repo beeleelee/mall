@@ -7,8 +7,8 @@ import (
 
 	"github.com/zeromicro/go-zero/rest/pathvar"
 
-	domain "github.com/beeleelee/mall/domain/review"
 	"github.com/beeleelee/mall/domain/kernel"
+	domain "github.com/beeleelee/mall/domain/review"
 	"github.com/beeleelee/mall/interfaces/middleware"
 )
 
@@ -28,14 +28,14 @@ type createReviewRequest struct {
 }
 
 type reviewResponse struct {
-	ID        int64   `json:"id"`
-	ProductID int64   `json:"product_id"`
-	UserID    int64   `json:"user_id"`
-	Rating    int     `json:"rating"`
-	Title     string  `json:"title"`
-	Content   string  `json:"content"`
-	Status    string  `json:"status"`
-	CreatedAt string  `json:"created_at"`
+	ID        int64  `json:"id"`
+	ProductID int64  `json:"product_id"`
+	UserID    int64  `json:"user_id"`
+	Rating    int    `json:"rating"`
+	Title     string `json:"title"`
+	Content   string `json:"content"`
+	Status    string `json:"status"`
+	CreatedAt string `json:"created_at"`
 }
 
 func buildReviewResponse(r *domain.Review) reviewResponse {

@@ -8,8 +8,8 @@ import (
 
 	"github.com/jmoiron/sqlx"
 
-	domain "github.com/beeleelee/mall/domain/review"
 	"github.com/beeleelee/mall/domain/kernel"
+	domain "github.com/beeleelee/mall/domain/review"
 )
 
 type reviewRow struct {
@@ -90,12 +90,9 @@ func (r *PostgresReviewRepository) FindByID(ctx context.Context, id kernel.ID) (
 func (r *PostgresReviewRepository) FindByProduct(ctx context.Context, productID kernel.ID, opts domain.ReviewQueryOptions) (*domain.ReviewListResult, error) {
 	where := "WHERE product_id = $1"
 	args := []any{productID.Int64()}
-	paramIdx := 2
-
 	if opts.Status != "" {
-		where += fmt.Sprintf(" AND status = $%d", paramIdx)
+		where += fmt.Sprintf(" AND status = $%d", len(args)+1)
 		args = append(args, string(opts.Status))
-		paramIdx++
 	}
 
 	return r.queryList(ctx, where, args, opts)
@@ -104,12 +101,9 @@ func (r *PostgresReviewRepository) FindByProduct(ctx context.Context, productID 
 func (r *PostgresReviewRepository) FindByUser(ctx context.Context, userID kernel.ID, opts domain.ReviewQueryOptions) (*domain.ReviewListResult, error) {
 	where := "WHERE user_id = $1"
 	args := []any{userID.Int64()}
-	paramIdx := 2
-
 	if opts.Status != "" {
-		where += fmt.Sprintf(" AND status = $%d", paramIdx)
+		where += fmt.Sprintf(" AND status = $%d", len(args)+1)
 		args = append(args, string(opts.Status))
-		paramIdx++
 	}
 
 	return r.queryList(ctx, where, args, opts)
@@ -130,12 +124,9 @@ func (r *PostgresReviewRepository) FindByProductAndUser(ctx context.Context, pro
 func (r *PostgresReviewRepository) FindAll(ctx context.Context, opts domain.ReviewQueryOptions) (*domain.ReviewListResult, error) {
 	where := "WHERE 1=1"
 	args := []any{}
-	paramIdx := 1
-
 	if opts.Status != "" {
-		where += fmt.Sprintf(" AND status = $%d", paramIdx)
+		where += fmt.Sprintf(" AND status = $%d", len(args)+1)
 		args = append(args, string(opts.Status))
-		paramIdx++
 	}
 
 	return r.queryList(ctx, where, args, opts)
@@ -185,5 +176,3 @@ func (r *PostgresReviewRepository) GetAverageRating(ctx context.Context, product
 	}
 	return 0, nil
 }
-
-
