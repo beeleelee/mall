@@ -40,6 +40,7 @@ import (
 	domainOAuth "github.com/beeleelee/mall/domain/oauth"
 	domainOrder "github.com/beeleelee/mall/domain/order"
 	domainPayment "github.com/beeleelee/mall/domain/payment"
+	domainReview "github.com/beeleelee/mall/domain/review"
 	infraA2A "github.com/beeleelee/mall/infrastructure/a2a"
 	infraAnalytics "github.com/beeleelee/mall/infrastructure/analytics"
 	infraCart "github.com/beeleelee/mall/infrastructure/cart"
@@ -56,6 +57,7 @@ import (
 	infraOAuth "github.com/beeleelee/mall/infrastructure/oauth"
 	infraOrder "github.com/beeleelee/mall/infrastructure/order"
 	infraPayment "github.com/beeleelee/mall/infrastructure/payment"
+	infraReview "github.com/beeleelee/mall/infrastructure/review"
 	infraStorage "github.com/beeleelee/mall/infrastructure/storage"
 	"github.com/beeleelee/mall/infrastructure/tracing"
 	"github.com/beeleelee/mall/interfaces/mcp"
@@ -244,9 +246,12 @@ func main() {
 	categoryRepo := infraCatalog.NewPostgresCategoryRepository(db)
 	analyticsRepo := infraAnalytics.NewPostgresAnalyticsRepository(db)
 	analyticsSvc := domainAnalytics.NewAnalyticsService(analyticsRepo)
+	reviewRepo := infraReview.NewPostgresReviewRepository(db)
+	reviewSvc := domainReview.NewReviewService(reviewRepo, logger)
 	refundRepo := infraOrder.NewPostgresRefundRepository(db)
 	refundSvc := domainOrder.NewRefundService(refundRepo, paymentSvc, inventorySvc, orderSvc, logger)
-	adminHandler := rest.NewAdminHandler(catalogSvc, orderSvc, appSvc, inventorySvc, storageSvc, categoryRepo, analyticsSvc, sf, db, webhookDLQ, refundSvc)
+	reviewHandler := rest.NewReviewHandler(reviewSvc, sf)
+	adminHandler := rest.NewAdminHandler(catalogSvc, orderSvc, appSvc, inventorySvc, storageSvc, categoryRepo, analyticsSvc, reviewSvc, sf, db, webhookDLQ, refundSvc)
 	adminMW := middleware.AdminMiddleware(userRepo)
 
 	a2aTaskRepo := infraA2A.NewPostgresTaskRepository(db)
@@ -353,7 +358,7 @@ func main() {
 		Timeout: 30000,
 	})
 
-	supportedCaps := []string{"dev.ucp.shopping.catalog", "dev.ucp.shopping.cart", "dev.ucp.shopping.checkout", "dev.ucp.shopping.order", "dev.ucp.shopping.ecp", "dev.ucp.shopping.ap2_mandate", "dev.ucp.shopping.payment_token_exchange", "dev.ucp.shopping.stripe_payment", "dev.ucp.shopping.fulfillment", "dev.ucp.shopping.discount", "dev.ucp.shopping.identity", "dev.ucp.shopping.webhook", "dev.ucp.shopping.oauth", "dev.ucp.shopping.inventory", "dev.ucp.shopping.admin", "dev.ucp.shopping.admin.dashboard", "dev.a2a.agent"}
+	supportedCaps := []string{"dev.ucp.shopping.catalog", "dev.ucp.shopping.cart", "dev.ucp.shopping.checkout", "dev.ucp.shopping.order", "dev.ucp.shopping.ecp", "dev.ucp.shopping.ap2_mandate", "dev.ucp.shopping.payment_token_exchange", "dev.ucp.shopping.stripe_payment", "dev.ucp.shopping.fulfillment", "dev.ucp.shopping.discount", "dev.ucp.shopping.identity", "dev.ucp.shopping.webhook", "dev.ucp.shopping.oauth", "dev.ucp.shopping.inventory", "dev.ucp.shopping.admin", "dev.ucp.shopping.admin.dashboard", "dev.ucp.shopping.reviews", "dev.a2a.agent"}
 	srv.Use(gozerorest.ToMiddleware(middleware.RequestIDMiddleware))
 	srv.Use(gozerorest.ToMiddleware(middleware.CORSMiddleware))
 	srv.Use(gozerorest.ToMiddleware(middleware.RecoveryMiddleware))
@@ -617,6 +622,27 @@ func main() {
 
 	srv.AddRoute(gozerorest.Route{
 		Method:  http.MethodPost,
+		Path:    "/api/v1/products/:id/reviews",
+		Handler: auth(http.HandlerFunc(reviewHandler.Create)).ServeHTTP,
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodGet,
+		Path:    "/api/v1/products/:id/reviews",
+		Handler: reviewHandler.ListByProduct,
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodGet,
+		Path:    "/api/v1/reviews/:id",
+		Handler: reviewHandler.Get,
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodDelete,
+		Path:    "/api/v1/reviews/:id",
+		Handler: auth(http.HandlerFunc(reviewHandler.Delete)).ServeHTTP,
+	})
+
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPost,
 		Path:    "/api/v1/webhooks",
 		Handler: auth(http.HandlerFunc(webhookHandler.Register)).ServeHTTP,
 	})
@@ -825,6 +851,22 @@ func main() {
 		Method:  http.MethodGet,
 		Path:    "/api/v1/admin/analytics/products",
 		Handler: adminAuth(adminHandler.ProductAnalytics),
+	})
+
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodGet,
+		Path:    "/api/v1/admin/reviews",
+		Handler: adminAuth(adminHandler.ListAllReviews),
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPost,
+		Path:    "/api/v1/admin/reviews/:id/approve",
+		Handler: adminAuth(adminHandler.ApproveReview),
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPost,
+		Path:    "/api/v1/admin/reviews/:id/reject",
+		Handler: adminAuth(adminHandler.RejectReview),
 	})
 
 	srv.AddRoute(gozerorest.Route{
