@@ -339,6 +339,20 @@ func DefaultProfile() *Profile {
 					},
 				},
 			},
+			"dev.ucp.shopping.wishlist": {
+				Version: "1.0.0",
+				Bindings: CapabilityBindings{
+					REST: &RESTBinding{
+						BaseURL: "/api/v1/wishlist",
+						Endpoints: map[string]string{
+							"get":    "GET /",
+							"add":    "POST /items",
+							"remove": "DELETE /items/{productId}",
+							"clear":  "DELETE /",
+						},
+					},
+				},
+			},
 			"dev.ucp.shopping.reviews": {
 				Version: "1.0.0",
 				Bindings: CapabilityBindings{

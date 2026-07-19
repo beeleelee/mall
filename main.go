@@ -41,6 +41,7 @@ import (
 	domainOrder "github.com/beeleelee/mall/domain/order"
 	domainPayment "github.com/beeleelee/mall/domain/payment"
 	domainReview "github.com/beeleelee/mall/domain/review"
+	domainWishlist "github.com/beeleelee/mall/domain/wishlist"
 	infraA2A "github.com/beeleelee/mall/infrastructure/a2a"
 	infraAnalytics "github.com/beeleelee/mall/infrastructure/analytics"
 	infraCart "github.com/beeleelee/mall/infrastructure/cart"
@@ -59,6 +60,7 @@ import (
 	infraPayment "github.com/beeleelee/mall/infrastructure/payment"
 	infraReview "github.com/beeleelee/mall/infrastructure/review"
 	infraStorage "github.com/beeleelee/mall/infrastructure/storage"
+	infraWishlist "github.com/beeleelee/mall/infrastructure/wishlist"
 	"github.com/beeleelee/mall/infrastructure/tracing"
 	"github.com/beeleelee/mall/interfaces/mcp"
 	"github.com/beeleelee/mall/interfaces/middleware"
@@ -251,6 +253,9 @@ func main() {
 	refundRepo := infraOrder.NewPostgresRefundRepository(db)
 	refundSvc := domainOrder.NewRefundService(refundRepo, paymentSvc, inventorySvc, orderSvc, logger)
 	reviewHandler := rest.NewReviewHandler(reviewSvc, sf)
+	wishlistRepo := infraWishlist.NewPostgresWishlistRepository(db)
+	wishlistSvc := domainWishlist.NewWishlistService(wishlistRepo, sf, logger)
+	wishlistHandler := rest.NewWishlistHandler(wishlistSvc)
 	adminHandler := rest.NewAdminHandler(catalogSvc, orderSvc, appSvc, inventorySvc, storageSvc, categoryRepo, analyticsSvc, reviewSvc, sf, db, webhookDLQ, refundSvc)
 	adminMW := middleware.AdminMiddleware(userRepo)
 
@@ -358,7 +363,7 @@ func main() {
 		Timeout: 30000,
 	})
 
-	supportedCaps := []string{"dev.ucp.shopping.catalog", "dev.ucp.shopping.cart", "dev.ucp.shopping.checkout", "dev.ucp.shopping.order", "dev.ucp.shopping.ecp", "dev.ucp.shopping.ap2_mandate", "dev.ucp.shopping.payment_token_exchange", "dev.ucp.shopping.stripe_payment", "dev.ucp.shopping.fulfillment", "dev.ucp.shopping.discount", "dev.ucp.shopping.identity", "dev.ucp.shopping.webhook", "dev.ucp.shopping.oauth", "dev.ucp.shopping.inventory", "dev.ucp.shopping.admin", "dev.ucp.shopping.admin.dashboard", "dev.ucp.shopping.reviews", "dev.a2a.agent"}
+	supportedCaps := []string{"dev.ucp.shopping.catalog", "dev.ucp.shopping.cart", "dev.ucp.shopping.checkout", "dev.ucp.shopping.order", "dev.ucp.shopping.ecp", "dev.ucp.shopping.ap2_mandate", "dev.ucp.shopping.payment_token_exchange", "dev.ucp.shopping.stripe_payment", "dev.ucp.shopping.fulfillment", "dev.ucp.shopping.discount", "dev.ucp.shopping.identity", "dev.ucp.shopping.webhook", "dev.ucp.shopping.oauth", "dev.ucp.shopping.inventory", "dev.ucp.shopping.admin", "dev.ucp.shopping.admin.dashboard", "dev.ucp.shopping.reviews", "dev.ucp.shopping.wishlist", "dev.a2a.agent"}
 	srv.Use(gozerorest.ToMiddleware(middleware.RequestIDMiddleware))
 	srv.Use(gozerorest.ToMiddleware(middleware.CORSMiddleware))
 	srv.Use(gozerorest.ToMiddleware(middleware.RecoveryMiddleware))
@@ -721,6 +726,27 @@ func main() {
 		Method:  http.MethodPost,
 		Path:    "/api/v1/discounts/deactivate",
 		Handler: auth(http.HandlerFunc(discountHandler.Deactivate)).ServeHTTP,
+	})
+
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodGet,
+		Path:    "/api/v1/wishlist",
+		Handler: auth(http.HandlerFunc(wishlistHandler.Get)).ServeHTTP,
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPost,
+		Path:    "/api/v1/wishlist/items",
+		Handler: auth(http.HandlerFunc(wishlistHandler.AddItem)).ServeHTTP,
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodDelete,
+		Path:    "/api/v1/wishlist/items/:productId",
+		Handler: auth(http.HandlerFunc(wishlistHandler.RemoveItem)).ServeHTTP,
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodDelete,
+		Path:    "/api/v1/wishlist",
+		Handler: auth(http.HandlerFunc(wishlistHandler.Clear)).ServeHTTP,
 	})
 
 	srv.AddRoute(gozerorest.Route{
