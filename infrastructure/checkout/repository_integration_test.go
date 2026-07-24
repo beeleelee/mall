@@ -112,7 +112,10 @@ CREATE TABLE IF NOT EXISTS checkout_sessions (
     mandate_id       BIGINT NOT NULL DEFAULT 0,
     wallet_provider  TEXT NOT NULL DEFAULT '',
     wallet_token     TEXT NOT NULL DEFAULT '',
-    completed_at     TIMESTAMPTZ,
+    stripe_session_id          TEXT NOT NULL DEFAULT '',
+    stripe_payment_intent_id   TEXT NOT NULL DEFAULT '',
+    stripe_payment_status      TEXT NOT NULL DEFAULT '',
+    completed_at               TIMESTAMPTZ,
     created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at       TIMESTAMPTZ NOT NULL DEFAULT now()
 );
