@@ -3,11 +3,15 @@ package rest
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
+	"sync"
 	"testing"
+	"time"
 
 	app "github.com/beeleelee/mall/application/identity"
 	domain "github.com/beeleelee/mall/domain/identity"
@@ -84,30 +88,76 @@ func (fakeLog) Info(_ context.Context, _ string, _ ...kernel.LogField)          
 func (fakeLog) Warn(_ context.Context, _ string, _ ...kernel.LogField)           {}
 func (fakeLog) Error(_ context.Context, _ string, _ error, _ ...kernel.LogField) {}
 
-type fakeTokenRepo struct{}
-
-func (f fakeTokenRepo) Save(_ context.Context, _ *domain.PasswordResetToken) error { return nil }
-func (f fakeTokenRepo) FindByHash(_ context.Context, _ string) (*domain.PasswordResetToken, error) {
-	return nil, kernel.NewDomainError(kernel.ErrNotFound, "not found")
+type fakeTokenRepo struct {
+	mu     sync.Mutex
+	tokens map[string]*domain.PasswordResetToken
 }
-func (f fakeTokenRepo) MarkUsed(_ context.Context, _ kernel.ID) error { return nil }
-func (f fakeTokenRepo) DeleteExpired(_ context.Context) error         { return nil }
 
-func newTestIdentityHandler(t *testing.T) *IdentityHandler {
+func newFakeTokenRepo() *fakeTokenRepo {
+	return &fakeTokenRepo{tokens: make(map[string]*domain.PasswordResetToken)}
+}
+
+func (f *fakeTokenRepo) Save(_ context.Context, token *domain.PasswordResetToken) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.tokens[token.TokenHash] = token
+	return nil
+}
+
+func (f *fakeTokenRepo) FindByHash(_ context.Context, hash string) (*domain.PasswordResetToken, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	t, ok := f.tokens[hash]
+	if !ok {
+		return nil, kernel.NewDomainError(kernel.ErrNotFound, "not found")
+	}
+	return t, nil
+}
+
+func (f *fakeTokenRepo) MarkUsed(_ context.Context, id kernel.ID) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for _, t := range f.tokens {
+		if t.ID == id {
+			t.MarkUsed()
+			return nil
+		}
+	}
+	return kernel.NewDomainError(kernel.ErrNotFound, "not found")
+}
+
+func (f *fakeTokenRepo) DeleteExpired(_ context.Context) error { return nil }
+
+type identityTestFixture struct {
+	handler   *IdentityHandler
+	tokenRepo *fakeTokenRepo
+}
+
+func newTestIdentityFixture(t *testing.T) *identityTestFixture {
 	t.Helper()
 	repo := newFakeUserRepo()
+	tokenRepo := newFakeTokenRepo()
 	logger := fakeLog{}
 	domainSvc := domain.NewIdentityService(repo, logger)
 	sf, err := kernel.NewSnowflake(1)
 	if err != nil {
 		t.Fatalf("NewSnowflake failed: %v", err)
 	}
-	appSvc := app.NewIdentityAppService(domainSvc, repo, fakeTokenRepo{}, logger, sf)
-	return NewIdentityHandler(appSvc)
+	appSvc := app.NewIdentityAppService(domainSvc, repo, tokenRepo, logger, sf)
+	return &identityTestFixture{
+		handler:   NewIdentityHandler(appSvc),
+		tokenRepo: tokenRepo,
+	}
+}
+
+func hashToken(token string) string {
+	sum := sha256.Sum256([]byte(token))
+	return hex.EncodeToString(sum[:])
 }
 
 func TestIdentityHandler_Register_Success(t *testing.T) {
-	h := newTestIdentityHandler(t)
+	fx := newTestIdentityFixture(t)
+	h := fx.handler
 	body := map[string]string{
 		"email":    "test@example.com",
 		"password": "securepass123",
@@ -138,7 +188,8 @@ func TestIdentityHandler_Register_Success(t *testing.T) {
 }
 
 func TestIdentityHandler_Register_Duplicate(t *testing.T) {
-	h := newTestIdentityHandler(t)
+	fx := newTestIdentityFixture(t)
+	h := fx.handler
 	body := map[string]string{
 		"email":    "dup@example.com",
 		"password": "password123",
@@ -162,7 +213,8 @@ func TestIdentityHandler_Register_Duplicate(t *testing.T) {
 }
 
 func TestIdentityHandler_Register_InvalidBody(t *testing.T) {
-	h := newTestIdentityHandler(t)
+	fx := newTestIdentityFixture(t)
+	h := fx.handler
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/register", bytes.NewReader([]byte("not json")))
 	req.Header.Set("Content-Type", "application/json")
@@ -171,7 +223,8 @@ func TestIdentityHandler_Register_InvalidBody(t *testing.T) {
 }
 
 func TestIdentityHandler_Login_Success(t *testing.T) {
-	h := newTestIdentityHandler(t)
+	fx := newTestIdentityFixture(t)
+	h := fx.handler
 
 	regBody := map[string]string{
 		"email":    "login@example.com",
@@ -208,7 +261,8 @@ func TestIdentityHandler_Login_Success(t *testing.T) {
 }
 
 func TestIdentityHandler_Login_WrongPassword(t *testing.T) {
-	h := newTestIdentityHandler(t)
+	fx := newTestIdentityFixture(t)
+	h := fx.handler
 
 	regBody := map[string]string{
 		"email":    "wrongpw@example.com",
@@ -237,7 +291,8 @@ func TestIdentityHandler_Login_WrongPassword(t *testing.T) {
 }
 
 func TestIdentityHandler_GetUser_Success(t *testing.T) {
-	h := newTestIdentityHandler(t)
+	fx := newTestIdentityFixture(t)
+	h := fx.handler
 
 	regBody := map[string]string{
 		"email":    "getuser@example.com",
@@ -274,7 +329,8 @@ func TestIdentityHandler_GetUser_Success(t *testing.T) {
 }
 
 func TestIdentityHandler_GetUser_NotFound(t *testing.T) {
-	h := newTestIdentityHandler(t)
+	fx := newTestIdentityFixture(t)
+	h := fx.handler
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/users/999", nil)
 	rec := httptest.NewRecorder()
 	h.GetUser(rec, req)
@@ -285,12 +341,234 @@ func TestIdentityHandler_GetUser_NotFound(t *testing.T) {
 }
 
 func TestIdentityHandler_GetUser_InvalidID(t *testing.T) {
-	h := newTestIdentityHandler(t)
+	fx := newTestIdentityFixture(t)
+	h := fx.handler
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/users/abc", nil)
 	rec := httptest.NewRecorder()
 	h.GetUser(rec, req)
 
 	if rec.Code != http.StatusBadRequest {
 		t.Errorf("expected 400, got %d", rec.Code)
+	}
+}
+
+func registerUserForReset(h *IdentityHandler, t *testing.T, email string) {
+	t.Helper()
+	body := map[string]string{"email": email, "password": "password123", "name": "User"}
+	data, _ := json.Marshal(body)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/register", bytes.NewReader(data))
+	req.Header.Set("Content-Type", "application/json")
+	h.Register(httptest.NewRecorder(), req)
+}
+
+func TestIdentityHandler_RequestPasswordReset_Success(t *testing.T) {
+	fx := newTestIdentityFixture(t)
+	h := fx.handler
+
+	regBody := map[string]string{"email": "reset-test@example.com", "password": "password123", "name": "User"}
+	regData, _ := json.Marshal(regBody)
+	regReq := httptest.NewRequest(http.MethodPost, "/api/v1/auth/register", bytes.NewReader(regData))
+	regReq.Header.Set("Content-Type", "application/json")
+	regRec := httptest.NewRecorder()
+	h.Register(regRec, regReq)
+	if regRec.Code != http.StatusCreated {
+		t.Fatalf("register expected 201, got %d: %s", regRec.Code, regRec.Body.String())
+	}
+
+	body := map[string]string{"email": "reset-test@example.com"}
+	data, _ := json.Marshal(body)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/password-reset/request", bytes.NewReader(data))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	h.RequestPasswordReset(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	var resp map[string]string
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if resp["token"] == "" {
+		t.Error("expected non-empty token")
+	}
+}
+
+func TestIdentityHandler_RequestPasswordReset_NotFound(t *testing.T) {
+	fx := newTestIdentityFixture(t)
+	h := fx.handler
+
+	body := map[string]string{"email": "nonexistent@example.com"}
+	data, _ := json.Marshal(body)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/password-reset/request", bytes.NewReader(data))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	h.RequestPasswordReset(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+	var resp map[string]string
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if resp["token"] != "" {
+		t.Error("expected empty token for unknown email")
+	}
+}
+
+func TestIdentityHandler_RequestPasswordReset_InvalidBody(t *testing.T) {
+	fx := newTestIdentityFixture(t)
+	h := fx.handler
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/password-reset/request", bytes.NewReader([]byte("not json")))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	h.RequestPasswordReset(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("expected 400, got %d", rec.Code)
+	}
+}
+
+func TestIdentityHandler_ResetPassword_Success(t *testing.T) {
+	fx := newTestIdentityFixture(t)
+	h := fx.handler
+	registerUserForReset(h, t, "reset-full@example.com")
+
+	reqBody := map[string]string{"email": "reset-full@example.com"}
+	data, _ := json.Marshal(reqBody)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/password-reset/request", bytes.NewReader(data))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	h.RequestPasswordReset(rec, req)
+
+	var reqResp map[string]string
+	json.NewDecoder(rec.Body).Decode(&reqResp)
+	rawToken := reqResp["token"]
+	if rawToken == "" {
+		t.Fatal("expected non-empty token for password reset")
+	}
+
+	resetBody := map[string]string{"token": rawToken, "new_password": "newSecurePass456"}
+	resetData, _ := json.Marshal(resetBody)
+	resetReq := httptest.NewRequest(http.MethodPost, "/api/v1/auth/password-reset", bytes.NewReader(resetData))
+	resetReq.Header.Set("Content-Type", "application/json")
+	resetRec := httptest.NewRecorder()
+	h.ResetPassword(resetRec, resetReq)
+
+	if resetRec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resetRec.Code)
+	}
+	var resetResp map[string]string
+	json.NewDecoder(resetRec.Body).Decode(&resetResp)
+	if resetResp["status"] != "ok" {
+		t.Errorf("expected status ok, got %s", resetResp["status"])
+	}
+}
+
+func TestIdentityHandler_ResetPassword_InvalidToken(t *testing.T) {
+	fx := newTestIdentityFixture(t)
+	h := fx.handler
+
+	resetBody := map[string]string{"token": "invalid-raw-token", "new_password": "newSecurePass456"}
+	data, _ := json.Marshal(resetBody)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/password-reset", bytes.NewReader(data))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	h.ResetPassword(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for invalid token, got %d", rec.Code)
+	}
+}
+
+func TestIdentityHandler_ResetPassword_InvalidBody(t *testing.T) {
+	fx := newTestIdentityFixture(t)
+	h := fx.handler
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/password-reset", bytes.NewReader([]byte("not json")))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	h.ResetPassword(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for invalid body, got %d", rec.Code)
+	}
+}
+
+func TestIdentityHandler_ResetPassword_AlreadyUsed(t *testing.T) {
+	fx := newTestIdentityFixture(t)
+	h := fx.handler
+	registerUserForReset(h, t, "reset-used@example.com")
+
+	reqBody := map[string]string{"email": "reset-used@example.com"}
+	data, _ := json.Marshal(reqBody)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/password-reset/request", bytes.NewReader(data))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	h.RequestPasswordReset(rec, req)
+
+	var reqResp map[string]string
+	json.NewDecoder(rec.Body).Decode(&reqResp)
+	rawToken := reqResp["token"]
+	if rawToken == "" {
+		t.Fatal("expected non-empty token")
+	}
+
+	tok, err := fx.tokenRepo.FindByHash(context.Background(), hashToken(rawToken))
+	if err != nil {
+		t.Fatalf("find token: %v", err)
+	}
+	if err := fx.tokenRepo.MarkUsed(context.Background(), tok.ID); err != nil {
+		t.Fatalf("mark used: %v", err)
+	}
+
+	resetBody := map[string]string{"token": rawToken, "new_password": "anotherPass789"}
+	resetData, _ := json.Marshal(resetBody)
+	resetReq := httptest.NewRequest(http.MethodPost, "/api/v1/auth/password-reset", bytes.NewReader(resetData))
+	resetReq.Header.Set("Content-Type", "application/json")
+	resetRec := httptest.NewRecorder()
+	h.ResetPassword(resetRec, resetReq)
+
+	if resetRec.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for used token, got %d", resetRec.Code)
+	}
+}
+
+func TestIdentityHandler_ResetPassword_ExpiredToken(t *testing.T) {
+	fx := newTestIdentityFixture(t)
+	h := fx.handler
+	registerUserForReset(h, t, "reset-expired@example.com")
+
+	reqBody := map[string]string{"email": "reset-expired@example.com"}
+	data, _ := json.Marshal(reqBody)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/password-reset/request", bytes.NewReader(data))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	h.RequestPasswordReset(rec, req)
+
+	var reqResp map[string]string
+	json.NewDecoder(rec.Body).Decode(&reqResp)
+	rawToken := reqResp["token"]
+	if rawToken == "" {
+		t.Fatal("expected non-empty token")
+	}
+
+	tok, err := fx.tokenRepo.FindByHash(context.Background(), hashToken(rawToken))
+	if err != nil {
+		t.Fatalf("find token: %v", err)
+	}
+	tok.ExpiresAt = time.Now().Add(-1 * time.Hour)
+
+	resetBody := map[string]string{"token": rawToken, "new_password": "newPassExpired"}
+	resetData, _ := json.Marshal(resetBody)
+	resetReq := httptest.NewRequest(http.MethodPost, "/api/v1/auth/password-reset", bytes.NewReader(resetData))
+	resetReq.Header.Set("Content-Type", "application/json")
+	resetRec := httptest.NewRecorder()
+	h.ResetPassword(resetRec, resetReq)
+
+	if resetRec.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for expired token, got %d", resetRec.Code)
 	}
 }
