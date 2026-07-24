@@ -18,6 +18,7 @@ import (
 	"github.com/beeleelee/mall/domain/inventory"
 	"github.com/beeleelee/mall/domain/kernel"
 	orderdomain "github.com/beeleelee/mall/domain/order"
+	reviewdomain "github.com/beeleelee/mall/domain/review"
 )
 
 type fakeInventoryRepo struct {
@@ -577,5 +578,128 @@ func TestAdminHandler_UpdateCategory_Success(t *testing.T) {
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+}
+
+func TestAdminHandler_ListAllReviews_Success(t *testing.T) {
+	sf, _ := kernel.NewSnowflake(1)
+	reviewRepo := newFakeReviewRepo()
+	logger := fakeLog{}
+	reviewSvc := reviewdomain.NewReviewService(reviewRepo, logger)
+	h := &AdminHandler{reviewSvc: reviewSvc, sf: sf}
+
+	id1, _ := sf.NextID()
+	r1, _ := reviewdomain.NewReview(id1, kernel.ID(10), kernel.ID(1), 5, "Great", "Love it")
+	reviewRepo.Save(context.Background(), r1)
+
+	id2, _ := sf.NextID()
+	r2, _ := reviewdomain.NewReview(id2, kernel.ID(10), kernel.ID(2), 4, "Good", "Nice")
+	reviewRepo.Save(context.Background(), r2)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/reviews?limit=10", nil)
+	rec := httptest.NewRecorder()
+	h.ListAllReviews(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+	var resp map[string]any
+	json.NewDecoder(rec.Body).Decode(&resp)
+	reviews := resp["reviews"].([]any)
+	if len(reviews) != 2 {
+		t.Errorf("expected 2 reviews, got %d", len(reviews))
+	}
+}
+
+func TestAdminHandler_ListAllReviews_Empty(t *testing.T) {
+	sf, _ := kernel.NewSnowflake(1)
+	reviewRepo := newFakeReviewRepo()
+	logger := fakeLog{}
+	reviewSvc := reviewdomain.NewReviewService(reviewRepo, logger)
+	h := &AdminHandler{reviewSvc: reviewSvc, sf: sf}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/reviews?limit=10", nil)
+	rec := httptest.NewRecorder()
+	h.ListAllReviews(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+	var resp map[string]any
+	json.NewDecoder(rec.Body).Decode(&resp)
+	reviews := resp["reviews"].([]any)
+	if len(reviews) != 0 {
+		t.Errorf("expected 0 reviews, got %d", len(reviews))
+	}
+}
+
+func TestAdminHandler_ApproveReview_Success(t *testing.T) {
+	sf, _ := kernel.NewSnowflake(1)
+	reviewRepo := newFakeReviewRepo()
+	logger := fakeLog{}
+	reviewSvc := reviewdomain.NewReviewService(reviewRepo, logger)
+	h := &AdminHandler{reviewSvc: reviewSvc, sf: sf}
+
+	id, _ := sf.NextID()
+	r, _ := reviewdomain.NewReview(id, kernel.ID(10), kernel.ID(1), 5, "Pending", "Approve me")
+	reviewRepo.Save(context.Background(), r)
+
+	idStr := strconv.FormatInt(id.Int64(), 10)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/reviews/"+idStr+"/approve", nil)
+	req = pathvar.WithVars(req, map[string]string{"id": idStr})
+	rec := httptest.NewRecorder()
+	h.ApproveReview(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+	var resp map[string]any
+	json.NewDecoder(rec.Body).Decode(&resp)
+	if resp["status"] != "approved" {
+		t.Errorf("expected status approved, got %v", resp["status"])
+	}
+}
+
+func TestAdminHandler_RejectReview_Success(t *testing.T) {
+	sf, _ := kernel.NewSnowflake(1)
+	reviewRepo := newFakeReviewRepo()
+	logger := fakeLog{}
+	reviewSvc := reviewdomain.NewReviewService(reviewRepo, logger)
+	h := &AdminHandler{reviewSvc: reviewSvc, sf: sf}
+
+	id, _ := sf.NextID()
+	r, _ := reviewdomain.NewReview(id, kernel.ID(10), kernel.ID(1), 3, "Flagged", "Reject me")
+	reviewRepo.Save(context.Background(), r)
+
+	idStr := strconv.FormatInt(id.Int64(), 10)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/reviews/"+idStr+"/reject", nil)
+	req = pathvar.WithVars(req, map[string]string{"id": idStr})
+	rec := httptest.NewRecorder()
+	h.RejectReview(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+	var resp map[string]any
+	json.NewDecoder(rec.Body).Decode(&resp)
+	if resp["status"] != "rejected" {
+		t.Errorf("expected status rejected, got %v", resp["status"])
+	}
+}
+
+func TestAdminHandler_ApproveReview_NotFound(t *testing.T) {
+	sf, _ := kernel.NewSnowflake(1)
+	reviewRepo := newFakeReviewRepo()
+	logger := fakeLog{}
+	reviewSvc := reviewdomain.NewReviewService(reviewRepo, logger)
+	h := &AdminHandler{reviewSvc: reviewSvc, sf: sf}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/reviews/999/approve", nil)
+	req = pathvar.WithVars(req, map[string]string{"id": "999"})
+	rec := httptest.NewRecorder()
+	h.ApproveReview(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("expected 404, got %d", rec.Code)
 	}
 }
