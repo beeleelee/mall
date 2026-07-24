@@ -71,14 +71,24 @@ func (s *NotificationService) SendPasswordReset(ctx context.Context, to EmailAdd
 }
 
 func formatID(id int64) string {
-	s := ""
-	for i, c := range []byte(formatInt64(id)) {
-		if i > 0 && i%3 == 0 {
-			s = "," + s
-		}
-		s = string(c) + s
+	abs := id
+	prefix := ""
+	if id < 0 {
+		prefix = "-"
+		abs = -id
 	}
-	return s
+	s := formatInt64(abs)
+	if len(s) <= 3 {
+		return prefix + s
+	}
+	var result []byte
+	for i, c := range []byte(s) {
+		if i > 0 && (len(s)-i)%3 == 0 {
+			result = append(result, ',')
+		}
+		result = append(result, c)
+	}
+	return prefix + string(result)
 }
 
 func formatInt64(n int64) string {
@@ -110,7 +120,7 @@ func formatMoney(cents int64) string {
 	}
 	dollars := cents / 100
 	remaining := cents % 100
-	s := formatInt64(dollars) + "."
+	s := formatID(dollars) + "."
 	if remaining < 10 {
 		s += "0"
 	}
