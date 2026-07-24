@@ -79,7 +79,7 @@ type updateProductRequest struct {
 func (h *AdminHandler) CreateProduct(w http.ResponseWriter, r *http.Request) {
 	var req createProductRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, kernel.NewDomainError(kernel.ErrInvalidArgument, "invalid request body"))
 		return
 	}
 
