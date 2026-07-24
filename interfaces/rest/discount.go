@@ -45,7 +45,7 @@ type deactivateDiscountRequest struct {
 func (h *DiscountHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var req createDiscountRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, kernel.NewDomainError(kernel.ErrInvalidArgument, "invalid request body"))
 		return
 	}
 
@@ -73,7 +73,7 @@ func (h *DiscountHandler) Create(w http.ResponseWriter, r *http.Request) {
 func (h *DiscountHandler) Validate(w http.ResponseWriter, r *http.Request) {
 	var req validateDiscountRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, kernel.NewDomainError(kernel.ErrInvalidArgument, "invalid request body"))
 		return
 	}
 
@@ -92,7 +92,7 @@ func (h *DiscountHandler) Validate(w http.ResponseWriter, r *http.Request) {
 func (h *DiscountHandler) Apply(w http.ResponseWriter, r *http.Request) {
 	var req applyDiscountRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, kernel.NewDomainError(kernel.ErrInvalidArgument, "invalid request body"))
 		return
 	}
 
@@ -113,7 +113,7 @@ func (h *DiscountHandler) Apply(w http.ResponseWriter, r *http.Request) {
 func (h *DiscountHandler) Deactivate(w http.ResponseWriter, r *http.Request) {
 	var req deactivateDiscountRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, kernel.NewDomainError(kernel.ErrInvalidArgument, "invalid request body"))
 		return
 	}
 
