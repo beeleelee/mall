@@ -25,9 +25,9 @@ func (m *mockEmailSender) Send(_ context.Context, msg EmailMessage) error {
 
 type discardLogger struct{}
 
-func (discardLogger) Debug(_ context.Context, _ string, _ ...kernel.LogField) {}
-func (discardLogger) Info(_ context.Context, _ string, _ ...kernel.LogField)  {}
-func (discardLogger) Warn(_ context.Context, _ string, _ ...kernel.LogField)  {}
+func (discardLogger) Debug(_ context.Context, _ string, _ ...kernel.LogField)          {}
+func (discardLogger) Info(_ context.Context, _ string, _ ...kernel.LogField)           {}
+func (discardLogger) Warn(_ context.Context, _ string, _ ...kernel.LogField)           {}
 func (discardLogger) Error(_ context.Context, _ string, _ error, _ ...kernel.LogField) {}
 
 func newTestService(sender EmailSender) *NotificationService {

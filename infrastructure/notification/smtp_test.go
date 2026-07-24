@@ -111,9 +111,9 @@ func TestSMTPEmailSender_MessageFormatting_HTML(t *testing.T) {
 	})
 
 	msgBytes := sender.buildMessage(domain.EmailMessage{
-		To:        "to@example.com",
-		Subject:   "HTML Test",
-		HTMLBody:  "<h1>Hello</h1>",
+		To:       "to@example.com",
+		Subject:  "HTML Test",
+		HTMLBody: "<h1>Hello</h1>",
 	})
 
 	body := string(msgBytes)

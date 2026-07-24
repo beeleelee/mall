@@ -188,7 +188,7 @@ func TestReviewRepository_FindByProduct(t *testing.T) {
 	ctx := context.Background()
 
 	for i := int64(1); i <= 3; i++ {
-		rating, _ := domain.NewRating(int((i%5)+1))
+		rating, _ := domain.NewRating(int((i % 5) + 1))
 		rv, _ := domain.NewReview(kernel.ID(i), 100, kernel.ID(200+i), rating, "Title", "Content")
 		f.repo.Save(ctx, rv)
 	}
