@@ -9,9 +9,9 @@ import (
 
 type mockLogger struct{}
 
-func (m *mockLogger) Debug(_ context.Context, _ string, _ ...kernel.LogField) {}
-func (m *mockLogger) Info(_ context.Context, _ string, _ ...kernel.LogField)  {}
-func (m *mockLogger) Warn(_ context.Context, _ string, _ ...kernel.LogField)  {}
+func (m *mockLogger) Debug(_ context.Context, _ string, _ ...kernel.LogField)          {}
+func (m *mockLogger) Info(_ context.Context, _ string, _ ...kernel.LogField)           {}
+func (m *mockLogger) Warn(_ context.Context, _ string, _ ...kernel.LogField)           {}
 func (m *mockLogger) Error(_ context.Context, _ string, _ error, _ ...kernel.LogField) {}
 
 type fakeWishlistRepo struct {

@@ -7,8 +7,8 @@ import (
 
 	"github.com/zeromicro/go-zero/rest/pathvar"
 
-	domain "github.com/beeleelee/mall/domain/wishlist"
 	"github.com/beeleelee/mall/domain/kernel"
+	domain "github.com/beeleelee/mall/domain/wishlist"
 )
 
 type WishlistHandler struct {
@@ -29,10 +29,10 @@ type wishlistItemResponse struct {
 }
 
 type wishlistResponse struct {
-	ID     int64                 `json:"id"`
-	UserID int64                 `json:"user_id"`
+	ID     int64                  `json:"id"`
+	UserID int64                  `json:"user_id"`
 	Items  []wishlistItemResponse `json:"items"`
-	Count  int                   `json:"count"`
+	Count  int                    `json:"count"`
 }
 
 func buildWishlistResponse(w *domain.Wishlist) wishlistResponse {

@@ -16,13 +16,13 @@ import (
 )
 
 type deliveryLogIntegrationFixture struct {
-	repo     *PostgresWebhookDeliveryLogRepository
-	whRepo   *PostgresWebhookRepository
-	db       *sqlx.DB
-	schema   string
-	cleanup  func()
-	sf       *kernel.Snowflake
-	webhook  *domain.Webhook
+	repo    *PostgresWebhookDeliveryLogRepository
+	whRepo  *PostgresWebhookRepository
+	db      *sqlx.DB
+	schema  string
+	cleanup func()
+	sf      *kernel.Snowflake
+	webhook *domain.Webhook
 }
 
 func deliveryLogServicesUp() bool {

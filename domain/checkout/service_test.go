@@ -165,8 +165,8 @@ func TestCheckoutService_GetCheckout_NotFound(t *testing.T) {
 }
 
 type fakeStripeProcessor struct {
-	createCheckoutSessionFn func(ctx context.Context, checkout *CheckoutSession) (string, string, error)
-	createPaymentIntentFn   func(ctx context.Context, checkoutID kernel.ID, amount int64) (string, string, error)
+	createCheckoutSessionFn  func(ctx context.Context, checkout *CheckoutSession) (string, string, error)
+	createPaymentIntentFn    func(ctx context.Context, checkoutID kernel.ID, amount int64) (string, string, error)
 	getPaymentIntentStatusFn func(ctx context.Context, paymentIntentID string) (string, error)
 }
 

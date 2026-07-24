@@ -90,8 +90,8 @@ func (f fakeTokenRepo) Save(_ context.Context, _ *domain.PasswordResetToken) err
 func (f fakeTokenRepo) FindByHash(_ context.Context, _ string) (*domain.PasswordResetToken, error) {
 	return nil, kernel.NewDomainError(kernel.ErrNotFound, "not found")
 }
-func (f fakeTokenRepo) MarkUsed(_ context.Context, _ kernel.ID) error   { return nil }
-func (f fakeTokenRepo) DeleteExpired(_ context.Context) error           { return nil }
+func (f fakeTokenRepo) MarkUsed(_ context.Context, _ kernel.ID) error { return nil }
+func (f fakeTokenRepo) DeleteExpired(_ context.Context) error         { return nil }
 
 func newTestIdentityHandler(t *testing.T) *IdentityHandler {
 	t.Helper()

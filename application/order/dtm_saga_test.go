@@ -52,12 +52,12 @@ func newDTMSaga() (*DTMCheckoutSaga, *domain.OrderService, *fakeDTMSubmitter) {
 	idGen := &fakeIDGen{next: 500}
 
 	saga := &DTMCheckoutSaga{
-		orderSvc: orderSvc,
-		submitFn: submitter.submit,
+		orderSvc:  orderSvc,
+		submitFn:  submitter.submit,
 		dtmServer: "http://dtm:36789/api/dtmsvr",
-		cbURL:    "http://localhost:8080",
-		idGen:    idGen.nextID,
-		logger:   logger,
+		cbURL:     "http://localhost:8080",
+		idGen:     idGen.nextID,
+		logger:    logger,
 	}
 	return saga, orderSvc, submitter
 }

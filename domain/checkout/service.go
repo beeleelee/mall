@@ -29,13 +29,13 @@ type StripePaymentProcessor interface {
 }
 
 type CheckoutService struct {
-	repo              CheckoutRepository
-	taxSvc            TaxService
-	priceCalc         PriceCalculator
-	publisher         CheckoutEventPublisher
-	logger            kernel.Logger
-	mandateVerifier   MandateVerifier
-	stripeProcessor   StripePaymentProcessor
+	repo            CheckoutRepository
+	taxSvc          TaxService
+	priceCalc       PriceCalculator
+	publisher       CheckoutEventPublisher
+	logger          kernel.Logger
+	mandateVerifier MandateVerifier
+	stripeProcessor StripePaymentProcessor
 }
 
 func NewCheckoutService(

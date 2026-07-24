@@ -13,9 +13,9 @@ import (
 )
 
 type fixture struct {
-	repo   *PostgresAnalyticsRepository
-	db     *sqlx.DB
-	schema string
+	repo    *PostgresAnalyticsRepository
+	db      *sqlx.DB
+	schema  string
 	cleanup func()
 }
 

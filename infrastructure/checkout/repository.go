@@ -42,29 +42,29 @@ func (m *nullRawMessage) UnmarshalJSON(data []byte) error {
 }
 
 type sessionRow struct {
-	ID                  int64          `db:"id"`
-	UserID              int64          `db:"user_id"`
-	CartID              int64          `db:"cart_id"`
-	CartSnapshot        nullRawMessage `db:"cart_snapshot"`
-	ShippingAddress     nullRawMessage `db:"shipping_address"`
-	BillingAddress      nullRawMessage `db:"billing_address"`
-	ShippingOption      nullRawMessage `db:"shipping_option"`
-	PaymentHandler      string         `db:"payment_handler"`
-	MandateID           int64          `db:"mandate_id"`
-	WalletProvider      string         `db:"wallet_provider"`
-	WalletToken         string         `db:"wallet_token"`
-	Subtotal            int64          `db:"subtotal"`
-	ShippingCost        int64          `db:"shipping_cost"`
-	TaxAmount           int64          `db:"tax_amount"`
-	GrandTotal          int64          `db:"grand_total"`
-	Status              string         `db:"status"`
-	ContinueURL         string         `db:"continue_url"`
-	StripeSessionID     string         `db:"stripe_session_id"`
-	StripePaymentIntentID string      `db:"stripe_payment_intent_id"`
-	StripePaymentStatus string         `db:"stripe_payment_status"`
-	CompletedAt         *time.Time     `db:"completed_at"`
-	CreatedAt           time.Time      `db:"created_at"`
-	UpdatedAt           time.Time      `db:"updated_at"`
+	ID                    int64          `db:"id"`
+	UserID                int64          `db:"user_id"`
+	CartID                int64          `db:"cart_id"`
+	CartSnapshot          nullRawMessage `db:"cart_snapshot"`
+	ShippingAddress       nullRawMessage `db:"shipping_address"`
+	BillingAddress        nullRawMessage `db:"billing_address"`
+	ShippingOption        nullRawMessage `db:"shipping_option"`
+	PaymentHandler        string         `db:"payment_handler"`
+	MandateID             int64          `db:"mandate_id"`
+	WalletProvider        string         `db:"wallet_provider"`
+	WalletToken           string         `db:"wallet_token"`
+	Subtotal              int64          `db:"subtotal"`
+	ShippingCost          int64          `db:"shipping_cost"`
+	TaxAmount             int64          `db:"tax_amount"`
+	GrandTotal            int64          `db:"grand_total"`
+	Status                string         `db:"status"`
+	ContinueURL           string         `db:"continue_url"`
+	StripeSessionID       string         `db:"stripe_session_id"`
+	StripePaymentIntentID string         `db:"stripe_payment_intent_id"`
+	StripePaymentStatus   string         `db:"stripe_payment_status"`
+	CompletedAt           *time.Time     `db:"completed_at"`
+	CreatedAt             time.Time      `db:"created_at"`
+	UpdatedAt             time.Time      `db:"updated_at"`
 }
 
 func (r sessionRow) toDomain() (*domain.CheckoutSession, error) {
@@ -161,29 +161,29 @@ func fromDomain(s *domain.CheckoutSession) (sessionRow, error) {
 	}
 
 	return sessionRow{
-		ID:                  s.ID.Int64(),
-		UserID:              s.UserID.Int64(),
-		CartID:              s.CartID.Int64(),
-		CartSnapshot:        cartSnapshot,
-		ShippingAddress:     shippingAddr,
-		BillingAddress:      billingAddr,
-		ShippingOption:      shippingOpt,
-		PaymentHandler:      s.PaymentHandler,
-		MandateID:           s.MandateID.Int64(),
-		WalletProvider:      s.WalletProvider,
-		WalletToken:         s.WalletToken,
-		Subtotal:            s.Subtotal,
-		ShippingCost:        s.ShippingCost,
-		TaxAmount:           s.TaxAmount,
-		GrandTotal:          s.GrandTotal,
-		Status:              string(s.Status),
-		ContinueURL:         s.ContinueURL,
-		StripeSessionID:     s.StripeSessionID,
+		ID:                    s.ID.Int64(),
+		UserID:                s.UserID.Int64(),
+		CartID:                s.CartID.Int64(),
+		CartSnapshot:          cartSnapshot,
+		ShippingAddress:       shippingAddr,
+		BillingAddress:        billingAddr,
+		ShippingOption:        shippingOpt,
+		PaymentHandler:        s.PaymentHandler,
+		MandateID:             s.MandateID.Int64(),
+		WalletProvider:        s.WalletProvider,
+		WalletToken:           s.WalletToken,
+		Subtotal:              s.Subtotal,
+		ShippingCost:          s.ShippingCost,
+		TaxAmount:             s.TaxAmount,
+		GrandTotal:            s.GrandTotal,
+		Status:                string(s.Status),
+		ContinueURL:           s.ContinueURL,
+		StripeSessionID:       s.StripeSessionID,
 		StripePaymentIntentID: s.StripePaymentIntentID,
-		StripePaymentStatus: s.StripePaymentStatus,
-		CompletedAt:         s.CompletedAt,
-		CreatedAt:           s.CreatedAt,
-		UpdatedAt:           s.UpdatedAt,
+		StripePaymentStatus:   s.StripePaymentStatus,
+		CompletedAt:           s.CompletedAt,
+		CreatedAt:             s.CreatedAt,
+		UpdatedAt:             s.UpdatedAt,
 	}, nil
 }
 

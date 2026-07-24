@@ -13,8 +13,8 @@ import (
 )
 
 type StripeWebhookHandler struct {
-	svc             *domain.CheckoutService
-	webhookSecret   string
+	svc              *domain.CheckoutService
+	webhookSecret    string
 	skipVerification bool
 }
 

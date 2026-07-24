@@ -12,13 +12,13 @@ import (
 )
 
 type mockPaymentSvc struct {
-	executeCalled  bool
-	settleCalled   bool
-	cancelCalled   bool
-	executeErr     error
-	settleErr      error
-	cancelErr      error
-	executeToken   string
+	executeCalled bool
+	settleCalled  bool
+	cancelCalled  bool
+	executeErr    error
+	settleErr     error
+	cancelErr     error
+	executeToken  string
 }
 
 func (m *mockPaymentSvc) ExecuteMandate(ctx context.Context, id kernel.ID, token string) (*mandateStub, error) {

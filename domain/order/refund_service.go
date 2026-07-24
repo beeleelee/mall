@@ -9,11 +9,11 @@ import (
 )
 
 type RefundService struct {
-	refundRepo    RefundRepository
-	paymentSvc    *payment.PaymentService
-	inventorySvc  *inventory.InventoryService
-	orderSvc      *OrderService
-	logger        kernel.Logger
+	refundRepo   RefundRepository
+	paymentSvc   *payment.PaymentService
+	inventorySvc *inventory.InventoryService
+	orderSvc     *OrderService
+	logger       kernel.Logger
 }
 
 func NewRefundService(refundRepo RefundRepository, paymentSvc *payment.PaymentService, inventorySvc *inventory.InventoryService, orderSvc *OrderService, logger kernel.Logger) *RefundService {

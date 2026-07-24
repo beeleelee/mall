@@ -8,26 +8,26 @@ import (
 
 type CheckoutSession struct {
 	kernel.AggregateRoot
-	UserID               kernel.ID
-	CartID               kernel.ID
-	CartSnapshot         CartSnapshot
-	ShippingAddress      *Address
-	BillingAddress       *Address
-	ShippingOption       *ShippingOption
-	PaymentHandler       string
-	MandateID            kernel.ID
-	WalletProvider       string
-	WalletToken          string
-	Subtotal             int64
-	ShippingCost         int64
-	TaxAmount            int64
-	GrandTotal           int64
-	Status               CheckoutStatus
-	ContinueURL          string
-	StripeSessionID      string
+	UserID                kernel.ID
+	CartID                kernel.ID
+	CartSnapshot          CartSnapshot
+	ShippingAddress       *Address
+	BillingAddress        *Address
+	ShippingOption        *ShippingOption
+	PaymentHandler        string
+	MandateID             kernel.ID
+	WalletProvider        string
+	WalletToken           string
+	Subtotal              int64
+	ShippingCost          int64
+	TaxAmount             int64
+	GrandTotal            int64
+	Status                CheckoutStatus
+	ContinueURL           string
+	StripeSessionID       string
 	StripePaymentIntentID string
-	StripePaymentStatus  string
-	CompletedAt          *time.Time
+	StripePaymentStatus   string
+	CompletedAt           *time.Time
 }
 
 func NewCheckoutSession(id, userID, cartID kernel.ID, snapshot CartSnapshot) (*CheckoutSession, error) {
