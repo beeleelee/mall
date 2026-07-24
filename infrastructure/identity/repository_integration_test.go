@@ -18,11 +18,12 @@ import (
 )
 
 type integrationFixture struct {
-	repo    *PostgresUserRepository
-	db      *sqlx.DB
-	rdb     *redis.Client
-	schema  string
-	cleanup func()
+	repo      *PostgresUserRepository
+	tokenRepo *PostgresPasswordResetTokenRepository
+	db        *sqlx.DB
+	rdb       *redis.Client
+	schema    string
+	cleanup   func()
 }
 
 func newIntegrationFixture(t *testing.T) *integrationFixture {
@@ -75,12 +76,14 @@ func newIntegrationFixture(t *testing.T) *integrationFixture {
 	rdb.FlushDB(context.Background())
 
 	repo := NewPostgresUserRepository(db, rdb)
+	tokenRepo := NewPostgresPasswordResetTokenRepository(db)
 
 	return &integrationFixture{
-		repo:   repo,
-		db:     db,
-		rdb:    rdb,
-		schema: schema,
+		repo:      repo,
+		tokenRepo: tokenRepo,
+		db:        db,
+		rdb:       rdb,
+		schema:    schema,
 		cleanup: func() {
 			db.Exec(fmt.Sprintf(`DROP SCHEMA IF EXISTS "%s" CASCADE`, schema))
 			rdb.FlushDB(context.Background())

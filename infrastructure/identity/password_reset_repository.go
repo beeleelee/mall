@@ -43,9 +43,10 @@ func (r *PostgresPasswordResetTokenRepository) Save(ctx context.Context, token *
 	_, err := r.db.ExecContext(ctx, `
 		INSERT INTO password_reset_tokens (id, user_id, token_hash, expires_at, used, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)
-		ON CONFLICT (id) DO UPDATE SET
-			used = EXCLUDED.used,
-			updated_at = EXCLUDED.updated_at
+	ON CONFLICT (id) DO UPDATE SET
+		token_hash = EXCLUDED.token_hash,
+		used = EXCLUDED.used,
+		updated_at = EXCLUDED.updated_at
 	`, token.ID.Int64(), token.UserID.Int64(), token.TokenHash, token.ExpiresAt, token.Used, token.CreatedAt, token.UpdatedAt)
 	if err != nil {
 		return kernel.NewDomainErrorWithCause(kernel.ErrInternal, "save password reset token", err)
