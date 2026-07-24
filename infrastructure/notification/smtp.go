@@ -24,9 +24,7 @@ func NewSMTPEmailSender(config SMTPConfig) *SMTPEmailSender {
 	return &SMTPEmailSender{config: config}
 }
 
-func (s *SMTPEmailSender) Send(ctx context.Context, msg domain.EmailMessage) error {
-	auth := smtp.PlainAuth("", s.config.Username, s.config.Password, s.config.Host)
-
+func (s *SMTPEmailSender) buildMessage(msg domain.EmailMessage) []byte {
 	body := msg.PlainBody
 	if msg.HTMLBody != "" {
 		body = msg.HTMLBody
@@ -35,9 +33,12 @@ func (s *SMTPEmailSender) Send(ctx context.Context, msg domain.EmailMessage) err
 	}
 
 	header := fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: %s\r\n", s.config.From, string(msg.To), msg.Subject)
+	return []byte(header + "\r\n" + body)
+}
 
-	msgBytes := []byte(header + "\r\n" + body)
-
+func (s *SMTPEmailSender) Send(ctx context.Context, msg domain.EmailMessage) error {
+	auth := smtp.PlainAuth("", s.config.Username, s.config.Password, s.config.Host)
+	msgBytes := s.buildMessage(msg)
 	addr := fmt.Sprintf("%s:%d", s.config.Host, s.config.Port)
 	return smtp.SendMail(addr, auth, s.config.From, []string{string(msg.To)}, msgBytes)
 }
