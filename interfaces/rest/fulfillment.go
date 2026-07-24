@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	domain "github.com/beeleelee/mall/domain/fulfillment"
+	"github.com/beeleelee/mall/domain/kernel"
 )
 
 type FulfillmentHandler struct {
@@ -30,7 +31,7 @@ type rateItemInput struct {
 func (h *FulfillmentHandler) CalculateRates(w http.ResponseWriter, r *http.Request) {
 	var req rateInputRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, kernel.NewDomainError(kernel.ErrInvalidArgument, "invalid request body"))
 		return
 	}
 
