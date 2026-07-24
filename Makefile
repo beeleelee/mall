@@ -7,7 +7,7 @@ all: lint vet build test
 
 build:
 	@mkdir -p $(BUILD_DIR)
-	go build -o $(BUILD_DIR)/$(APP_NAME) ./...
+	go build -o $(BUILD_DIR)/$(APP_NAME) .
 
 test:
 	go test -count=1 -race ./...
