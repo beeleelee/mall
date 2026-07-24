@@ -45,6 +45,11 @@ func newIntegrationFixture(t *testing.T) *integrationFixture {
 		db.Close()
 		t.Fatalf("create schema: %v", err)
 	}
+	if _, err := db.Exec(`CREATE EXTENSION IF NOT EXISTS ltree`); err != nil {
+		db.Close()
+		t.Fatalf("create ltree extension: %v", err)
+	}
+
 	if _, err := db.Exec(fmt.Sprintf(`SET search_path TO "%s", public`, schema)); err != nil {
 		db.Close()
 		t.Fatalf("set search_path: %v", err)
