@@ -136,6 +136,43 @@ func (s *SubscriptionService) DeactivatePlan(ctx context.Context, id kernel.ID) 
 	return s.planRepo.Save(ctx, plan)
 }
 
+func (s *SubscriptionService) ActivatePlan(ctx context.Context, id kernel.ID) (*Plan, error) {
+	plan, err := s.planRepo.FindByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if err := plan.Activate(); err != nil {
+		return nil, err
+	}
+	return plan, s.planRepo.Save(ctx, plan)
+}
+
+func (s *SubscriptionService) ActivateSubscription(ctx context.Context, id kernel.ID) (*Subscription, error) {
+	ctx, span := subTracer.Start(ctx, "subscription.activate",
+		trace.WithAttributes(attribute.Int64("subscription_id", id.Int64())),
+	)
+	defer span.End()
+
+	sub, err := s.subRepo.FindByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := sub.Activate(); err != nil {
+		return nil, err
+	}
+
+	if err := s.subRepo.Save(ctx, sub); err != nil {
+		return nil, err
+	}
+
+	s.publishEvents(ctx, sub)
+	s.logger.Info(ctx, "subscription.activated",
+		kernel.Field("subscription_id", sub.ID.String()),
+	)
+	return sub, nil
+}
+
 func (s *SubscriptionService) Subscribe(ctx context.Context, id, userID, planID kernel.ID) (*Subscription, error) {
 	ctx, span := subTracer.Start(ctx, "subscription.subscribe",
 		trace.WithAttributes(

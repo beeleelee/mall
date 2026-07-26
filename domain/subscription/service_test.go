@@ -210,6 +210,78 @@ func TestDeactivatePlan(t *testing.T) {
 	}
 }
 
+func TestActivatePlan_Success(t *testing.T) {
+	svc, planRepo, _ := newTestService(t)
+	p, _ := NewPlan(1, "X", "", 100, "month", 1, 0, nil)
+	planRepo.Save(context.Background(), p)
+	p.Status = PlanStatusInactive
+
+	updated, err := svc.ActivatePlan(context.Background(), 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.Status != PlanStatusActive {
+		t.Errorf("expected active, got %s", updated.Status)
+	}
+}
+
+func TestActivatePlan_NotFound(t *testing.T) {
+	svc, _, _ := newTestService(t)
+	_, err := svc.ActivatePlan(context.Background(), 999)
+	if !kernel.IsNotFound(err) {
+		t.Fatalf("expected not found, got %v", err)
+	}
+}
+
+func TestActivatePlan_AlreadyActive(t *testing.T) {
+	svc, planRepo, _ := newTestService(t)
+	p, _ := NewPlan(1, "X", "", 100, "month", 1, 0, nil)
+	planRepo.Save(context.Background(), p)
+	_, err := svc.ActivatePlan(context.Background(), 1)
+	if !kernel.IsInvalidArgument(err) {
+		t.Fatalf("expected invalid argument, got %v", err)
+	}
+}
+
+func TestActivateSubscription_Success(t *testing.T) {
+	svc, planRepo, subRepo := newTestService(t)
+	p, _ := NewPlan(1, "Basic", "", 999, "month", 1, 0, nil)
+	planRepo.Save(context.Background(), p)
+	subRepo.Save(context.Background(), &Subscription{
+		AggregateRoot: kernel.NewAggregateRoot(1), UserID: 100, PlanID: 1,
+		Status: SubscriptionStatusPending,
+	})
+	s, err := svc.ActivateSubscription(context.Background(), 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.Status != SubscriptionStatusActive {
+		t.Errorf("expected active, got %s", s.Status)
+	}
+}
+
+func TestActivateSubscription_NotFound(t *testing.T) {
+	svc, _, _ := newTestService(t)
+	_, err := svc.ActivateSubscription(context.Background(), 999)
+	if !kernel.IsNotFound(err) {
+		t.Fatalf("expected not found, got %v", err)
+	}
+}
+
+func TestActivateSubscription_AlreadyActive(t *testing.T) {
+	svc, planRepo, subRepo := newTestService(t)
+	p, _ := NewPlan(1, "Basic", "", 999, "month", 1, 0, nil)
+	planRepo.Save(context.Background(), p)
+	subRepo.Save(context.Background(), &Subscription{
+		AggregateRoot: kernel.NewAggregateRoot(1), UserID: 100, PlanID: 1,
+		Status: SubscriptionStatusActive,
+	})
+	_, err := svc.ActivateSubscription(context.Background(), 1)
+	if !kernel.IsInvalidArgument(err) {
+		t.Fatalf("expected invalid argument, got %v", err)
+	}
+}
+
 func TestSubscribe_Success(t *testing.T) {
 	svc, planRepo, _ := newTestService(t)
 	p, _ := NewPlan(1, "Basic", "", 999, "month", 1, 0, nil)
