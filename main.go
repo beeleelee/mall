@@ -669,6 +669,11 @@ func main() {
 		Path:    "/api/v1/reviews/:id",
 		Handler: auth(http.HandlerFunc(reviewHandler.Delete)).ServeHTTP,
 	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodGet,
+		Path:    "/api/v1/reviews/user/:id",
+		Handler: reviewHandler.ListByUser,
+	})
 
 	srv.AddRoute(gozerorest.Route{
 		Method:  http.MethodPost,
