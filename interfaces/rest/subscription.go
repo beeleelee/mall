@@ -177,6 +177,52 @@ func (h *SubscriptionHandler) GetSubscription(w http.ResponseWriter, r *http.Req
 	writeJSON(w, http.StatusOK, sub)
 }
 
+func (h *SubscriptionHandler) ActivateSubscription(w http.ResponseWriter, r *http.Request) {
+	userID, err := userIDFromContext(r)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+	vars := pathvar.Vars(r)
+	idStr := vars["id"]
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		writeDomainError(w, kernel.NewDomainError(kernel.ErrInvalidArgument, "invalid subscription id"))
+		return
+	}
+	sub, err := h.svc.GetSubscription(r.Context(), id)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+	if sub.UserID != userID.Int64() {
+		writeDomainError(w, kernel.NewDomainError(kernel.ErrPermissionDenied, "subscription does not belong to user"))
+		return
+	}
+	activated, err := h.svc.ActivateSubscription(r.Context(), id)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, activated)
+}
+
+func (h *SubscriptionHandler) ActivatePlan(w http.ResponseWriter, r *http.Request) {
+	vars := pathvar.Vars(r)
+	idStr := vars["id"]
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		writeDomainError(w, kernel.NewDomainError(kernel.ErrInvalidArgument, "invalid plan id"))
+		return
+	}
+	resp, err := h.svc.ActivatePlan(r.Context(), id)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, resp)
+}
+
 func (h *SubscriptionHandler) CancelSubscription(w http.ResponseWriter, r *http.Request) {
 	userID, err := userIDFromContext(r)
 	if err != nil {

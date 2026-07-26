@@ -833,6 +833,16 @@ func main() {
 		Path:    "/api/v1/subscriptions/:id/change-plan",
 		Handler: auth(http.HandlerFunc(subHandler.ChangePlan)).ServeHTTP,
 	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPost,
+		Path:    "/api/v1/subscriptions/:id/activate",
+		Handler: auth(http.HandlerFunc(subHandler.ActivateSubscription)).ServeHTTP,
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPost,
+		Path:    "/api/v1/subscriptions/plans/:id/activate",
+		Handler: adminAuth(subHandler.ActivatePlan),
+	})
 
 	srv.AddRoute(gozerorest.Route{
 		Method:  http.MethodPost,

@@ -529,6 +529,108 @@ func TestSubscriptionHandler_GetSubscription_WrongUser(t *testing.T) {
 	}
 }
 
+func TestSubscriptionHandler_ActivateSubscription_Success(t *testing.T) {
+	h := newTestSubscriptionHandler(t)
+	body, _ := json.Marshal(map[string]any{
+		"name": "Basic", "amount": 999, "interval": "month",
+		"interval_count": 1,
+	})
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/subscriptions/plans", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	crec := httptest.NewRecorder()
+	h.CreatePlan(crec, req)
+
+	plan, err := decodeMap(crec.Body)
+	if err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	planID := getInt64(plan, "id")
+
+	subBody, _ := json.Marshal(map[string]any{"plan_id": planID})
+	subReq := httptest.NewRequest(http.MethodPost, "/api/v1/subscriptions", bytes.NewReader(subBody))
+	subReq.Header.Set("Content-Type", "application/json")
+	subReq = subReq.WithContext(middleware.ContextWithUser(subReq.Context(), middleware.UserInfo{UserID: 1}))
+	srec := httptest.NewRecorder()
+	h.Subscribe(srec, subReq)
+
+	created, err := decodeMap(srec.Body)
+	if err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	subID := getInt64(created, "id")
+
+	activateReq := httptest.NewRequest(http.MethodPost, "/api/v1/subscriptions/"+strconv.FormatInt(subID, 10)+"/activate", nil)
+	activateReq = pathvar.WithVars(activateReq, map[string]string{"id": strconv.FormatInt(subID, 10)})
+	activateReq = activateReq.WithContext(middleware.ContextWithUser(activateReq.Context(), middleware.UserInfo{UserID: 1}))
+	rec := httptest.NewRecorder()
+	h.ActivateSubscription(rec, activateReq)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp, err := decodeMap(rec.Body)
+	if err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if resp["status"] != "active" {
+		t.Errorf("expected status=active, got %v", resp["status"])
+	}
+}
+
+func TestSubscriptionHandler_ActivateSubscription_WrongUser(t *testing.T) {
+	h := newTestSubscriptionHandler(t)
+	body, _ := json.Marshal(map[string]any{
+		"name": "Basic", "amount": 999, "interval": "month",
+		"interval_count": 1,
+	})
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/subscriptions/plans", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	crec := httptest.NewRecorder()
+	h.CreatePlan(crec, req)
+
+	plan, err := decodeMap(crec.Body)
+	if err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	planID := getInt64(plan, "id")
+
+	subBody, _ := json.Marshal(map[string]any{"plan_id": planID})
+	subReq := httptest.NewRequest(http.MethodPost, "/api/v1/subscriptions", bytes.NewReader(subBody))
+	subReq.Header.Set("Content-Type", "application/json")
+	subReq = subReq.WithContext(middleware.ContextWithUser(subReq.Context(), middleware.UserInfo{UserID: 1}))
+	srec := httptest.NewRecorder()
+	h.Subscribe(srec, subReq)
+
+	created, err := decodeMap(srec.Body)
+	if err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	subID := getInt64(created, "id")
+
+	activateReq := httptest.NewRequest(http.MethodPost, "/api/v1/subscriptions/"+strconv.FormatInt(subID, 10)+"/activate", nil)
+	activateReq = pathvar.WithVars(activateReq, map[string]string{"id": strconv.FormatInt(subID, 10)})
+	activateReq = activateReq.WithContext(middleware.ContextWithUser(activateReq.Context(), middleware.UserInfo{UserID: 99}))
+	rec := httptest.NewRecorder()
+	h.ActivateSubscription(rec, activateReq)
+
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("expected 403, got %d", rec.Code)
+	}
+}
+
+func TestSubscriptionHandler_ActivateSubscription_NotFound(t *testing.T) {
+	h := newTestSubscriptionHandler(t)
+	activateReq := httptest.NewRequest(http.MethodPost, "/api/v1/subscriptions/999/activate", nil)
+	activateReq = pathvar.WithVars(activateReq, map[string]string{"id": "999"})
+	activateReq = activateReq.WithContext(middleware.ContextWithUser(activateReq.Context(), middleware.UserInfo{UserID: 1}))
+	rec := httptest.NewRecorder()
+	h.ActivateSubscription(rec, activateReq)
+
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("expected 404, got %d", rec.Code)
+	}
+}
+
 func TestSubscriptionHandler_CancelSubscription_Success(t *testing.T) {
 	h := newTestSubscriptionHandler(t)
 	body, _ := json.Marshal(map[string]any{
