@@ -105,7 +105,7 @@ func (fakeLogger) Info(_ context.Context, _ string, _ ...kernel.LogField)  {}
 func (fakeLogger) Warn(_ context.Context, _ string, _ ...kernel.LogField)  {}
 func (fakeLogger) Error(_ context.Context, _ string, _ error, _ ...kernel.LogField) {}
 
-func newTestAppService(t *testing.T) *SubscriptionAppService {
+func newTestAppService(t *testing.T) (*SubscriptionAppService, *fakePlanRepo, *fakeSubRepo) {
 	t.Helper()
 	planRepo := newFakePlanRepo()
 	subRepo := newFakeSubRepo()
@@ -116,11 +116,11 @@ func newTestAppService(t *testing.T) *SubscriptionAppService {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return NewSubscriptionAppService(svc, sf)
+	return NewSubscriptionAppService(svc, sf), planRepo, subRepo
 }
 
 func TestApp_CreatePlan(t *testing.T) {
-	a := newTestAppService(t)
+	a, _, _ := newTestAppService(t)
 	resp, err := a.CreatePlan(context.Background(), CreatePlanRequest{
 		Name: "Basic", Amount: 999, Interval: "month", IntervalCount: 1,
 	})
@@ -139,7 +139,7 @@ func TestApp_CreatePlan(t *testing.T) {
 }
 
 func TestApp_ListPlans(t *testing.T) {
-	a := newTestAppService(t)
+	a, _, _ := newTestAppService(t)
 	a.CreatePlan(context.Background(), CreatePlanRequest{Name: "A", Amount: 100, Interval: "month", IntervalCount: 1})
 	a.CreatePlan(context.Background(), CreatePlanRequest{Name: "B", Amount: 200, Interval: "month", IntervalCount: 1})
 
@@ -153,13 +153,17 @@ func TestApp_ListPlans(t *testing.T) {
 }
 
 func TestApp_ActivatePlan(t *testing.T) {
-	a := newTestAppService(t)
+	a, planRepo, _ := newTestAppService(t)
 	plan, err := a.CreatePlan(context.Background(), CreatePlanRequest{
 		Name: "Basic", Amount: 999, Interval: "month", IntervalCount: 1,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	p, _ := planRepo.FindByID(context.Background(), kernel.ID(plan.ID))
+	_ = p.Deactivate()
+	planRepo.Save(context.Background(), p)
 
 	activated, err := a.ActivatePlan(context.Background(), plan.ID)
 	if err != nil {
@@ -171,7 +175,7 @@ func TestApp_ActivatePlan(t *testing.T) {
 }
 
 func TestApp_ActivateSubscription(t *testing.T) {
-	a := newTestAppService(t)
+	a, _, _ := newTestAppService(t)
 	plan, _ := a.CreatePlan(context.Background(), CreatePlanRequest{
 		Name: "Basic", Amount: 999, Interval: "month", IntervalCount: 1,
 	})
@@ -187,7 +191,7 @@ func TestApp_ActivateSubscription(t *testing.T) {
 }
 
 func TestApp_Subscribe(t *testing.T) {
-	a := newTestAppService(t)
+	a, _, _ := newTestAppService(t)
 	plan, err := a.CreatePlan(context.Background(), CreatePlanRequest{
 		Name: "Basic", Amount: 999, Interval: "month", IntervalCount: 1,
 	})
@@ -211,7 +215,7 @@ func TestApp_Subscribe(t *testing.T) {
 }
 
 func TestApp_CancelSubscription(t *testing.T) {
-	a := newTestAppService(t)
+	a, _, _ := newTestAppService(t)
 	plan, _ := a.CreatePlan(context.Background(), CreatePlanRequest{
 		Name: "Basic", Amount: 999, Interval: "month", IntervalCount: 1,
 	})

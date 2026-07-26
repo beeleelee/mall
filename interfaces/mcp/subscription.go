@@ -83,6 +83,17 @@ var subscriptionTools = []ToolDefinition{
 			},
 		},
 	},
+	{
+		Name:        "activate_subscription",
+		Description: "Activate a pending, trialing, or past_due subscription",
+		InputSchema: InputSchema{
+			Type: "object",
+			Properties: map[string]PropertySchema{
+				"subscription_id": {Type: "number", Description: "Subscription ID to activate"},
+				"user_id":         {Type: "number", Description: "User ID who owns the subscription"},
+			},
+		},
+	},
 }
 
 func (h *SubscriptionMCPHandler) ListTools() []ToolDefinition {
@@ -103,6 +114,8 @@ func (h *SubscriptionMCPHandler) HandleTool(ctx context.Context, name string, ra
 		return h.callCancelSubscription(ctx, raw)
 	case "change_subscription_plan":
 		return h.callChangePlan(ctx, raw)
+	case "activate_subscription":
+		return h.callActivateSubscription(ctx, raw)
 	default:
 		return nil, kernel.NewDomainError(kernel.ErrInvalidArgument, "unknown tool: "+name)
 	}
@@ -218,6 +231,29 @@ func (h *SubscriptionMCPHandler) callChangePlan(ctx context.Context, raw json.Ra
 		return nil, kernel.NewDomainError(kernel.ErrInvalidArgument, "new_plan_id is required")
 	}
 	sub, err := h.svc.ChangePlan(ctx, args.SubscriptionID, args.NewPlanID)
+	if err != nil {
+		return nil, err
+	}
+	return sub, nil
+}
+
+type activateSubArgs struct {
+	SubscriptionID int64 `json:"subscription_id"`
+	UserID         int64 `json:"user_id"`
+}
+
+func (h *SubscriptionMCPHandler) callActivateSubscription(ctx context.Context, raw json.RawMessage) (any, error) {
+	var args activateSubArgs
+	if err := json.Unmarshal(raw, &args); err != nil {
+		return nil, kernel.NewDomainError(kernel.ErrInvalidArgument, "invalid arguments")
+	}
+	if args.UserID <= 0 {
+		return nil, kernel.NewDomainError(kernel.ErrInvalidArgument, "user_id is required")
+	}
+	if args.SubscriptionID <= 0 {
+		return nil, kernel.NewDomainError(kernel.ErrInvalidArgument, "subscription_id is required")
+	}
+	sub, err := h.svc.ActivateSubscription(ctx, args.SubscriptionID)
 	if err != nil {
 		return nil, err
 	}
