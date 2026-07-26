@@ -41,29 +41,33 @@ var subscriptionTools = []ToolDefinition{
 	},
 	{
 		Name:        "subscribe",
-		Description: "Subscribe the current user to a plan",
+		Description: "Subscribe a user to a plan",
 		InputSchema: InputSchema{
 			Type: "object",
 			Properties: map[string]PropertySchema{
 				"plan_id": {Type: "number", Description: "Plan ID to subscribe to"},
+				"user_id": {Type: "number", Description: "User ID to subscribe"},
 			},
 		},
 	},
 	{
 		Name:        "list_user_subscriptions",
-		Description: "List all subscriptions for the current user",
+		Description: "List all subscriptions for a user",
 		InputSchema: InputSchema{
-			Type:       "object",
-			Properties: map[string]PropertySchema{},
+			Type: "object",
+			Properties: map[string]PropertySchema{
+				"user_id": {Type: "number", Description: "User ID to list subscriptions for"},
+			},
 		},
 	},
 	{
 		Name:        "cancel_subscription",
-		Description: "Cancel an active subscription",
+		Description: "Cancel a subscription",
 		InputSchema: InputSchema{
 			Type: "object",
 			Properties: map[string]PropertySchema{
 				"subscription_id": {Type: "number", Description: "Subscription ID to cancel"},
+				"user_id":         {Type: "number", Description: "User ID who owns the subscription"},
 			},
 		},
 	},
@@ -75,6 +79,7 @@ var subscriptionTools = []ToolDefinition{
 			Properties: map[string]PropertySchema{
 				"subscription_id": {Type: "number", Description: "Subscription ID"},
 				"new_plan_id":     {Type: "number", Description: "New plan ID"},
+				"user_id":         {Type: "number", Description: "User ID who owns the subscription"},
 			},
 		},
 	},
@@ -93,7 +98,7 @@ func (h *SubscriptionMCPHandler) HandleTool(ctx context.Context, name string, ra
 	case "subscribe":
 		return h.callSubscribe(ctx, raw)
 	case "list_user_subscriptions":
-		return h.callListUserSubscriptions(ctx)
+		return h.callListUserSubscriptions(ctx, raw)
 	case "cancel_subscription":
 		return h.callCancelSubscription(ctx, raw)
 	case "change_subscription_plan":
@@ -109,15 +114,22 @@ type planIDArgs struct {
 
 type subscribeArgs struct {
 	PlanID int64 `json:"plan_id"`
+	UserID int64 `json:"user_id"`
+}
+
+type listUserSubsArgs struct {
+	UserID int64 `json:"user_id"`
 }
 
 type subscriptionIDArgs struct {
 	SubscriptionID int64 `json:"subscription_id"`
+	UserID         int64 `json:"user_id"`
 }
 
 type changePlanArgs struct {
 	SubscriptionID int64 `json:"subscription_id"`
 	NewPlanID      int64 `json:"new_plan_id"`
+	UserID         int64 `json:"user_id"`
 }
 
 func (h *SubscriptionMCPHandler) callListPlans(ctx context.Context) (any, error) {
@@ -145,15 +157,28 @@ func (h *SubscriptionMCPHandler) callSubscribe(ctx context.Context, raw json.Raw
 	if err := json.Unmarshal(raw, &args); err != nil {
 		return nil, kernel.NewDomainError(kernel.ErrInvalidArgument, "invalid arguments")
 	}
-	sub, err := h.svc.Subscribe(ctx, 0, subscription.SubscribeRequest{PlanID: args.PlanID})
+	if args.UserID <= 0 {
+		return nil, kernel.NewDomainError(kernel.ErrInvalidArgument, "user_id is required")
+	}
+	if args.PlanID <= 0 {
+		return nil, kernel.NewDomainError(kernel.ErrInvalidArgument, "plan_id is required")
+	}
+	sub, err := h.svc.Subscribe(ctx, args.UserID, subscription.SubscribeRequest{PlanID: args.PlanID})
 	if err != nil {
 		return nil, err
 	}
 	return sub, nil
 }
 
-func (h *SubscriptionMCPHandler) callListUserSubscriptions(ctx context.Context) (any, error) {
-	subs, err := h.svc.ListUserSubscriptions(ctx, 0)
+func (h *SubscriptionMCPHandler) callListUserSubscriptions(ctx context.Context, raw json.RawMessage) (any, error) {
+	var args listUserSubsArgs
+	if err := json.Unmarshal(raw, &args); err != nil {
+		return nil, kernel.NewDomainError(kernel.ErrInvalidArgument, "invalid arguments")
+	}
+	if args.UserID <= 0 {
+		return nil, kernel.NewDomainError(kernel.ErrInvalidArgument, "user_id is required")
+	}
+	subs, err := h.svc.ListUserSubscriptions(ctx, args.UserID)
 	if err != nil {
 		return nil, err
 	}
@@ -164,6 +189,12 @@ func (h *SubscriptionMCPHandler) callCancelSubscription(ctx context.Context, raw
 	var args subscriptionIDArgs
 	if err := json.Unmarshal(raw, &args); err != nil {
 		return nil, kernel.NewDomainError(kernel.ErrInvalidArgument, "invalid arguments")
+	}
+	if args.UserID <= 0 {
+		return nil, kernel.NewDomainError(kernel.ErrInvalidArgument, "user_id is required")
+	}
+	if args.SubscriptionID <= 0 {
+		return nil, kernel.NewDomainError(kernel.ErrInvalidArgument, "subscription_id is required")
 	}
 	sub, err := h.svc.CancelSubscription(ctx, args.SubscriptionID)
 	if err != nil {
@@ -176,6 +207,15 @@ func (h *SubscriptionMCPHandler) callChangePlan(ctx context.Context, raw json.Ra
 	var args changePlanArgs
 	if err := json.Unmarshal(raw, &args); err != nil {
 		return nil, kernel.NewDomainError(kernel.ErrInvalidArgument, "invalid arguments")
+	}
+	if args.UserID <= 0 {
+		return nil, kernel.NewDomainError(kernel.ErrInvalidArgument, "user_id is required")
+	}
+	if args.SubscriptionID <= 0 {
+		return nil, kernel.NewDomainError(kernel.ErrInvalidArgument, "subscription_id is required")
+	}
+	if args.NewPlanID <= 0 {
+		return nil, kernel.NewDomainError(kernel.ErrInvalidArgument, "new_plan_id is required")
 	}
 	sub, err := h.svc.ChangePlan(ctx, args.SubscriptionID, args.NewPlanID)
 	if err != nil {
