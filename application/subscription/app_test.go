@@ -152,6 +152,40 @@ func TestApp_ListPlans(t *testing.T) {
 	}
 }
 
+func TestApp_ActivatePlan(t *testing.T) {
+	a := newTestAppService(t)
+	plan, err := a.CreatePlan(context.Background(), CreatePlanRequest{
+		Name: "Basic", Amount: 999, Interval: "month", IntervalCount: 1,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	activated, err := a.ActivatePlan(context.Background(), plan.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if activated.Status != "active" {
+		t.Errorf("Status = %s, want active", activated.Status)
+	}
+}
+
+func TestApp_ActivateSubscription(t *testing.T) {
+	a := newTestAppService(t)
+	plan, _ := a.CreatePlan(context.Background(), CreatePlanRequest{
+		Name: "Basic", Amount: 999, Interval: "month", IntervalCount: 1,
+	})
+	sub, _ := a.Subscribe(context.Background(), 100, SubscribeRequest{PlanID: plan.ID})
+
+	activated, err := a.ActivateSubscription(context.Background(), sub.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if activated.Status != "active" {
+		t.Errorf("Status = %s, want active", activated.Status)
+	}
+}
+
 func TestApp_Subscribe(t *testing.T) {
 	a := newTestAppService(t)
 	plan, err := a.CreatePlan(context.Background(), CreatePlanRequest{

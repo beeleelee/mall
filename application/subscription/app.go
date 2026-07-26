@@ -157,6 +157,22 @@ func (a *SubscriptionAppService) ListUserSubscriptions(ctx context.Context, user
 	return resp, nil
 }
 
+func (a *SubscriptionAppService) ActivateSubscription(ctx context.Context, id int64) (*SubscriptionResponse, error) {
+	sub, err := a.svc.ActivateSubscription(ctx, kernel.ID(id))
+	if err != nil {
+		return nil, err
+	}
+	return subToResponse(sub), nil
+}
+
+func (a *SubscriptionAppService) ActivatePlan(ctx context.Context, id int64) (*PlanResponse, error) {
+	plan, err := a.svc.ActivatePlan(ctx, kernel.ID(id))
+	if err != nil {
+		return nil, err
+	}
+	return planToResponse(plan), nil
+}
+
 func (a *SubscriptionAppService) CancelSubscription(ctx context.Context, id int64) (*SubscriptionResponse, error) {
 	sub, err := a.svc.CancelSubscription(ctx, kernel.ID(id))
 	if err != nil {
