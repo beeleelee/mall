@@ -268,6 +268,8 @@ func main() {
 	wishlistRepo := infraWishlist.NewPostgresWishlistRepository(db)
 	wishlistSvc := domainWishlist.NewWishlistService(wishlistRepo, sf, logger)
 	wishlistHandler := rest.NewWishlistHandler(wishlistSvc)
+	mcpRouter.Register(mcp.NewReviewMCPHandler(reviewSvc, sf))
+	mcpRouter.Register(mcp.NewWishlistMCPHandler(wishlistSvc))
 
 	subPlanRepo := infraSubscription.NewPostgresPlanRepository(db, rdb)
 	subRepo := infraSubscription.NewPostgresSubscriptionRepository(db, rdb)
