@@ -27,6 +27,7 @@ import (
 	appOAuth "github.com/beeleelee/mall/application/oauth"
 	appOrder "github.com/beeleelee/mall/application/order"
 	appPayment "github.com/beeleelee/mall/application/payment"
+	appSubscription "github.com/beeleelee/mall/application/subscription"
 	domainA2A "github.com/beeleelee/mall/domain/a2a"
 	domainAnalytics "github.com/beeleelee/mall/domain/analytics"
 	domainCart "github.com/beeleelee/mall/domain/cart"
@@ -41,6 +42,7 @@ import (
 	domainOrder "github.com/beeleelee/mall/domain/order"
 	domainPayment "github.com/beeleelee/mall/domain/payment"
 	domainReview "github.com/beeleelee/mall/domain/review"
+	domainSubscription "github.com/beeleelee/mall/domain/subscription"
 	domainWishlist "github.com/beeleelee/mall/domain/wishlist"
 	infraA2A "github.com/beeleelee/mall/infrastructure/a2a"
 	infraAnalytics "github.com/beeleelee/mall/infrastructure/analytics"
@@ -60,6 +62,7 @@ import (
 	infraPayment "github.com/beeleelee/mall/infrastructure/payment"
 	infraReview "github.com/beeleelee/mall/infrastructure/review"
 	infraStorage "github.com/beeleelee/mall/infrastructure/storage"
+	infraSubscription "github.com/beeleelee/mall/infrastructure/subscription"
 	"github.com/beeleelee/mall/infrastructure/tracing"
 	infraWishlist "github.com/beeleelee/mall/infrastructure/wishlist"
 	"github.com/beeleelee/mall/interfaces/mcp"
@@ -156,6 +159,15 @@ func main() {
 		Storage:  jetstream.FileStorage,
 	}); err != nil {
 		log.Fatalf("create orders jetstream: %v", err)
+	}
+
+	if _, err := js.CreateOrUpdateStream(context.Background(), jetstream.StreamConfig{
+		Name:     "subscriptions",
+		Subjects: []string{"subscription.>"},
+		MaxAge:   72 * time.Hour,
+		Storage:  jetstream.FileStorage,
+	}); err != nil {
+		log.Fatalf("create subscriptions jetstream: %v", err)
 	}
 
 	healthHandler := rest.NewHealthHandler(db, rdb, nc)
@@ -256,6 +268,16 @@ func main() {
 	wishlistRepo := infraWishlist.NewPostgresWishlistRepository(db)
 	wishlistSvc := domainWishlist.NewWishlistService(wishlistRepo, sf, logger)
 	wishlistHandler := rest.NewWishlistHandler(wishlistSvc)
+
+	subPlanRepo := infraSubscription.NewPostgresPlanRepository(db, rdb)
+	subRepo := infraSubscription.NewPostgresSubscriptionRepository(db, rdb)
+	subPub := infraSubscription.NewNATSSubscriptionEventPublisher(js)
+	subLogger := logger.WithCapability("subscription")
+	subDomainSvc := domainSubscription.NewSubscriptionService(subPlanRepo, subRepo, subPub, subLogger)
+	subAppSvc := appSubscription.NewSubscriptionAppService(subDomainSvc, sf)
+	subHandler := rest.NewSubscriptionHandler(subAppSvc)
+	mcpRouter.Register(mcp.NewSubscriptionMCPHandler(subAppSvc))
+
 	adminHandler := rest.NewAdminHandler(catalogSvc, orderSvc, appSvc, inventorySvc, storageSvc, categoryRepo, analyticsSvc, reviewSvc, sf, db, webhookDLQ, refundSvc)
 	adminMW := middleware.AdminMiddleware(userRepo)
 
@@ -363,7 +385,7 @@ func main() {
 		Timeout: 30000,
 	})
 
-	supportedCaps := []string{"dev.ucp.shopping.catalog", "dev.ucp.shopping.cart", "dev.ucp.shopping.checkout", "dev.ucp.shopping.order", "dev.ucp.shopping.ecp", "dev.ucp.shopping.ap2_mandate", "dev.ucp.shopping.payment_token_exchange", "dev.ucp.shopping.stripe_payment", "dev.ucp.shopping.fulfillment", "dev.ucp.shopping.discount", "dev.ucp.shopping.identity", "dev.ucp.shopping.webhook", "dev.ucp.shopping.oauth", "dev.ucp.shopping.inventory", "dev.ucp.shopping.admin", "dev.ucp.shopping.admin.dashboard", "dev.ucp.shopping.reviews", "dev.ucp.shopping.wishlist", "dev.a2a.agent"}
+	supportedCaps := []string{"dev.ucp.shopping.catalog", "dev.ucp.shopping.cart", "dev.ucp.shopping.checkout", "dev.ucp.shopping.order", "dev.ucp.shopping.ecp", "dev.ucp.shopping.ap2_mandate", "dev.ucp.shopping.payment_token_exchange", "dev.ucp.shopping.stripe_payment", "dev.ucp.shopping.fulfillment", "dev.ucp.shopping.discount", "dev.ucp.shopping.identity", "dev.ucp.shopping.webhook", "dev.ucp.shopping.oauth", "dev.ucp.shopping.inventory", "dev.ucp.shopping.admin", "dev.ucp.shopping.admin.dashboard", "dev.ucp.shopping.reviews", "dev.ucp.shopping.wishlist", "dev.ucp.shopping.subscriptions", "dev.a2a.agent"}
 	srv.Use(gozerorest.ToMiddleware(middleware.RequestIDMiddleware))
 	srv.Use(gozerorest.ToMiddleware(middleware.CORSMiddleware))
 	srv.Use(gozerorest.ToMiddleware(middleware.RecoveryMiddleware))
@@ -758,6 +780,52 @@ func main() {
 	adminAuth := func(handler http.HandlerFunc) http.HandlerFunc {
 		return adminMW(auth(http.HandlerFunc(handler))).ServeHTTP
 	}
+
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPost,
+		Path:    "/api/v1/subscriptions/plans",
+		Handler: adminAuth(subHandler.CreatePlan),
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodGet,
+		Path:    "/api/v1/subscriptions/plans",
+		Handler: subHandler.ListPlans,
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodGet,
+		Path:    "/api/v1/subscriptions/plans/:id",
+		Handler: subHandler.GetPlan,
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPut,
+		Path:    "/api/v1/subscriptions/plans/:id",
+		Handler: adminAuth(subHandler.UpdatePlan),
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPost,
+		Path:    "/api/v1/subscriptions",
+		Handler: auth(http.HandlerFunc(subHandler.Subscribe)).ServeHTTP,
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodGet,
+		Path:    "/api/v1/subscriptions",
+		Handler: auth(http.HandlerFunc(subHandler.ListUserSubscriptions)).ServeHTTP,
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodGet,
+		Path:    "/api/v1/subscriptions/:id",
+		Handler: auth(http.HandlerFunc(subHandler.GetSubscription)).ServeHTTP,
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPost,
+		Path:    "/api/v1/subscriptions/:id/cancel",
+		Handler: auth(http.HandlerFunc(subHandler.CancelSubscription)).ServeHTTP,
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPost,
+		Path:    "/api/v1/subscriptions/:id/change-plan",
+		Handler: auth(http.HandlerFunc(subHandler.ChangePlan)).ServeHTTP,
+	})
 
 	srv.AddRoute(gozerorest.Route{
 		Method:  http.MethodPost,
