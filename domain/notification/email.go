@@ -2,6 +2,7 @@ package notification
 
 import (
 	"context"
+	"time"
 
 	"github.com/beeleelee/mall/domain/kernel"
 )
@@ -26,11 +27,25 @@ type InAppWriter interface {
 type NotificationService struct {
 	sender   EmailSender
 	writer   InAppWriter
+	repo     NotificationRepository
 	prefRepo NotificationPreferenceRepository
+	sf       *kernel.Snowflake
 	logger   kernel.Logger
 }
 
 type NotificationServiceOption func(*NotificationService)
+
+func WithSnowflake(sf *kernel.Snowflake) NotificationServiceOption {
+	return func(s *NotificationService) {
+		s.sf = sf
+	}
+}
+
+func WithNotificationRepository(r NotificationRepository) NotificationServiceOption {
+	return func(s *NotificationService) {
+		s.repo = r
+	}
+}
 
 func WithInAppWriter(w InAppWriter) NotificationServiceOption {
 	return func(s *NotificationService) {
@@ -86,6 +101,82 @@ func (s *NotificationService) NotifyInApp(ctx context.Context, id, userID kernel
 		return err
 	}
 	return s.writer.Write(ctx, n)
+}
+
+func (s *NotificationService) ListByUser(ctx context.Context, userID kernel.ID, limit int) ([]*Notification, error) {
+	if s.repo == nil {
+		return nil, kernel.NewDomainError(kernel.ErrInternal, "notification repository not configured")
+	}
+	return s.repo.FindByUserID(ctx, userID, limit)
+}
+
+func (s *NotificationService) MarkRead(ctx context.Context, id, userID kernel.ID) error {
+	if s.repo == nil {
+		return kernel.NewDomainError(kernel.ErrInternal, "notification repository not configured")
+	}
+	return s.repo.MarkRead(ctx, id, userID)
+}
+
+func (s *NotificationService) MarkAllRead(ctx context.Context, userID kernel.ID) error {
+	if s.repo == nil {
+		return kernel.NewDomainError(kernel.ErrInternal, "notification repository not configured")
+	}
+	return s.repo.MarkAllRead(ctx, userID)
+}
+
+func (s *NotificationService) UnreadCount(ctx context.Context, userID kernel.ID) (int, error) {
+	if s.repo == nil {
+		return 0, kernel.NewDomainError(kernel.ErrInternal, "notification repository not configured")
+	}
+	return s.repo.UnreadCount(ctx, userID)
+}
+
+func (s *NotificationService) GetPreferences(ctx context.Context, userID kernel.ID) (*NotificationPreferences, error) {
+	if s.prefRepo == nil {
+		return nil, kernel.NewDomainError(kernel.ErrInternal, "notification preference repository not configured")
+	}
+	return s.prefRepo.Get(ctx, userID)
+}
+
+func (s *NotificationService) UpdatePreferences(ctx context.Context, userID kernel.ID, emailEnabled, inAppEnabled *bool, types *[]NotificationType) (*NotificationPreferences, error) {
+	if s.prefRepo == nil {
+		return nil, kernel.NewDomainError(kernel.ErrInternal, "notification preference repository not configured")
+	}
+
+	prefs, err := s.prefRepo.Get(ctx, userID)
+	if err != nil {
+		if s.sf == nil {
+			return nil, kernel.NewDomainError(kernel.ErrInternal, "snowflake generator not configured")
+		}
+		id, genErr := s.sf.NextID()
+		if genErr != nil {
+			return nil, genErr
+		}
+		prefs, err = NewNotificationPreferences(id, userID)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if emailEnabled != nil {
+		if err := prefs.SetChannel(ChannelEmail, *emailEnabled); err != nil {
+			return nil, err
+		}
+	}
+	if inAppEnabled != nil {
+		if err := prefs.SetChannel(ChannelInApp, *inAppEnabled); err != nil {
+			return nil, err
+		}
+	}
+	if types != nil {
+		prefs.Types = types
+		prefs.UpdatedAt = time.Now()
+	}
+
+	if err := s.prefRepo.Upsert(ctx, prefs); err != nil {
+		return nil, err
+	}
+	return prefs, nil
 }
 
 func (s *NotificationService) SendOrderConfirmation(ctx context.Context, to EmailAddress, userName string, orderID int64, total int64) error {

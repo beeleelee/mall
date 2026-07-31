@@ -382,9 +382,13 @@ func main() {
 	notifSvc := domainNotification.NewNotificationService(
 		emailSender,
 		logger,
+		domainNotification.WithNotificationRepository(notifRepo),
 		domainNotification.WithInAppWriter(notifRepo),
 		domainNotification.WithPreferenceRepository(notifPrefRepo),
+		domainNotification.WithSnowflake(sf),
 	)
+	notifHandler := rest.NewNotificationHandler(notifSvc)
+	mcpRouter.Register(mcp.NewNotificationMCPHandler(notifSvc))
 	notificationConsumer := notificationInfra.NewNotificationConsumer(js, notifSvc, userRepo, sf)
 	notifCtx, notifCancel := context.WithCancel(context.Background())
 	defer notifCancel()
@@ -797,6 +801,37 @@ func main() {
 		Method:  http.MethodDelete,
 		Path:    "/api/v1/wishlist",
 		Handler: auth(http.HandlerFunc(wishlistHandler.Clear)).ServeHTTP,
+	})
+
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodGet,
+		Path:    "/api/v1/notifications",
+		Handler: auth(http.HandlerFunc(notifHandler.List)).ServeHTTP,
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodGet,
+		Path:    "/api/v1/notifications/unread-count",
+		Handler: auth(http.HandlerFunc(notifHandler.UnreadCount)).ServeHTTP,
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPost,
+		Path:    "/api/v1/notifications/mark-all-read",
+		Handler: auth(http.HandlerFunc(notifHandler.MarkAllRead)).ServeHTTP,
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPost,
+		Path:    "/api/v1/notifications/:id/read",
+		Handler: auth(http.HandlerFunc(notifHandler.MarkRead)).ServeHTTP,
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodGet,
+		Path:    "/api/v1/notifications/preferences",
+		Handler: auth(http.HandlerFunc(notifHandler.GetPreferences)).ServeHTTP,
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPut,
+		Path:    "/api/v1/notifications/preferences",
+		Handler: auth(http.HandlerFunc(notifHandler.UpdatePreferences)).ServeHTTP,
 	})
 
 	srv.AddRoute(gozerorest.Route{

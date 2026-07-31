@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/beeleelee/mall/domain/kernel"
@@ -17,6 +18,7 @@ import (
 	domainFulfillment "github.com/beeleelee/mall/domain/fulfillment"
 	domainIdentity "github.com/beeleelee/mall/domain/identity"
 	domainInventory "github.com/beeleelee/mall/domain/inventory"
+	domainNotification "github.com/beeleelee/mall/domain/notification"
 	domainOAuth "github.com/beeleelee/mall/domain/oauth"
 	domainOrder "github.com/beeleelee/mall/domain/order"
 	domainPayment "github.com/beeleelee/mall/domain/payment"
@@ -806,6 +808,9 @@ func TestMCP_ToolsList_AllDomains(t *testing.T) {
 	inventorySvc2 := domainInventory.NewInventoryService(inventoryRepo, fakeLoggerMCP{})
 	router.Register(NewAdminMCPHandler(catalogSvc, orderSvc2, identitySvc, userRepo, inventorySvc2, sf))
 
+	notifSvc := domainNotification.NewNotificationService(fakeNotificationSender{}, fakeLoggerMCP{})
+	router.Register(NewNotificationMCPHandler(notifSvc))
+
 	// tools/list should return all tools from all providers
 	w := rpcCall(t, router, "tools/list", "", nil)
 	assertOK(t, w)
@@ -835,9 +840,11 @@ func TestMCP_ToolsList_AllDomains(t *testing.T) {
 		"authorize":       false, "token": false, "revoke": false,
 		"create_product": false, "update_product": false, "delete_product": false,
 		"list_all_orders": false, "list_users": false, "activate_user": false,
+		"list_notifications": false, "mark_notification_read": false, "mark_all_notifications_read": false,
+		"get_unread_notification_count": false, "get_notification_preferences": false, "update_notification_preferences": false,
 	}
 
-	expectedCount := 3 + 5 + 9 + 8 + 4 + 3 + 7 + 4 + 3 + 1 + 3 + 9 // 59 with 3 duplicates
+	expectedCount := 3 + 5 + 9 + 8 + 4 + 3 + 7 + 4 + 3 + 1 + 3 + 9 + 6 // 65 with 3 duplicates
 
 	for _, tDef := range tools {
 		name := tDef.(map[string]any)["name"].(string)
@@ -1219,6 +1226,12 @@ func TestMCP_WebhookTools(t *testing.T) {
 
 type fakeRateCalculator struct{}
 
+type fakeNotificationSender struct{}
+
+func (fakeNotificationSender) Send(context.Context, domainNotification.EmailMessage) error {
+	return nil
+}
+
 func (fakeRateCalculator) CalculateRates(_ context.Context, _ domainFulfillment.RateInput) (*domainFulfillment.RateResult, error) {
 	return &domainFulfillment.RateResult{
 		Options: []domainFulfillment.ShippingOption{
@@ -1516,6 +1529,189 @@ func TestMCP_AdminTools(t *testing.T) {
 	w = rpcCall(t, router, "tools/call", "delete_product", map[string]any{
 		"admin_user_id": 100,
 		"id":            productID,
+	})
+	assertOK(t, w)
+}
+
+// ---------------------------------------------------------------------------
+// Notification MCP tests
+// ---------------------------------------------------------------------------
+
+type fakeNotificationRepoMCP struct {
+	notifs map[kernel.ID]*domainNotification.Notification
+}
+
+func newFakeNotificationRepoMCP() *fakeNotificationRepoMCP {
+	return &fakeNotificationRepoMCP{notifs: make(map[kernel.ID]*domainNotification.Notification)}
+}
+
+func (f *fakeNotificationRepoMCP) Write(_ context.Context, n *domainNotification.Notification) error {
+	return f.Save(context.Background(), n)
+}
+
+func (f *fakeNotificationRepoMCP) Save(_ context.Context, n *domainNotification.Notification) error {
+	f.notifs[n.ID] = n
+	return nil
+}
+
+func (f *fakeNotificationRepoMCP) FindByID(_ context.Context, id kernel.ID) (*domainNotification.Notification, error) {
+	n, ok := f.notifs[id]
+	if !ok {
+		return nil, kernel.NewDomainError(kernel.ErrNotFound, "notification not found")
+	}
+	return n, nil
+}
+
+func (f *fakeNotificationRepoMCP) FindByUserID(_ context.Context, userID kernel.ID, limit int) ([]*domainNotification.Notification, error) {
+	result := []*domainNotification.Notification{}
+	for _, n := range f.notifs {
+		if n.UserID == userID {
+			result = append(result, n)
+		}
+	}
+	if limit > 0 && len(result) > limit {
+		result = result[:limit]
+	}
+	return result, nil
+}
+
+func (f *fakeNotificationRepoMCP) MarkRead(_ context.Context, id, userID kernel.ID) error {
+	n, ok := f.notifs[id]
+	if !ok || n.UserID != userID {
+		return kernel.NewDomainError(kernel.ErrNotFound, "notification not found")
+	}
+	n.Read = true
+	return nil
+}
+
+func (f *fakeNotificationRepoMCP) MarkAllRead(_ context.Context, userID kernel.ID) error {
+	for _, n := range f.notifs {
+		if n.UserID == userID {
+			n.Read = true
+		}
+	}
+	return nil
+}
+
+func (f *fakeNotificationRepoMCP) UnreadCount(_ context.Context, userID kernel.ID) (int, error) {
+	count := 0
+	for _, n := range f.notifs {
+		if n.UserID == userID && !n.Read {
+			count++
+		}
+	}
+	return count, nil
+}
+
+type fakeNotificationPrefRepoMCP struct {
+	prefs map[kernel.ID]*domainNotification.NotificationPreferences
+}
+
+func newFakeNotificationPrefRepoMCP() *fakeNotificationPrefRepoMCP {
+	return &fakeNotificationPrefRepoMCP{prefs: make(map[kernel.ID]*domainNotification.NotificationPreferences)}
+}
+
+func (f *fakeNotificationPrefRepoMCP) Get(_ context.Context, userID kernel.ID) (*domainNotification.NotificationPreferences, error) {
+	p, ok := f.prefs[userID]
+	if !ok {
+		return nil, kernel.NewDomainError(kernel.ErrNotFound, "notification preferences not found")
+	}
+	return p, nil
+}
+
+func (f *fakeNotificationPrefRepoMCP) Upsert(_ context.Context, p *domainNotification.NotificationPreferences) error {
+	f.prefs[p.UserID] = p
+	return nil
+}
+
+func TestMCP_NotificationTools(t *testing.T) {
+	sf, _ := kernel.NewSnowflake(1)
+	repo := newFakeNotificationRepoMCP()
+	prefRepo := newFakeNotificationPrefRepoMCP()
+	svc := domainNotification.NewNotificationService(
+		fakeNotificationSender{},
+		fakeLoggerMCP{},
+		domainNotification.WithNotificationRepository(repo),
+		domainNotification.WithInAppWriter(repo),
+		domainNotification.WithPreferenceRepository(prefRepo),
+		domainNotification.WithSnowflake(sf),
+	)
+	router := NewMCPRouter()
+	router.Register(NewNotificationMCPHandler(svc))
+
+	// seed a notification
+	n, _ := domainNotification.NewNotification(1, 100, domainNotification.NotificationTypeOrder, "Order Confirmed", "Your order has been confirmed.")
+	repo.Save(context.Background(), n)
+
+	// list_notifications
+	w := rpcCall(t, router, "tools/call", "list_notifications", map[string]any{
+		"user_id": 100,
+	})
+	assertOK(t, w)
+
+	var resp map[string]any
+	json.Unmarshal(w.Body.Bytes(), &resp)
+	content := resp["result"].(map[string]any)["content"].([]any)
+	notifs := content[0].(map[string]any)["text"]
+	if !strings.Contains(notifs.(string), "Order Confirmed") {
+		t.Fatalf("expected notification in list response, got: %v", notifs)
+	}
+
+	// get_unread_notification_count
+	w = rpcCall(t, router, "tools/call", "get_unread_notification_count", map[string]any{
+		"user_id": 100,
+	})
+	assertOK(t, w)
+	json.Unmarshal(w.Body.Bytes(), &resp)
+	content = resp["result"].(map[string]any)["content"].([]any)
+	if !strings.Contains(content[0].(map[string]any)["text"].(string), `"unread_count":1`) {
+		t.Fatalf("expected unread_count 1, got: %v", content[0].(map[string]any)["text"])
+	}
+
+	// mark_notification_read
+	w = rpcCall(t, router, "tools/call", "mark_notification_read", map[string]any{
+		"notification_id": 1,
+		"user_id":         100,
+	})
+	assertOK(t, w)
+
+	// get_unread_notification_count should now be 0
+	w = rpcCall(t, router, "tools/call", "get_unread_notification_count", map[string]any{
+		"user_id": 100,
+	})
+	assertOK(t, w)
+	json.Unmarshal(w.Body.Bytes(), &resp)
+	content = resp["result"].(map[string]any)["content"].([]any)
+	if !strings.Contains(content[0].(map[string]any)["text"].(string), `"unread_count":0`) {
+		t.Fatalf("expected unread_count 0 after mark read, got: %v", content[0].(map[string]any)["text"])
+	}
+
+	// update_notification_preferences
+	w = rpcCall(t, router, "tools/call", "update_notification_preferences", map[string]any{
+		"user_id":       100,
+		"email_enabled": false,
+		"types":         []string{"order"},
+	})
+	assertOK(t, w)
+
+	// get_notification_preferences
+	w = rpcCall(t, router, "tools/call", "get_notification_preferences", map[string]any{
+		"user_id": 100,
+	})
+	assertOK(t, w)
+	json.Unmarshal(w.Body.Bytes(), &resp)
+	content = resp["result"].(map[string]any)["content"].([]any)
+	prefsText := content[0].(map[string]any)["text"].(string)
+	if !strings.Contains(prefsText, `"email_enabled":false`) {
+		t.Fatalf("expected email_enabled false, got: %v", prefsText)
+	}
+	if !strings.Contains(prefsText, `"order"`) {
+		t.Fatalf("expected type order in prefs, got: %v", prefsText)
+	}
+
+	// mark_all_notifications_read
+	w = rpcCall(t, router, "tools/call", "mark_all_notifications_read", map[string]any{
+		"user_id": 100,
 	})
 	assertOK(t, w)
 }
