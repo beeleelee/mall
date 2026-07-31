@@ -19,13 +19,73 @@ type EmailSender interface {
 	Send(ctx context.Context, msg EmailMessage) error
 }
 
-type NotificationService struct {
-	sender EmailSender
-	logger kernel.Logger
+type InAppWriter interface {
+	Write(ctx context.Context, n *Notification) error
 }
 
-func NewNotificationService(sender EmailSender, logger kernel.Logger) *NotificationService {
-	return &NotificationService{sender: sender, logger: logger}
+type NotificationService struct {
+	sender   EmailSender
+	writer   InAppWriter
+	prefRepo NotificationPreferenceRepository
+	logger   kernel.Logger
+}
+
+type NotificationServiceOption func(*NotificationService)
+
+func WithInAppWriter(w InAppWriter) NotificationServiceOption {
+	return func(s *NotificationService) {
+		s.writer = w
+	}
+}
+
+func WithPreferenceRepository(r NotificationPreferenceRepository) NotificationServiceOption {
+	return func(s *NotificationService) {
+		s.prefRepo = r
+	}
+}
+
+func NewNotificationService(sender EmailSender, logger kernel.Logger, opts ...NotificationServiceOption) *NotificationService {
+	svc := &NotificationService{sender: sender, logger: logger}
+	for _, opt := range opts {
+		opt(svc)
+	}
+	return svc
+}
+
+func (s *NotificationService) allowsEmail(ctx context.Context, userID kernel.ID, ntype NotificationType) bool {
+	if s.prefRepo == nil {
+		return true
+	}
+	prefs, err := s.prefRepo.Get(ctx, userID)
+	if err != nil {
+		return true
+	}
+	return prefs.Allows(ChannelEmail, ntype)
+}
+
+func (s *NotificationService) allowsInApp(ctx context.Context, userID kernel.ID, ntype NotificationType) bool {
+	if s.prefRepo == nil {
+		return true
+	}
+	prefs, err := s.prefRepo.Get(ctx, userID)
+	if err != nil {
+		return true
+	}
+	return prefs.Allows(ChannelInApp, ntype)
+}
+
+func (s *NotificationService) NotifyInApp(ctx context.Context, id, userID kernel.ID, ntype NotificationType, title, body string) error {
+	if s.writer == nil {
+		return nil
+	}
+	if !s.allowsInApp(ctx, userID, ntype) {
+		return nil
+	}
+	n, err := NewNotification(id, userID, ntype, title, body)
+	if err != nil {
+		return err
+	}
+	return s.writer.Write(ctx, n)
 }
 
 func (s *NotificationService) SendOrderConfirmation(ctx context.Context, to EmailAddress, userName string, orderID int64, total int64) error {
@@ -65,6 +125,88 @@ func (s *NotificationService) SendPasswordReset(ctx context.Context, to EmailAdd
 	})
 	if err != nil {
 		s.logger.Error(ctx, "failed to send password reset", err, kernel.Field("to", string(to)))
+		return err
+	}
+	return nil
+}
+
+func (s *NotificationService) SendOrderConfirmationPref(ctx context.Context, userID kernel.ID, to EmailAddress, userName string, orderID int64, total int64) error {
+	if !s.allowsEmail(ctx, userID, NotificationTypeOrder) {
+		return nil
+	}
+	return s.SendOrderConfirmation(ctx, to, userName, orderID, total)
+}
+
+func (s *NotificationService) SendShippingUpdatePref(ctx context.Context, userID kernel.ID, to EmailAddress, userName string, orderID int64, status string) error {
+	if !s.allowsEmail(ctx, userID, NotificationTypeShipping) {
+		return nil
+	}
+	return s.SendShippingUpdate(ctx, to, userName, orderID, status)
+}
+
+func (s *NotificationService) SendSubscriptionRenewed(ctx context.Context, userID kernel.ID, to EmailAddress, userName string, subID int64, planName string, amount int64) error {
+	if !s.allowsEmail(ctx, userID, NotificationTypeSubscription) {
+		return nil
+	}
+	err := s.sender.Send(ctx, EmailMessage{
+		To:        to,
+		Subject:   "Subscription Renewed",
+		PlainBody: "Hi " + userName + ",\n\nYour " + planName + " subscription (##" + formatID(subID) + ") has been renewed. Amount charged: " + formatMoney(amount) + ".\n\nThank you!",
+		HTMLBody:  "<h2>Subscription Renewed</h2><p>Hi " + userName + ",</p><p>Your <strong>" + planName + "</strong> subscription has been renewed.</p><p>Amount charged: <strong>" + formatMoney(amount) + "</strong></p>",
+	})
+	if err != nil {
+		s.logger.Error(ctx, "failed to send subscription renewal", err, kernel.Field("subscription_id", subID), kernel.Field("to", string(to)))
+		return err
+	}
+	return nil
+}
+
+func (s *NotificationService) SendPaymentFailed(ctx context.Context, userID kernel.ID, to EmailAddress, userName string, subID int64) error {
+	if !s.allowsEmail(ctx, userID, NotificationTypeSubscription) {
+		return nil
+	}
+	err := s.sender.Send(ctx, EmailMessage{
+		To:        to,
+		Subject:   "Payment Failed — Action Required",
+		PlainBody: "Hi " + userName + ",\n\nWe could not charge your subscription (##" + formatID(subID) + "). Please update your payment method to avoid interruption.\n\nThank you!",
+		HTMLBody:  "<h2>Payment Failed</h2><p>Hi " + userName + ",</p><p>We could not charge your subscription <strong>#" + formatID(subID) + "</strong>.</p><p>Please <a href='#'>update your payment method</a> to avoid interruption.</p>",
+	})
+	if err != nil {
+		s.logger.Error(ctx, "failed to send payment failed", err, kernel.Field("subscription_id", subID), kernel.Field("to", string(to)))
+		return err
+	}
+	return nil
+}
+
+func (s *NotificationService) SendSubscriptionExpired(ctx context.Context, userID kernel.ID, to EmailAddress, userName string, subID int64) error {
+	if !s.allowsEmail(ctx, userID, NotificationTypeSubscription) {
+		return nil
+	}
+	err := s.sender.Send(ctx, EmailMessage{
+		To:        to,
+		Subject:   "Subscription Expired",
+		PlainBody: "Hi " + userName + ",\n\nYour subscription (##" + formatID(subID) + ") has expired.\n\nYou can resubscribe at any time.",
+		HTMLBody:  "<h2>Subscription Expired</h2><p>Hi " + userName + ",</p><p>Your subscription <strong>#" + formatID(subID) + "</strong> has expired.</p><p>You can <a href='#'>resubscribe</a> at any time.</p>",
+	})
+	if err != nil {
+		s.logger.Error(ctx, "failed to send subscription expired", err, kernel.Field("subscription_id", subID), kernel.Field("to", string(to)))
+		return err
+	}
+	return nil
+}
+
+func (s *NotificationService) SendRefundProcessed(ctx context.Context, userID kernel.ID, to EmailAddress, userName string, orderID int64, amount int64) error {
+	if !s.allowsEmail(ctx, userID, NotificationTypeRefund) {
+		return nil
+	}
+	err := s.sender.Send(ctx, EmailMessage{
+		To:        to,
+		Subject:   "Refund Processed",
+		PlainBody: "Hi " + userName + ",\n\nA refund of " + formatMoney(amount) + " has been processed for your order #" + formatID(orderID) + ".\n\nThank you!",
+		HTMLBody:  "<h2>Refund Processed</h2><p>Hi " + userName + ",</p><p>A refund of <strong>" + formatMoney(amount) + "</strong> has been processed for your order <strong>#" + formatID(orderID) + "</strong>.</p>",
+	})
+	if err != nil {
+		s.logger.Error(ctx, "failed to send refund processed", err, kernel.Field("order_id", orderID), kernel.Field("to", string(to)))
 		return err
 	}
 	return nil

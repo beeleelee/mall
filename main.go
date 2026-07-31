@@ -365,17 +365,31 @@ func main() {
 	retryWorker := infraOrder.NewWebhookRetryWorker(webhookDLQ, webhookRepo, webhookDeliverer, 30*time.Second, logger)
 	go retryWorker.Start(retryCtx)
 
+	var emailSender domainNotification.EmailSender = notificationInfra.NoopEmailSender{}
 	if smtpHost := envOrDefault("SMTP_HOST", ""); smtpHost != "" {
 		smtpPort, _ := strconv.Atoi(envOrDefault("SMTP_PORT", "587"))
-		smtpSender := notificationInfra.NewSMTPEmailSender(notificationInfra.SMTPConfig{
+		emailSender = notificationInfra.NewSMTPEmailSender(notificationInfra.SMTPConfig{
 			Host:     smtpHost,
 			Port:     smtpPort,
 			Username: envOrDefault("SMTP_USERNAME", ""),
 			Password: envOrDefault("SMTP_PASSWORD", ""),
 			From:     envOrDefault("SMTP_FROM", "noreply@mall.example.com"),
 		})
-		notifSvc := domainNotification.NewNotificationService(smtpSender, logger)
-		notificationInfra.StartEmailConsumer(js, notifSvc, userRepo)
+	}
+
+	notifRepo := notificationInfra.NewPostgresNotificationRepository(db)
+	notifPrefRepo := notificationInfra.NewPostgresNotificationPreferenceRepository(db)
+	notifSvc := domainNotification.NewNotificationService(
+		emailSender,
+		logger,
+		domainNotification.WithInAppWriter(notifRepo),
+		domainNotification.WithPreferenceRepository(notifPrefRepo),
+	)
+	notificationConsumer := notificationInfra.NewNotificationConsumer(js, notifSvc, userRepo, sf)
+	notifCtx, notifCancel := context.WithCancel(context.Background())
+	defer notifCancel()
+	if err := notificationConsumer.Start(notifCtx); err != nil {
+		log.Fatalf("start notification consumer: %v", err)
 	}
 
 	if otelEndpoint := envOrDefault("OTEL_ENDPOINT", ""); otelEndpoint != "" {
