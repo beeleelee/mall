@@ -3,8 +3,8 @@ package subscription
 import (
 	"context"
 
-	domain "github.com/beeleelee/mall/domain/subscription"
 	"github.com/beeleelee/mall/domain/kernel"
+	domain "github.com/beeleelee/mall/domain/subscription"
 )
 
 type CreatePlanRequest struct {
@@ -30,18 +30,20 @@ type PlanResponse struct {
 }
 
 type SubscribeRequest struct {
-	PlanID int64
+	PlanID       int64
+	PaymentToken string
 }
 
 type SubscriptionResponse struct {
-	ID                int64  `json:"id"`
-	UserID            int64  `json:"user_id"`
-	PlanID            int64  `json:"plan_id"`
-	Status            string `json:"status"`
+	ID                 int64  `json:"id"`
+	UserID             int64  `json:"user_id"`
+	PlanID             int64  `json:"plan_id"`
+	Status             string `json:"status"`
 	CurrentPeriodStart string `json:"current_period_start"`
 	CurrentPeriodEnd   string `json:"current_period_end"`
-	TrialEndsAt       string `json:"trial_ends_at,omitempty"`
-	CancelledAt       string `json:"cancelled_at,omitempty"`
+	TrialEndsAt        string `json:"trial_ends_at,omitempty"`
+	CancelledAt        string `json:"cancelled_at,omitempty"`
+	PaymentToken       string `json:"payment_token,omitempty"`
 }
 
 type SubscriptionAppService struct {
@@ -69,10 +71,10 @@ func planToResponse(p *domain.Plan) *PlanResponse {
 
 func subToResponse(s *domain.Subscription) *SubscriptionResponse {
 	resp := &SubscriptionResponse{
-		ID:                s.ID.Int64(),
-		UserID:            s.UserID.Int64(),
-		PlanID:            s.PlanID.Int64(),
-		Status:            string(s.Status),
+		ID:                 s.ID.Int64(),
+		UserID:             s.UserID.Int64(),
+		PlanID:             s.PlanID.Int64(),
+		Status:             string(s.Status),
 		CurrentPeriodStart: s.CurrentPeriodStart.Format("2006-01-02T15:04:05Z"),
 		CurrentPeriodEnd:   s.CurrentPeriodEnd.Format("2006-01-02T15:04:05Z"),
 	}
@@ -81,6 +83,9 @@ func subToResponse(s *domain.Subscription) *SubscriptionResponse {
 	}
 	if s.CancelledAt != nil {
 		resp.CancelledAt = s.CancelledAt.Format("2006-01-02T15:04:05Z")
+	}
+	if s.PaymentToken != "" {
+		resp.PaymentToken = s.PaymentToken
 	}
 	return resp
 }
@@ -130,7 +135,15 @@ func (a *SubscriptionAppService) Subscribe(ctx context.Context, userID int64, re
 	if err != nil {
 		return nil, err
 	}
-	sub, err := a.svc.Subscribe(ctx, id, kernel.ID(userID), kernel.ID(req.PlanID))
+	sub, err := a.svc.SubscribeWithToken(ctx, id, kernel.ID(userID), kernel.ID(req.PlanID), req.PaymentToken)
+	if err != nil {
+		return nil, err
+	}
+	return subToResponse(sub), nil
+}
+
+func (a *SubscriptionAppService) AttachPaymentToken(ctx context.Context, id int64, token string) (*SubscriptionResponse, error) {
+	sub, err := a.svc.AttachPaymentToken(ctx, kernel.ID(id), token)
 	if err != nil {
 		return nil, err
 	}

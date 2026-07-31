@@ -316,6 +316,49 @@ func TestSubscription_Renew(t *testing.T) {
 	}
 }
 
+func TestSubscription_AttachPaymentToken(t *testing.T) {
+	s := validSubscription(t, 1, 100, validPlan(t))
+	if err := s.AttachPaymentToken("tok_test_123"); err != nil {
+		t.Fatal(err)
+	}
+	if s.PaymentToken != "tok_test_123" {
+		t.Errorf("expected payment token set, got %q", s.PaymentToken)
+	}
+}
+
+func TestSubscription_AttachPaymentToken_Empty(t *testing.T) {
+	s := validSubscription(t, 1, 100, validPlan(t))
+	if err := s.AttachPaymentToken(""); !kernel.IsInvalidArgument(err) {
+		t.Fatalf("expected invalid argument, got %v", err)
+	}
+}
+
+func TestSubscription_AttachPaymentToken_InvalidState(t *testing.T) {
+	s := validSubscription(t, 1, 100, validPlan(t))
+	s.Activate()
+	s.Cancel()
+	if err := s.AttachPaymentToken("tok_test_123"); !kernel.IsInvalidArgument(err) {
+		t.Fatalf("expected invalid argument, got %v", err)
+	}
+}
+
+func TestSubscription_Expire_FromTrialing(t *testing.T) {
+	p, _ := NewPlan(1, "Trial", "", 999, "month", 1, 7, nil)
+	s, err := NewSubscription(1, 100, p.ID, p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.Status != SubscriptionStatusTrialing {
+		t.Fatalf("expected trialing, got %s", s.Status)
+	}
+	if err := s.Expire(); err != nil {
+		t.Fatal(err)
+	}
+	if s.Status != SubscriptionStatusExpired {
+		t.Errorf("expected expired, got %s", s.Status)
+	}
+}
+
 func TestSubscription_IsActive(t *testing.T) {
 	s := validSubscription(t, 1, 100, validPlan(t))
 	if s.IsActive() {

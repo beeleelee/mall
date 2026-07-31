@@ -136,16 +136,17 @@ func (r *PostgresPlanRepository) FindActive(ctx context.Context) ([]*domain.Plan
 }
 
 type subscriptionRow struct {
-	ID                int64     `db:"id"`
-	UserID            int64     `db:"user_id"`
-	PlanID            int64     `db:"plan_id"`
-	Status            string    `db:"status"`
-	CurrentPeriodStart time.Time `db:"current_period_start"`
-	CurrentPeriodEnd   time.Time `db:"current_period_end"`
-	TrialEndsAt       *time.Time `db:"trial_ends_at"`
-	CancelledAt       *time.Time `db:"cancelled_at"`
-	CreatedAt         time.Time `db:"created_at"`
-	UpdatedAt         time.Time `db:"updated_at"`
+	ID                 int64      `db:"id"`
+	UserID             int64      `db:"user_id"`
+	PlanID             int64      `db:"plan_id"`
+	Status             string     `db:"status"`
+	CurrentPeriodStart time.Time  `db:"current_period_start"`
+	CurrentPeriodEnd   time.Time  `db:"current_period_end"`
+	TrialEndsAt        *time.Time `db:"trial_ends_at"`
+	CancelledAt        *time.Time `db:"cancelled_at"`
+	PaymentToken       string     `db:"payment_token"`
+	CreatedAt          time.Time  `db:"created_at"`
+	UpdatedAt          time.Time  `db:"updated_at"`
 }
 
 func (r subscriptionRow) toDomain() *domain.Subscription {
@@ -157,28 +158,30 @@ func (r subscriptionRow) toDomain() *domain.Subscription {
 				UpdatedAt: r.UpdatedAt,
 			},
 		},
-		UserID:            kernel.ID(r.UserID),
-		PlanID:            kernel.ID(r.PlanID),
-		Status:            domain.SubscriptionStatus(r.Status),
+		UserID:             kernel.ID(r.UserID),
+		PlanID:             kernel.ID(r.PlanID),
+		Status:             domain.SubscriptionStatus(r.Status),
 		CurrentPeriodStart: r.CurrentPeriodStart,
 		CurrentPeriodEnd:   r.CurrentPeriodEnd,
-		TrialEndsAt:       r.TrialEndsAt,
-		CancelledAt:       r.CancelledAt,
+		TrialEndsAt:        r.TrialEndsAt,
+		CancelledAt:        r.CancelledAt,
+		PaymentToken:       r.PaymentToken,
 	}
 }
 
 func (r subscriptionRow) fromDomain(s *domain.Subscription) subscriptionRow {
 	return subscriptionRow{
-		ID:                s.ID.Int64(),
-		UserID:            s.UserID.Int64(),
-		PlanID:            s.PlanID.Int64(),
-		Status:            string(s.Status),
+		ID:                 s.ID.Int64(),
+		UserID:             s.UserID.Int64(),
+		PlanID:             s.PlanID.Int64(),
+		Status:             string(s.Status),
 		CurrentPeriodStart: s.CurrentPeriodStart,
 		CurrentPeriodEnd:   s.CurrentPeriodEnd,
-		TrialEndsAt:       s.TrialEndsAt,
-		CancelledAt:       s.CancelledAt,
-		CreatedAt:         s.CreatedAt,
-		UpdatedAt:         s.UpdatedAt,
+		TrialEndsAt:        s.TrialEndsAt,
+		CancelledAt:        s.CancelledAt,
+		PaymentToken:       s.PaymentToken,
+		CreatedAt:          s.CreatedAt,
+		UpdatedAt:          s.UpdatedAt,
 	}
 }
 
@@ -193,12 +196,13 @@ func NewPostgresSubscriptionRepository(db *sqlx.DB, rdb *redis.Client) *Postgres
 
 func (r *PostgresSubscriptionRepository) Save(ctx context.Context, sub *domain.Subscription) error {
 	row := subscriptionRow{}.fromDomain(sub)
-	query := `INSERT INTO subscriptions (id, user_id, plan_id, status, current_period_start, current_period_end, trial_ends_at, cancelled_at, created_at, updated_at)
-		VALUES (:id, :user_id, :plan_id, :status, :current_period_start, :current_period_end, :trial_ends_at, :cancelled_at, :created_at, :updated_at)
+	query := `INSERT INTO subscriptions (id, user_id, plan_id, status, current_period_start, current_period_end, trial_ends_at, cancelled_at, payment_token, created_at, updated_at)
+		VALUES (:id, :user_id, :plan_id, :status, :current_period_start, :current_period_end, :trial_ends_at, :cancelled_at, :payment_token, :created_at, :updated_at)
 		ON CONFLICT (id) DO UPDATE SET
 			status = EXCLUDED.status, plan_id = EXCLUDED.plan_id,
 			current_period_start = EXCLUDED.current_period_start, current_period_end = EXCLUDED.current_period_end,
 			trial_ends_at = EXCLUDED.trial_ends_at, cancelled_at = EXCLUDED.cancelled_at,
+			payment_token = EXCLUDED.payment_token,
 			updated_at = EXCLUDED.updated_at`
 	if _, err := r.db.NamedExecContext(ctx, query, row); err != nil {
 		return kernel.NewDomainErrorWithCause(kernel.ErrInternal, "save subscription", err)
@@ -249,6 +253,20 @@ func (r *PostgresSubscriptionRepository) FindDueForBilling(ctx context.Context, 
 		`SELECT * FROM subscriptions WHERE current_period_end < $1 AND status = 'active'`,
 		now); err != nil {
 		return nil, kernel.NewDomainErrorWithCause(kernel.ErrInternal, "find subscriptions due for billing", err)
+	}
+	subs := make([]*domain.Subscription, 0, len(rows))
+	for _, row := range rows {
+		subs = append(subs, row.toDomain())
+	}
+	return subs, nil
+}
+
+func (r *PostgresSubscriptionRepository) FindTrialsEnded(ctx context.Context, now time.Time) ([]*domain.Subscription, error) {
+	var rows []subscriptionRow
+	if err := r.db.SelectContext(ctx, &rows,
+		`SELECT * FROM subscriptions WHERE status = 'trialing' AND trial_ends_at < $1`,
+		now); err != nil {
+		return nil, kernel.NewDomainErrorWithCause(kernel.ErrInternal, "find trials ended", err)
 	}
 	subs := make([]*domain.Subscription, 0, len(rows))
 	for _, row := range rows {

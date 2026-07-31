@@ -275,10 +275,17 @@ func main() {
 	subRepo := infraSubscription.NewPostgresSubscriptionRepository(db, rdb)
 	subPub := infraSubscription.NewNATSSubscriptionEventPublisher(js)
 	subLogger := logger.WithCapability("subscription")
-	subDomainSvc := domainSubscription.NewSubscriptionService(subPlanRepo, subRepo, subPub, subLogger)
+	subCharger := infraSubscription.NewMockBillingCharger()
+	subDomainSvc := domainSubscription.NewSubscriptionService(subPlanRepo, subRepo, subPub, subLogger, domainSubscription.WithBillingCharger(subCharger))
 	subAppSvc := appSubscription.NewSubscriptionAppService(subDomainSvc, sf)
 	subHandler := rest.NewSubscriptionHandler(subAppSvc)
 	mcpRouter.Register(mcp.NewSubscriptionMCPHandler(subAppSvc))
+
+	billingSvc := appSubscription.NewSubscriptionBillingService(subDomainSvc, subLogger)
+	billingCtx, billingCancel := context.WithCancel(context.Background())
+	defer billingCancel()
+	billingWorker := infraSubscription.NewSubscriptionBillingWorker(billingSvc, 60*time.Second, subLogger)
+	go billingWorker.Start(billingCtx)
 
 	adminHandler := rest.NewAdminHandler(catalogSvc, orderSvc, appSvc, inventorySvc, storageSvc, categoryRepo, analyticsSvc, reviewSvc, sf, db, webhookDLQ, refundSvc)
 	adminMW := middleware.AdminMiddleware(userRepo)
@@ -837,6 +844,11 @@ func main() {
 		Method:  http.MethodPost,
 		Path:    "/api/v1/subscriptions/:id/activate",
 		Handler: auth(http.HandlerFunc(subHandler.ActivateSubscription)).ServeHTTP,
+	})
+	srv.AddRoute(gozerorest.Route{
+		Method:  http.MethodPost,
+		Path:    "/api/v1/subscriptions/:id/payment-token",
+		Handler: auth(http.HandlerFunc(subHandler.AttachPaymentToken)).ServeHTTP,
 	})
 	srv.AddRoute(gozerorest.Route{
 		Method:  http.MethodPost,

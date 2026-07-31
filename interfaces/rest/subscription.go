@@ -30,7 +30,12 @@ type createPlanJSON struct {
 }
 
 type subscribeJSON struct {
-	PlanID int64 `json:"plan_id"`
+	PlanID       int64  `json:"plan_id"`
+	PaymentToken string `json:"payment_token,omitempty"`
+}
+
+type attachTokenJSON struct {
+	PaymentToken string `json:"payment_token"`
 }
 
 type changePlanJSON struct {
@@ -127,12 +132,47 @@ func (h *SubscriptionHandler) Subscribe(w http.ResponseWriter, r *http.Request) 
 		writeDomainError(w, kernel.NewDomainError(kernel.ErrInvalidArgument, "invalid request body"))
 		return
 	}
-	resp, err := h.svc.Subscribe(r.Context(), userID.Int64(), subscription.SubscribeRequest{PlanID: req.PlanID})
+	resp, err := h.svc.Subscribe(r.Context(), userID.Int64(), subscription.SubscribeRequest{PlanID: req.PlanID, PaymentToken: req.PaymentToken})
 	if err != nil {
 		writeDomainError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusCreated, resp)
+}
+
+func (h *SubscriptionHandler) AttachPaymentToken(w http.ResponseWriter, r *http.Request) {
+	userID, err := userIDFromContext(r)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+	vars := pathvar.Vars(r)
+	idStr := vars["id"]
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		writeDomainError(w, kernel.NewDomainError(kernel.ErrInvalidArgument, "invalid subscription id"))
+		return
+	}
+	sub, err := h.svc.GetSubscription(r.Context(), id)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+	if sub.UserID != userID.Int64() {
+		writeDomainError(w, kernel.NewDomainError(kernel.ErrPermissionDenied, "subscription does not belong to user"))
+		return
+	}
+	var req attachTokenJSON
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeDomainError(w, kernel.NewDomainError(kernel.ErrInvalidArgument, "invalid request body"))
+		return
+	}
+	updated, err := h.svc.AttachPaymentToken(r.Context(), id, req.PaymentToken)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, updated)
 }
 
 func (h *SubscriptionHandler) ListUserSubscriptions(w http.ResponseWriter, r *http.Request) {

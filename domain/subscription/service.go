@@ -26,17 +26,31 @@ type SubscriptionRepository interface {
 	FindByUserID(ctx context.Context, userID kernel.ID) ([]*Subscription, error)
 	FindActiveByUserID(ctx context.Context, userID kernel.ID) (*Subscription, error)
 	FindDueForBilling(ctx context.Context, now time.Time) ([]*Subscription, error)
+	FindTrialsEnded(ctx context.Context, now time.Time) ([]*Subscription, error)
 }
 
 type SubscriptionEventPublisher interface {
 	PublishSubscriptionEvent(ctx context.Context, sub *Subscription) error
 }
 
+type BillingCharger interface {
+	Charge(ctx context.Context, subID, userID kernel.ID, amount int64, token string) error
+}
+
 type SubscriptionService struct {
-	planRepo PlanRepository
-	subRepo  SubscriptionRepository
+	planRepo  PlanRepository
+	subRepo   SubscriptionRepository
 	publisher SubscriptionEventPublisher
-	logger   kernel.Logger
+	charger   BillingCharger
+	logger    kernel.Logger
+}
+
+type SubscriptionServiceOption func(*SubscriptionService)
+
+func WithBillingCharger(c BillingCharger) SubscriptionServiceOption {
+	return func(s *SubscriptionService) {
+		s.charger = c
+	}
 }
 
 func NewSubscriptionService(
@@ -44,13 +58,18 @@ func NewSubscriptionService(
 	subRepo SubscriptionRepository,
 	publisher SubscriptionEventPublisher,
 	logger kernel.Logger,
+	opts ...SubscriptionServiceOption,
 ) *SubscriptionService {
-	return &SubscriptionService{
+	svc := &SubscriptionService{
 		planRepo:  planRepo,
 		subRepo:   subRepo,
 		publisher: publisher,
 		logger:    logger,
 	}
+	for _, opt := range opts {
+		opt(svc)
+	}
+	return svc
 }
 
 func (s *SubscriptionService) CreatePlan(ctx context.Context, id kernel.ID, name, description string, amount int64, interval string, intervalCount, trialDays int, features []string) (*Plan, error) {
@@ -174,6 +193,10 @@ func (s *SubscriptionService) ActivateSubscription(ctx context.Context, id kerne
 }
 
 func (s *SubscriptionService) Subscribe(ctx context.Context, id, userID, planID kernel.ID) (*Subscription, error) {
+	return s.SubscribeWithToken(ctx, id, userID, planID, "")
+}
+
+func (s *SubscriptionService) SubscribeWithToken(ctx context.Context, id, userID, planID kernel.ID, token string) (*Subscription, error) {
 	ctx, span := subTracer.Start(ctx, "subscription.subscribe",
 		trace.WithAttributes(
 			attribute.Int64("subscription_id", id.Int64()),
@@ -193,6 +216,12 @@ func (s *SubscriptionService) Subscribe(ctx context.Context, id, userID, planID 
 		return nil, err
 	}
 
+	if token != "" {
+		if err := sub.AttachPaymentToken(token); err != nil {
+			return nil, err
+		}
+	}
+
 	if err := s.subRepo.Save(ctx, sub); err != nil {
 		return nil, err
 	}
@@ -201,6 +230,26 @@ func (s *SubscriptionService) Subscribe(ctx context.Context, id, userID, planID 
 	s.logger.Info(ctx, "subscription.created",
 		kernel.Field("subscription_id", sub.ID.String()),
 		kernel.Field("user_id", sub.UserID.String()),
+	)
+	return sub, nil
+}
+
+func (s *SubscriptionService) AttachPaymentToken(ctx context.Context, id kernel.ID, token string) (*Subscription, error) {
+	sub, err := s.subRepo.FindByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := sub.AttachPaymentToken(token); err != nil {
+		return nil, err
+	}
+
+	if err := s.subRepo.Save(ctx, sub); err != nil {
+		return nil, err
+	}
+
+	s.logger.Info(ctx, "subscription.payment_token_attached",
+		kernel.Field("subscription_id", sub.ID.String()),
 	)
 	return sub, nil
 }
@@ -273,6 +322,10 @@ func (s *SubscriptionService) ChangePlan(ctx context.Context, id, newPlanID kern
 	return sub, nil
 }
 
+func (s *SubscriptionService) ListDueForBilling(ctx context.Context, now time.Time) ([]*Subscription, error) {
+	return s.subRepo.FindDueForBilling(ctx, now)
+}
+
 func (s *SubscriptionService) HandleBillingCycle(ctx context.Context, subID kernel.ID) (*Subscription, error) {
 	ctx, span := subTracer.Start(ctx, "subscription.billing_cycle",
 		trace.WithAttributes(attribute.Int64("subscription_id", subID.Int64())),
@@ -289,6 +342,29 @@ func (s *SubscriptionService) HandleBillingCycle(ctx context.Context, subID kern
 		return nil, err
 	}
 
+	if s.charger != nil && sub.PaymentToken != "" {
+		if err := s.charger.Charge(ctx, sub.ID, sub.UserID, plan.Amount, sub.PaymentToken); err != nil {
+			s.logger.Error(ctx, "subscription.charge_failed", err,
+				kernel.Field("subscription_id", sub.ID.String()),
+				kernel.Field("amount", plan.Amount),
+			)
+			var billingErr error
+			if sub.Status == SubscriptionStatusPastDue {
+				billingErr = sub.Expire()
+			} else {
+				billingErr = sub.FailPayment()
+			}
+			if billingErr != nil {
+				return nil, billingErr
+			}
+			if err := s.subRepo.Save(ctx, sub); err != nil {
+				return nil, err
+			}
+			s.publishEvents(ctx, sub)
+			return sub, nil
+		}
+	}
+
 	if err := sub.Renew(plan); err != nil {
 		return nil, err
 	}
@@ -302,6 +378,57 @@ func (s *SubscriptionService) HandleBillingCycle(ctx context.Context, subID kern
 		kernel.Field("subscription_id", sub.ID.String()),
 	)
 	return sub, nil
+}
+
+func (s *SubscriptionService) ExpireTrials(ctx context.Context, now time.Time) ([]*Subscription, error) {
+	ctx, span := subTracer.Start(ctx, "subscription.expire_trials")
+	defer span.End()
+
+	subs, err := s.subRepo.FindTrialsEnded(ctx, now)
+	if err != nil {
+		return nil, err
+	}
+
+	expired := make([]*Subscription, 0, len(subs))
+	for _, sub := range subs {
+		if sub.Status != SubscriptionStatusTrialing {
+			continue
+		}
+		plan, err := s.planRepo.FindByID(ctx, sub.PlanID)
+		if err != nil {
+			s.logger.Error(ctx, "subscription.expire_trials: plan lookup failed", err,
+				kernel.Field("subscription_id", sub.ID.String()),
+			)
+			continue
+		}
+
+		if s.charger != nil && sub.PaymentToken != "" {
+			if err := s.charger.Charge(ctx, sub.ID, sub.UserID, plan.Amount, sub.PaymentToken); err != nil {
+				s.logger.Error(ctx, "subscription.trial_charge_failed", err,
+					kernel.Field("subscription_id", sub.ID.String()),
+				)
+			} else if err := sub.Activate(); err == nil {
+				_ = sub.Renew(plan)
+				if err := s.subRepo.Save(ctx, sub); err == nil {
+					s.publishEvents(ctx, sub)
+					continue
+				}
+			}
+		}
+
+		if err := sub.Expire(); err != nil {
+			s.logger.Error(ctx, "subscription.expire_trials: expire failed", err,
+				kernel.Field("subscription_id", sub.ID.String()),
+			)
+			continue
+		}
+		if err := s.subRepo.Save(ctx, sub); err != nil {
+			return nil, err
+		}
+		s.publishEvents(ctx, sub)
+		expired = append(expired, sub)
+	}
+	return expired, nil
 }
 
 func (s *SubscriptionService) publishEvents(ctx context.Context, sub *Subscription) {

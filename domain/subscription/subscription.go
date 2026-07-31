@@ -91,13 +91,14 @@ func (p *Plan) Activate() error {
 
 type Subscription struct {
 	kernel.AggregateRoot
-	UserID            kernel.ID
-	PlanID            kernel.ID
-	Status            SubscriptionStatus
+	UserID             kernel.ID
+	PlanID             kernel.ID
+	Status             SubscriptionStatus
 	CurrentPeriodStart time.Time
 	CurrentPeriodEnd   time.Time
-	TrialEndsAt       *time.Time
-	CancelledAt       *time.Time
+	TrialEndsAt        *time.Time
+	CancelledAt        *time.Time
+	PaymentToken       string
 }
 
 func NewSubscription(id, userID, planID kernel.ID, plan *Plan) (*Subscription, error) {
@@ -182,7 +183,7 @@ func (s *Subscription) Cancel() error {
 }
 
 func (s *Subscription) Expire() error {
-	if s.Status != SubscriptionStatusActive && s.Status != SubscriptionStatusPastDue {
+	if s.Status != SubscriptionStatusActive && s.Status != SubscriptionStatusPastDue && s.Status != SubscriptionStatusTrialing {
 		return kernel.NewDomainError(kernel.ErrInvalidArgument, "cannot expire subscription in current state: "+string(s.Status))
 	}
 	s.Status = SubscriptionStatusExpired
@@ -226,6 +227,18 @@ func (s *Subscription) ChangePlan(newPlan *Plan) error {
 		OldPlanID:      oldPlanID,
 		NewPlanID:      newPlan.ID,
 	})
+	return nil
+}
+
+func (s *Subscription) AttachPaymentToken(token string) error {
+	if token == "" {
+		return kernel.NewDomainError(kernel.ErrInvalidArgument, "payment token must not be empty")
+	}
+	if s.Status != SubscriptionStatusPending && s.Status != SubscriptionStatusTrialing && s.Status != SubscriptionStatusPastDue {
+		return kernel.NewDomainError(kernel.ErrInvalidArgument, "cannot attach payment token in current state: "+string(s.Status))
+	}
+	s.PaymentToken = token
+	s.touch()
 	return nil
 }
 

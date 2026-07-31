@@ -121,6 +121,10 @@ func (f *fakeSubRepo) FindDueForBilling(_ context.Context, now time.Time) ([]*do
 	return nil, nil
 }
 
+func (f *fakeSubRepo) FindTrialsEnded(_ context.Context, now time.Time) ([]*domain.Subscription, error) {
+	return nil, nil
+}
+
 type fakeSubPublisher struct{}
 
 func (f *fakeSubPublisher) PublishSubscriptionEvent(_ context.Context, _ *domain.Subscription) error {
@@ -155,6 +159,11 @@ func decodeMap(r io.Reader) (map[string]any, error) {
 func getInt64(m map[string]any, key string) int64 {
 	n, _ := strconv.ParseInt(string(m[key].(json.Number)), 10, 64)
 	return n
+}
+
+func getString(m map[string]any, key string) string {
+	s, _ := m[key].(string)
+	return s
 }
 
 func TestSubscriptionHandler_CreatePlan_Success(t *testing.T) {
@@ -393,6 +402,104 @@ func TestSubscriptionHandler_Subscribe_Success(t *testing.T) {
 	}
 	if getInt64(resp, "plan_id") != planID {
 		t.Errorf("expected plan_id=%d, got %v", planID, resp["plan_id"])
+	}
+}
+
+func TestSubscriptionHandler_Subscribe_WithPaymentToken(t *testing.T) {
+	h := newTestSubscriptionHandler(t)
+	body, _ := json.Marshal(map[string]any{
+		"name": "Basic", "amount": 999, "interval": "month",
+		"interval_count": 1,
+	})
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/subscriptions/plans", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	crec := httptest.NewRecorder()
+	h.CreatePlan(crec, req)
+
+	plan, err := decodeMap(crec.Body)
+	if err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	planID := getInt64(plan, "id")
+
+	subBody, _ := json.Marshal(map[string]any{"plan_id": planID, "payment_token": "tok_abc"})
+	subReq := httptest.NewRequest(http.MethodPost, "/api/v1/subscriptions", bytes.NewReader(subBody))
+	subReq.Header.Set("Content-Type", "application/json")
+	subReq = subReq.WithContext(middleware.ContextWithUser(subReq.Context(), middleware.UserInfo{UserID: 1}))
+	rec := httptest.NewRecorder()
+	h.Subscribe(rec, subReq)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp, err := decodeMap(rec.Body)
+	if err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if getString(resp, "payment_token") != "tok_abc" {
+		t.Errorf("expected payment_token=tok_abc, got %v", resp["payment_token"])
+	}
+}
+
+func TestSubscriptionHandler_AttachPaymentToken_Success(t *testing.T) {
+	h := newTestSubscriptionHandler(t)
+	body, _ := json.Marshal(map[string]any{
+		"name": "Basic", "amount": 999, "interval": "month",
+		"interval_count": 1,
+	})
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/subscriptions/plans", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	crec := httptest.NewRecorder()
+	h.CreatePlan(crec, req)
+
+	plan, err := decodeMap(crec.Body)
+	if err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	planID := getInt64(plan, "id")
+
+	subBody, _ := json.Marshal(map[string]any{"plan_id": planID})
+	subReq := httptest.NewRequest(http.MethodPost, "/api/v1/subscriptions", bytes.NewReader(subBody))
+	subReq.Header.Set("Content-Type", "application/json")
+	subReq = subReq.WithContext(middleware.ContextWithUser(subReq.Context(), middleware.UserInfo{UserID: 1}))
+	rec := httptest.NewRecorder()
+	h.Subscribe(rec, subReq)
+	sub, err := decodeMap(rec.Body)
+	if err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	subID := getInt64(sub, "id")
+
+	tokBody, _ := json.Marshal(map[string]any{"payment_token": "tok_xyz"})
+	tokReq := httptest.NewRequest(http.MethodPost, "/api/v1/subscriptions/"+strconv.FormatInt(subID, 10)+"/payment-token", bytes.NewReader(tokBody))
+	tokReq = pathvar.WithVars(tokReq, map[string]string{"id": strconv.FormatInt(subID, 10)})
+	tokReq = tokReq.WithContext(middleware.ContextWithUser(tokReq.Context(), middleware.UserInfo{UserID: 1}))
+	trec := httptest.NewRecorder()
+	h.AttachPaymentToken(trec, tokReq)
+
+	if trec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", trec.Code, trec.Body.String())
+	}
+	resp, err := decodeMap(trec.Body)
+	if err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if getString(resp, "payment_token") != "tok_xyz" {
+		t.Errorf("expected payment_token=tok_xyz, got %v", resp["payment_token"])
+	}
+}
+
+func TestSubscriptionHandler_AttachPaymentToken_NotOwner(t *testing.T) {
+	h := newTestSubscriptionHandler(t)
+	tokBody, _ := json.Marshal(map[string]any{"payment_token": "tok_xyz"})
+	tokReq := httptest.NewRequest(http.MethodPost, "/api/v1/subscriptions/999/payment-token", bytes.NewReader(tokBody))
+	tokReq = pathvar.WithVars(tokReq, map[string]string{"id": "999"})
+	tokReq = tokReq.WithContext(middleware.ContextWithUser(tokReq.Context(), middleware.UserInfo{UserID: 2}))
+	trec := httptest.NewRecorder()
+	h.AttachPaymentToken(trec, tokReq)
+
+	if trec.Code != http.StatusNotFound {
+		t.Errorf("expected 404 for missing subscription, got %d", trec.Code)
 	}
 }
 

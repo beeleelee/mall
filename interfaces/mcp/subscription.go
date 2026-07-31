@@ -45,8 +45,9 @@ var subscriptionTools = []ToolDefinition{
 		InputSchema: InputSchema{
 			Type: "object",
 			Properties: map[string]PropertySchema{
-				"plan_id": {Type: "number", Description: "Plan ID to subscribe to"},
-				"user_id": {Type: "number", Description: "User ID to subscribe"},
+				"plan_id":       {Type: "number", Description: "Plan ID to subscribe to"},
+				"user_id":       {Type: "number", Description: "User ID to subscribe"},
+				"payment_token": {Type: "string", Description: "Optional payment token for billing"},
 			},
 		},
 	},
@@ -94,6 +95,18 @@ var subscriptionTools = []ToolDefinition{
 			},
 		},
 	},
+	{
+		Name:        "attach_payment_token",
+		Description: "Attach a payment token to an existing subscription for recurring billing",
+		InputSchema: InputSchema{
+			Type: "object",
+			Properties: map[string]PropertySchema{
+				"subscription_id": {Type: "number", Description: "Subscription ID"},
+				"user_id":         {Type: "number", Description: "User ID who owns the subscription"},
+				"payment_token":   {Type: "string", Description: "Payment token to attach"},
+			},
+		},
+	},
 }
 
 func (h *SubscriptionMCPHandler) ListTools() []ToolDefinition {
@@ -116,6 +129,8 @@ func (h *SubscriptionMCPHandler) HandleTool(ctx context.Context, name string, ra
 		return h.callChangePlan(ctx, raw)
 	case "activate_subscription":
 		return h.callActivateSubscription(ctx, raw)
+	case "attach_payment_token":
+		return h.callAttachPaymentToken(ctx, raw)
 	default:
 		return nil, kernel.NewDomainError(kernel.ErrInvalidArgument, "unknown tool: "+name)
 	}
@@ -126,8 +141,9 @@ type planIDArgs struct {
 }
 
 type subscribeArgs struct {
-	PlanID int64 `json:"plan_id"`
-	UserID int64 `json:"user_id"`
+	PlanID       int64  `json:"plan_id"`
+	UserID       int64  `json:"user_id"`
+	PaymentToken string `json:"payment_token"`
 }
 
 type listUserSubsArgs struct {
@@ -176,7 +192,7 @@ func (h *SubscriptionMCPHandler) callSubscribe(ctx context.Context, raw json.Raw
 	if args.PlanID <= 0 {
 		return nil, kernel.NewDomainError(kernel.ErrInvalidArgument, "plan_id is required")
 	}
-	sub, err := h.svc.Subscribe(ctx, args.UserID, subscription.SubscribeRequest{PlanID: args.PlanID})
+	sub, err := h.svc.Subscribe(ctx, args.UserID, subscription.SubscribeRequest{PlanID: args.PlanID, PaymentToken: args.PaymentToken})
 	if err != nil {
 		return nil, err
 	}
@@ -254,6 +270,33 @@ func (h *SubscriptionMCPHandler) callActivateSubscription(ctx context.Context, r
 		return nil, kernel.NewDomainError(kernel.ErrInvalidArgument, "subscription_id is required")
 	}
 	sub, err := h.svc.ActivateSubscription(ctx, args.SubscriptionID)
+	if err != nil {
+		return nil, err
+	}
+	return sub, nil
+}
+
+type attachTokenArgs struct {
+	SubscriptionID int64  `json:"subscription_id"`
+	UserID         int64  `json:"user_id"`
+	PaymentToken   string `json:"payment_token"`
+}
+
+func (h *SubscriptionMCPHandler) callAttachPaymentToken(ctx context.Context, raw json.RawMessage) (any, error) {
+	var args attachTokenArgs
+	if err := json.Unmarshal(raw, &args); err != nil {
+		return nil, kernel.NewDomainError(kernel.ErrInvalidArgument, "invalid arguments")
+	}
+	if args.UserID <= 0 {
+		return nil, kernel.NewDomainError(kernel.ErrInvalidArgument, "user_id is required")
+	}
+	if args.SubscriptionID <= 0 {
+		return nil, kernel.NewDomainError(kernel.ErrInvalidArgument, "subscription_id is required")
+	}
+	if args.PaymentToken == "" {
+		return nil, kernel.NewDomainError(kernel.ErrInvalidArgument, "payment_token is required")
+	}
+	sub, err := h.svc.AttachPaymentToken(ctx, args.SubscriptionID, args.PaymentToken)
 	if err != nil {
 		return nil, err
 	}

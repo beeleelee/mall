@@ -89,7 +89,23 @@ func (f *fakeSubRepo) FindActiveByUserID(_ context.Context, userID kernel.ID) (*
 }
 
 func (f *fakeSubRepo) FindDueForBilling(_ context.Context, now time.Time) ([]*domain.Subscription, error) {
-	return nil, nil
+	subs := make([]*domain.Subscription, 0)
+	for _, s := range f.subs {
+		if s.CurrentPeriodEnd.Before(now) && s.Status == domain.SubscriptionStatusActive {
+			subs = append(subs, s)
+		}
+	}
+	return subs, nil
+}
+
+func (f *fakeSubRepo) FindTrialsEnded(_ context.Context, now time.Time) ([]*domain.Subscription, error) {
+	subs := make([]*domain.Subscription, 0)
+	for _, s := range f.subs {
+		if s.Status == domain.SubscriptionStatusTrialing && s.TrialEndsAt != nil && s.TrialEndsAt.Before(now) {
+			subs = append(subs, s)
+		}
+	}
+	return subs, nil
 }
 
 type fakeSubPub struct{}
@@ -100,9 +116,9 @@ func (fakeSubPub) PublishSubscriptionEvent(_ context.Context, _ *domain.Subscrip
 
 type fakeLogger struct{}
 
-func (fakeLogger) Debug(_ context.Context, _ string, _ ...kernel.LogField) {}
-func (fakeLogger) Info(_ context.Context, _ string, _ ...kernel.LogField)  {}
-func (fakeLogger) Warn(_ context.Context, _ string, _ ...kernel.LogField)  {}
+func (fakeLogger) Debug(_ context.Context, _ string, _ ...kernel.LogField)          {}
+func (fakeLogger) Info(_ context.Context, _ string, _ ...kernel.LogField)           {}
+func (fakeLogger) Warn(_ context.Context, _ string, _ ...kernel.LogField)           {}
 func (fakeLogger) Error(_ context.Context, _ string, _ error, _ ...kernel.LogField) {}
 
 func newTestAppService(t *testing.T) (*SubscriptionAppService, *fakePlanRepo, *fakeSubRepo) {

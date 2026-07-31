@@ -97,17 +97,40 @@ func (f *fakeSubRepo) FindDueForBilling(_ context.Context, now time.Time) ([]*Su
 	return subs, nil
 }
 
+func (f *fakeSubRepo) FindTrialsEnded(_ context.Context, now time.Time) ([]*Subscription, error) {
+	subs := make([]*Subscription, 0)
+	for _, s := range f.subs {
+		if s.Status == SubscriptionStatusTrialing && s.TrialEndsAt != nil && s.TrialEndsAt.Before(now) {
+			subs = append(subs, s)
+		}
+	}
+	return subs, nil
+}
+
 type fakeSubPub struct{}
 
 func (fakeSubPub) PublishSubscriptionEvent(_ context.Context, _ *Subscription) error {
 	return nil
 }
 
+type fakeCharger struct {
+	failOn []kernel.ID
+}
+
+func (c *fakeCharger) Charge(_ context.Context, subID, _ kernel.ID, _ int64, _ string) error {
+	for _, id := range c.failOn {
+		if id == subID {
+			return kernel.NewDomainError(kernel.ErrUnavailable, "charge failed")
+		}
+	}
+	return nil
+}
+
 type fakeLogger struct{}
 
-func (fakeLogger) Debug(_ context.Context, _ string, _ ...kernel.LogField) {}
-func (fakeLogger) Info(_ context.Context, _ string, _ ...kernel.LogField)  {}
-func (fakeLogger) Warn(_ context.Context, _ string, _ ...kernel.LogField)  {}
+func (fakeLogger) Debug(_ context.Context, _ string, _ ...kernel.LogField)          {}
+func (fakeLogger) Info(_ context.Context, _ string, _ ...kernel.LogField)           {}
+func (fakeLogger) Warn(_ context.Context, _ string, _ ...kernel.LogField)           {}
 func (fakeLogger) Error(_ context.Context, _ string, _ error, _ ...kernel.LogField) {}
 
 func newTestService(t *testing.T) (*SubscriptionService, *fakePlanRepo, *fakeSubRepo) {
@@ -117,6 +140,15 @@ func newTestService(t *testing.T) (*SubscriptionService, *fakePlanRepo, *fakeSub
 	pub := fakeSubPub{}
 	logger := fakeLogger{}
 	return NewSubscriptionService(planRepo, subRepo, pub, logger), planRepo, subRepo
+}
+
+func newTestServiceWithCharger(t *testing.T, c BillingCharger) (*SubscriptionService, *fakePlanRepo, *fakeSubRepo) {
+	t.Helper()
+	planRepo := newFakePlanRepo()
+	subRepo := newFakeSubRepo()
+	pub := fakeSubPub{}
+	logger := fakeLogger{}
+	return NewSubscriptionService(planRepo, subRepo, pub, logger, WithBillingCharger(c)), planRepo, subRepo
 }
 
 func TestCreatePlan_Success(t *testing.T) {
@@ -403,5 +435,160 @@ func TestHandleBillingCycle(t *testing.T) {
 	}
 	if s.CurrentPeriodEnd.Before(time.Now()) {
 		t.Error("period end should be in the future after renewal")
+	}
+}
+
+func TestHandleBillingCycle_ChargeFailure_ActiveToPastDue(t *testing.T) {
+	svc, planRepo, subRepo := newTestServiceWithCharger(t, &fakeCharger{failOn: []kernel.ID{1}})
+	p, _ := NewPlan(1, "Basic", "", 999, "month", 1, 0, nil)
+	planRepo.Save(context.Background(), p)
+	subRepo.Save(context.Background(), &Subscription{
+		AggregateRoot: kernel.NewAggregateRoot(1), UserID: 100,
+		PlanID: 1, Status: SubscriptionStatusActive, PaymentToken: "tok_1",
+		CurrentPeriodStart: time.Now().AddDate(0, -1, 0),
+		CurrentPeriodEnd:   time.Now().AddDate(0, 0, -1),
+	})
+	s, err := svc.HandleBillingCycle(context.Background(), 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.Status != SubscriptionStatusPastDue {
+		t.Errorf("expected past_due after failed charge, got %s", s.Status)
+	}
+}
+
+func TestHandleBillingCycle_ChargeFailure_PastDueToExpired(t *testing.T) {
+	svc, planRepo, subRepo := newTestServiceWithCharger(t, &fakeCharger{failOn: []kernel.ID{1}})
+	p, _ := NewPlan(1, "Basic", "", 999, "month", 1, 0, nil)
+	planRepo.Save(context.Background(), p)
+	subRepo.Save(context.Background(), &Subscription{
+		AggregateRoot: kernel.NewAggregateRoot(1), UserID: 100,
+		PlanID: 1, Status: SubscriptionStatusPastDue, PaymentToken: "tok_1",
+		CurrentPeriodStart: time.Now().AddDate(0, -2, 0),
+		CurrentPeriodEnd:   time.Now().AddDate(0, -1, 0),
+	})
+	s, err := svc.HandleBillingCycle(context.Background(), 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.Status != SubscriptionStatusExpired {
+		t.Errorf("expected expired after second failed charge, got %s", s.Status)
+	}
+}
+
+func TestHandleBillingCycle_ChargeSuccess(t *testing.T) {
+	svc, planRepo, subRepo := newTestServiceWithCharger(t, &fakeCharger{})
+	p, _ := NewPlan(1, "Basic", "", 999, "month", 1, 0, nil)
+	planRepo.Save(context.Background(), p)
+	subRepo.Save(context.Background(), &Subscription{
+		AggregateRoot: kernel.NewAggregateRoot(1), UserID: 100,
+		PlanID: 1, Status: SubscriptionStatusActive, PaymentToken: "tok_1",
+		CurrentPeriodStart: time.Now().AddDate(0, -1, 0),
+		CurrentPeriodEnd:   time.Now().AddDate(0, 0, -1),
+	})
+	s, err := svc.HandleBillingCycle(context.Background(), 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.Status != SubscriptionStatusActive {
+		t.Errorf("expected active after successful charge, got %s", s.Status)
+	}
+	if !s.CurrentPeriodEnd.After(time.Now()) {
+		t.Error("period end should be extended after successful charge")
+	}
+}
+
+func TestAttachPaymentToken_Service(t *testing.T) {
+	svc, planRepo, subRepo := newTestService(t)
+	p, _ := NewPlan(1, "Basic", "", 999, "month", 1, 0, nil)
+	planRepo.Save(context.Background(), p)
+	subRepo.Save(context.Background(), &Subscription{
+		AggregateRoot: kernel.NewAggregateRoot(1), UserID: 100, PlanID: 1,
+		Status: SubscriptionStatusPending,
+	})
+	s, err := svc.AttachPaymentToken(context.Background(), 1, "tok_123")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.PaymentToken != "tok_123" {
+		t.Errorf("expected token tok_123, got %q", s.PaymentToken)
+	}
+}
+
+func TestSubscribeWithToken(t *testing.T) {
+	svc, planRepo, _ := newTestService(t)
+	p, _ := NewPlan(1, "Basic", "", 999, "month", 1, 0, nil)
+	planRepo.Save(context.Background(), p)
+
+	sub, err := svc.SubscribeWithToken(context.Background(), 1, 100, 1, "tok_abc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sub.PaymentToken != "tok_abc" {
+		t.Errorf("expected payment token tok_abc, got %q", sub.PaymentToken)
+	}
+}
+
+func TestExpireTrials_ExpiresTrialing(t *testing.T) {
+	svc, planRepo, subRepo := newTestService(t)
+	p, _ := NewPlan(1, "Trial", "", 999, "month", 1, 7, nil)
+	planRepo.Save(context.Background(), p)
+	trialEnd := time.Now().Add(-time.Hour)
+	subRepo.Save(context.Background(), &Subscription{
+		AggregateRoot: kernel.NewAggregateRoot(1), UserID: 100, PlanID: 1,
+		Status: SubscriptionStatusTrialing, TrialEndsAt: &trialEnd,
+	})
+
+	expired, err := svc.ExpireTrials(context.Background(), time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(expired) != 1 {
+		t.Fatalf("expected 1 expired, got %d", len(expired))
+	}
+	if expired[0].Status != SubscriptionStatusExpired {
+		t.Errorf("expected expired, got %s", expired[0].Status)
+	}
+}
+
+func TestExpireTrials_ActivateOnSuccessfulCharge(t *testing.T) {
+	svc, planRepo, subRepo := newTestServiceWithCharger(t, &fakeCharger{})
+	p, _ := NewPlan(1, "Trial", "", 999, "month", 1, 7, nil)
+	planRepo.Save(context.Background(), p)
+	trialEnd := time.Now().Add(-time.Hour)
+	subRepo.Save(context.Background(), &Subscription{
+		AggregateRoot: kernel.NewAggregateRoot(1), UserID: 100, PlanID: 1,
+		Status: SubscriptionStatusTrialing, TrialEndsAt: &trialEnd, PaymentToken: "tok_1",
+	})
+
+	expired, err := svc.ExpireTrials(context.Background(), time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(expired) != 0 {
+		t.Fatalf("expected no expired on successful trial charge, got %d", len(expired))
+	}
+	s, _ := subRepo.FindByID(context.Background(), 1)
+	if s.Status != SubscriptionStatusActive {
+		t.Errorf("expected active after successful trial charge, got %s", s.Status)
+	}
+}
+
+func TestExpireTrials_SkipsFutureTrials(t *testing.T) {
+	svc, planRepo, subRepo := newTestService(t)
+	p, _ := NewPlan(1, "Trial", "", 999, "month", 1, 7, nil)
+	planRepo.Save(context.Background(), p)
+	trialEnd := time.Now().Add(time.Hour)
+	subRepo.Save(context.Background(), &Subscription{
+		AggregateRoot: kernel.NewAggregateRoot(1), UserID: 100, PlanID: 1,
+		Status: SubscriptionStatusTrialing, TrialEndsAt: &trialEnd,
+	})
+
+	expired, err := svc.ExpireTrials(context.Background(), time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(expired) != 0 {
+		t.Fatalf("expected no expired for future trial, got %d", len(expired))
 	}
 }

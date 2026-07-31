@@ -101,6 +101,7 @@ CREATE TABLE subscriptions (
     current_period_end TIMESTAMPTZ NOT NULL,
     trial_ends_at TIMESTAMPTZ,
     cancelled_at TIMESTAMPTZ,
+    payment_token TEXT NOT NULL DEFAULT '',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
