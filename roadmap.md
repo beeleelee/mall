@@ -241,3 +241,33 @@ The outcome is a **single integration point** that collapses N×N complexity —
 **UCP Capability**: `dev.ucp.shopping.payment_token_exchange` with REST binding `POST /{id}/payment-token` and MCP binding `exchange_payment_token`
 
 **Key files**: `domain/payment/token_exchange.go`, `infrastructure/payment/mock_token_validator.go`, `infrastructure/checkout/mandate_verifier.go`, `infrastructure/database/migrations/000015_add_checkout_payment_token.up.sql`
+
+---
+
+### Phase 6: Reviews, Wishlist, Subscriptions & Notifications ✅
+
+**Goal**: Complete the merchant/consumer feature surface — product reviews, wishlists, recurring subscriptions with full billing cycles, and preference-gated email + in-app notifications wired to order and subscription events.
+
+#### Reviews & Wishlist
+
+- [x] **6.1** Review domain: `Review` aggregate, `ReviewStatus` (`pending`/`approved`/`rejected`), `ReviewService` (create, get, list by product/user, average rating, delete), 30+ tests
+- [x] **6.2** Review infra: migration `000023`, `PostgresReviewRepository` with Redis cache-aside, integration tests
+- [x] **6.3** Review REST + MCP: `/api/v1/products/:id/reviews` CRUD + admin review management + MCP tools
+- [x] **6.4** Wishlist domain + infra + REST + MCP: `Wishlist` aggregate, `PostgresWishlistRepository`, `/api/v1/wishlist` endpoints, MCP tools
+#### Subscriptions
+
+- [x] **6.5** Subscription domain: `Subscription` aggregate state machine (`pending → trialing/active → past_due → cancelled | expired`), `SubscriptionPlan` aggregate, `SubscriptionService`, `BillingCharger` interface, 30+ tests
+- [x] **6.6** Subscription infra: migration `000025`/`000026` (plans, subscriptions, payment token), `PostgresSubscriptionRepository` + `PostgresPlanRepository`, NATS `subscription.>` publisher, integration tests
+- [x] **6.7** Billing cycle: `MockBillingCharger`, charge-aware `HandleBillingCycle` (past_due on first failure, expired on second), `ExpireTrials`, `ListDueForBilling`, `SubscriptionBillingService.ProcessDueBilling`, ticker-based `SubscriptionBillingWorker`
+- [x] **6.8** Subscription REST + MCP: plans CRUD (admin), subscribe/list/get/cancel/change-plan/activate/attach-payment-token (user) + MCP tools
+
+#### Notifications
+
+- [x] **6.9** Notification domain: `Notification` aggregate, `NotificationPreferences` with channel toggles + `*[]NotificationType` allow-list (nil = allow all), `NotificationService` with in-app writer + preference gating, tests
+- [x] **6.10** Notification infra: migration `000027`, `PostgresNotificationRepository` + `PostgresNotificationPreferenceRepository`, `NoopEmailSender`, generalized `NotificationConsumer` (subscribes to `order.>` + `subscription.>` → preference-gated email + in-app with Snowflake IDs)
+- [x] **6.11** Notification REST: `/api/v1/notifications` (list + unread count, mark-read, mark-all-read, preferences GET/PUT), handler tests
+- [x] **6.12** Notification MCP: 6 tools (list, mark read, mark all read, unread count, preferences get/update), tools/list count assertion updated
+
+**Key files**: `domain/review/`, `domain/wishlist/`, `domain/subscription/`, `domain/notification/`, `infrastructure/subscription/billing_worker.go`, `infrastructure/notification/consumer.go`, `application/subscription/billing.go`
+
+**New dependencies**: none — built entirely on the existing go-zero + sqlx + NATS stack

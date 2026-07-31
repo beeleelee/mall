@@ -2,16 +2,16 @@
 
 ## What this is
 
-A **UCP-native e-commerce platform** in Go with **A2A (Agent-to-Agent) Protocol** support. All phases complete — catalog, identity, OAuth, cart, checkout, order, inventory, payment/discount/fulfillment, admin, and A2A agent capabilities.
+A **UCP-native e-commerce platform** in Go with **A2A (Agent-to-Agent) Protocol** support. All phases complete — catalog, identity, OAuth, cart, checkout, order, inventory, payment/discount/fulfillment, reviews, wishlist, subscriptions, notifications, admin, and A2A agent capabilities.
 
 ## Architecture
 
 DDD layering:
 | Layer | Path | Status |
 |-------|------|--------|
- | Domain | `domain/{catalog,identity,oauth,cart,checkout,order,kernel,a2a,inventory,payment,discount,fulfillment,ecp}/` | All domains done |
-| Application | `application/{identity,oauth,order}/` | Identity + OAuth app services + Checkout→Order saga done |
-| Infrastructure | `infrastructure/{catalog,identity,oauth,cart,checkout,order,database,a2a,inventory,payment,discount,fulfillment,...}/` | All repos, migrator, NATS publishers done |
+ | Domain | `domain/{catalog,identity,oauth,cart,checkout,order,kernel,a2a,inventory,payment,discount,fulfillment,ecp,review,wishlist,subscription,notification,analytics}/` | All domains done |
+| Application | `application/{identity,oauth,order,payment,subscription}/` | Identity + OAuth app services, Checkout→Order saga, subscription billing service |
+| Infrastructure | `infrastructure/{catalog,identity,oauth,cart,checkout,order,database,a2a,inventory,payment,discount,fulfillment,review,wishlist,subscription,notification,...}/` | All repos, migrator, NATS publishers + consumers done |
 | Interfaces | `interfaces/{middleware,rest,mcp}/` | REST + MCP + A2A handlers done |
 
 Web framework: **go-zero** (`github.com/zeromicro/go-zero`). Do not import gin, chi, or similar.
@@ -56,6 +56,8 @@ Persistence: `pgx`/`sqlx` + `go-redis`. Identity uses bcrypt via `golang.org/x/c
 - **Seed client**: `main.go` seeds a default OAuth client (`client_id: "web"`, `client_secret: "web-secret"`) on startup.
 - **Application service**: `IdentityAppService` in `application/identity/` generates IDs via Snowflake, delegates to domain. New features should follow this pattern.
 - **Webhooks**: `Webhook` aggregate in `domain/order/`, `WebhookRepository` interface, `WebhookService` with Register/ListByUser/Delete. HMAC-SHA256 signatures via `infra/webhook.go`. Delivery consumer subscribes to `order.>` JetStream subject, 3 retries with 1s backoff.
+- **Subscription**: `Subscription` aggregate (`pending → trialing/active → past_due → cancelled | expired`), `SubscriptionPlan` aggregate, `SubscriptionService`, `BillingCharger` interface + `MockBillingCharger`. Payment tokens enable recurring billing; `HandleBillingCycle` marks past_due on first charge failure, expired on second. `SubscriptionBillingWorker` (ticker) + `SubscriptionBillingService.ProcessDueBilling` in `application/subscription/billing.go`. NATS `subscription.>` events via `NATSPaymentEventPublisher`-style publisher. Migration `000025`/`000026`.
+- **Notification**: `Notification` aggregate + `NotificationPreferences` (channel toggles, `*[]NotificationType` where nil = allow all). `NotificationService` with `WithInAppWriter`, `WithPreferenceRepository`, `WithNotificationRepository`, `WithSnowflake`. `NotificationConsumer` in `infrastructure/notification/` subscribes to `order.>` and `subscription.>` for preference-gated email + in-app. Migration `000027`. REST `/api/v1/notifications*` + MCP tools.
 
 ## Admin (requires admin role)
 
@@ -112,6 +114,38 @@ Persistence: `pgx`/`sqlx` + `go-redis`. Identity uses bcrypt via `golang.org/x/c
 | GET | `/.well-known/a2a/agent-card` | A2A Agent Card | No |
 | GET | `/.well-known/a2a/agent-card/extended` | A2A Extended Agent Card | Yes |
 | POST | `/a2a` | A2A JSON-RPC (tasks/send, tasks/get, tasks/list, tasks/cancel, pushConfig/create, etc.) | Yes |
+| GET | `/api/v1/products/:id/reviews` | List product reviews | No |
+| POST | `/api/v1/products/:id/reviews` | Create review | Yes |
+| GET | `/api/v1/reviews/:id` | Get review | No |
+| DELETE | `/api/v1/reviews/:id` | Delete review | Yes |
+| GET | `/api/v1/reviews/user/:id` | List user reviews | No |
+| POST | `/api/v1/discounts` | Create discount code | Admin |
+| GET | `/api/v1/discounts/validate` | Validate discount code | No |
+| POST | `/api/v1/discounts/apply` | Apply discount code | Yes |
+| POST | `/api/v1/discounts/deactivate` | Deactivate discount code | Admin |
+| GET | `/api/v1/wishlist` | Get wishlist | Yes |
+| POST | `/api/v1/wishlist/items` | Add item | Yes |
+| DELETE | `/api/v1/wishlist/items/:productId` | Remove item | Yes |
+| DELETE | `/api/v1/wishlist` | Clear wishlist | Yes |
+| GET | `/api/v1/notifications` | List + unread count | Yes |
+| GET | `/api/v1/notifications/unread-count` | Unread count | Yes |
+| POST | `/api/v1/notifications/:id/read` | Mark read | Yes |
+| POST | `/api/v1/notifications/mark-all-read` | Mark all read | Yes |
+| GET | `/api/v1/notifications/preferences` | Get preferences | Yes |
+| PUT | `/api/v1/notifications/preferences` | Update preferences | Yes |
+| POST | `/api/v1/fulfillment/rates` | Calculate rates | Yes |
+| GET | `/api/v1/subscriptions/plans` | List plans | No |
+| GET | `/api/v1/subscriptions/plans/:id` | Get plan | No |
+| POST | `/api/v1/subscriptions/plans` | Create plan | Admin |
+| PUT | `/api/v1/subscriptions/plans/:id` | Update plan | Admin |
+| POST | `/api/v1/subscriptions` | Subscribe | Yes |
+| GET | `/api/v1/subscriptions` | List user subscriptions | Yes |
+| GET | `/api/v1/subscriptions/:id` | Get subscription | Yes |
+| POST | `/api/v1/subscriptions/:id/cancel` | Cancel subscription | Yes |
+| POST | `/api/v1/subscriptions/:id/change-plan` | Change plan | Yes |
+| POST | `/api/v1/subscriptions/:id/activate` | Activate subscription | Yes |
+| POST | `/api/v1/subscriptions/:id/payment-token` | Attach payment token | Yes |
+| POST | `/api/v1/subscriptions/plans/:id/activate` | Activate plan | Admin |
 
 ## Key files
 
@@ -121,6 +155,8 @@ Persistence: `pgx`/`sqlx` + `go-redis`. Identity uses bcrypt via `golang.org/x/c
 - `infrastructure/cart/publisher.go` — reference for NATS publisher (JetStream publisher)
 - `infrastructure/order/webhook.go` — PostgresWebhookRepository, HMAC signer, HTTP delivery with retries
 - `infrastructure/a2a/repository.go` — PostgresTaskRepository with JSONB, cursor pagination
+- `infrastructure/notification/consumer.go` — NotificationConsumer (order.> + subscription.> → email + in-app)
+- `infrastructure/subscription/billing_worker.go` — ticker-based billing worker pattern
 - `interfaces/mcp/catalog.go` — MCP JSON-RPC 2.0 handler (tools/list, tools/call)
 - `interfaces/rest/a2a.go` — A2A JSON-RPC router, Agent Card endpoint, SSE streaming
 - `domain/a2a/` — A2A data model (Task, Message, Part, Artifact, AgentCard) + AgentService
