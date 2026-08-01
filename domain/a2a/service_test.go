@@ -442,8 +442,8 @@ func TestAgentCard(t *testing.T) {
 	if !card.Capabilities.Streaming {
 		t.Error("expected streaming capability")
 	}
-	if len(card.Skills) != 5 {
-		t.Errorf("expected 5 skills, got %d", len(card.Skills))
+	if len(card.Skills) != 13 {
+		t.Errorf("expected 13 skills, got %d", len(card.Skills))
 	}
 	if len(card.Interfaces) != 1 {
 		t.Errorf("expected 1 interface, got %d", len(card.Interfaces))

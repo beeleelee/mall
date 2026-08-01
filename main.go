@@ -300,6 +300,13 @@ func main() {
 	a2aSvc.RegisterSkill("checkout", &checkoutSkillHandler{svc: checkoutSvc, sf: sf})
 	a2aSvc.RegisterSkill("order", &orderSkillHandler{svc: orderSvc})
 	a2aSvc.RegisterSkill("identity", &identitySkillHandler{svc: domainSvc, sf: sf})
+	a2aSvc.RegisterSkill("discount", &discountSkillHandler{svc: discountSvc})
+	a2aSvc.RegisterSkill("inventory", &inventorySkillHandler{svc: inventorySvc})
+	a2aSvc.RegisterSkill("payment", &paymentSkillHandler{svc: paymentSvc})
+	a2aSvc.RegisterSkill("fulfillment", &fulfillmentSkillHandler{svc: fulfillmentSvc})
+	a2aSvc.RegisterSkill("review", &reviewSkillHandler{svc: reviewSvc})
+	a2aSvc.RegisterSkill("wishlist", &wishlistSkillHandler{svc: wishlistSvc})
+	a2aSvc.RegisterSkill("subscription", &subscriptionSkillHandler{svc: subAppSvc})
 
 	a2aHandler := rest.NewA2AHandler(a2aSvc, fmt.Sprintf("http://localhost:%s", port))
 
@@ -390,6 +397,7 @@ func main() {
 	)
 	notifHandler := rest.NewNotificationHandler(notifSvc)
 	mcpRouter.Register(mcp.NewNotificationMCPHandler(notifSvc))
+	a2aSvc.RegisterSkill("notification", &notificationSkillHandler{svc: notifSvc})
 	notificationConsumer := notificationInfra.NewNotificationConsumer(js, notifSvc, userRepo, sf)
 	notifCtx, notifCancel := context.WithCancel(context.Background())
 	defer notifCancel()
@@ -1233,10 +1241,48 @@ type cartSkillHandler struct {
 }
 
 func (h *cartSkillHandler) Handle(ctx context.Context, task *domainA2A.Task, msg domainA2A.Message) error {
+	if data, ok := skillData(msg); ok {
+		pid := numArg(data, "product_id")
+		if pid > 0 {
+			cartID, err := h.sf.NextID()
+			if err != nil {
+				return err
+			}
+			qty := int(numArg(data, "quantity"))
+			if qty <= 0 {
+				qty = 1
+			}
+			_, err = h.svc.AddItem(ctx, domainCart.AddItemInput{
+				CartID:    cartID,
+				UserID:    task.UserID,
+				ProductID: kernel.ID(pid),
+				SKU:       strArg(data, "sku"),
+				Name:      strArg(data, "name"),
+				Quantity:  qty,
+				UnitPrice: numArg(data, "unit_price"),
+				ImageURL:  strArg(data, "image_url"),
+			})
+			if err != nil {
+				return err
+			}
+			task.AddArtifact(domainA2A.Artifact{
+				ID:    "cart-result",
+				Name:  "Cart Response",
+				Parts: []domainA2A.Part{domainA2A.TextPart(fmt.Sprintf("added product %d to cart for user %d", pid, task.UserID.Int64()))},
+			})
+			return nil
+		}
+	}
+
+	cart, err := h.svc.GetCart(ctx, task.UserID)
+	if err != nil {
+		return err
+	}
+	total := cart.GetTotal()
 	task.AddArtifact(domainA2A.Artifact{
 		ID:    "cart-result",
 		Name:  "Cart Response",
-		Parts: []domainA2A.Part{domainA2A.TextPart("cart operation received for user " + task.UserID.String())},
+		Parts: []domainA2A.Part{domainA2A.TextPart(fmt.Sprintf("cart for user %d has %d item(s), subtotal %d", task.UserID.Int64(), total.ItemCount, total.Subtotal))},
 	})
 	return nil
 }
@@ -1247,10 +1293,22 @@ type checkoutSkillHandler struct {
 }
 
 func (h *checkoutSkillHandler) Handle(ctx context.Context, task *domainA2A.Task, msg domainA2A.Message) error {
+	session, err := h.svc.GetCheckoutByUser(ctx, task.UserID)
+	if err != nil && !kernel.IsNotFound(err) {
+		return err
+	}
+	if session == nil {
+		task.AddArtifact(domainA2A.Artifact{
+			ID:    "checkout-result",
+			Name:  "Checkout Response",
+			Parts: []domainA2A.Part{domainA2A.TextPart("no active checkout for user " + task.UserID.String())},
+		})
+		return nil
+	}
 	task.AddArtifact(domainA2A.Artifact{
 		ID:    "checkout-result",
 		Name:  "Checkout Response",
-		Parts: []domainA2A.Part{domainA2A.TextPart("checkout operation received")},
+		Parts: []domainA2A.Part{domainA2A.TextPart(fmt.Sprintf("checkout %d is %s, grand total %d", session.ID.Int64(), session.Status, session.GrandTotal))},
 	})
 	return nil
 }
@@ -1280,10 +1338,18 @@ type identitySkillHandler struct {
 }
 
 func (h *identitySkillHandler) Handle(ctx context.Context, task *domainA2A.Task, msg domainA2A.Message) error {
+	user, err := h.svc.GetUser(ctx, task.UserID)
+	if err != nil {
+		return err
+	}
+	roles := make([]string, len(user.Roles))
+	for i, r := range user.Roles {
+		roles[i] = string(r)
+	}
 	task.AddArtifact(domainA2A.Artifact{
 		ID:    "identity-result",
 		Name:  "Identity Response",
-		Parts: []domainA2A.Part{domainA2A.TextPart("identity operation received")},
+		Parts: []domainA2A.Part{domainA2A.TextPart(fmt.Sprintf("user %d: %s <%s> status=%s roles=%s", user.ID.Int64(), user.Name, user.Email, user.Status, strings.Join(roles, ",")))},
 	})
 	return nil
 }

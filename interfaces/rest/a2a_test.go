@@ -164,8 +164,8 @@ func TestAgentCardEndpoint(t *testing.T) {
 	if card.Name != "Mall E-Commerce Agent" {
 		t.Errorf("expected name, got %s", card.Name)
 	}
-	if len(card.Skills) != 5 {
-		t.Errorf("expected 5 skills, got %d", len(card.Skills))
+	if len(card.Skills) != 13 {
+		t.Errorf("expected 13 skills, got %d", len(card.Skills))
 	}
 	if !card.Capabilities.Streaming {
 		t.Error("expected streaming capability")
