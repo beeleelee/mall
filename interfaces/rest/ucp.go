@@ -367,6 +367,66 @@ func DefaultProfile() *Profile {
 					},
 				},
 			},
+			"dev.ucp.shopping.stripe_payment": {
+				Version: "1.0.0",
+				Bindings: CapabilityBindings{
+					REST: &RESTBinding{
+						BaseURL: "/api/v1",
+						Endpoints: map[string]string{
+							"create_payment_intent": "POST /checkouts/{id}/stripe/payment-intent",
+							"webhook":               "POST /stripe/webhook",
+						},
+					},
+				},
+			},
+			"dev.ucp.shopping.subscriptions": {
+				Version: "1.0.0",
+				Bindings: CapabilityBindings{
+					MCP: &MCPBinding{
+						Tools:         []string{"list_subscription_plans", "get_subscription_plan", "subscribe", "list_user_subscriptions", "cancel_subscription", "change_subscription_plan", "activate_subscription", "attach_payment_token"},
+						TransportType: "json-rpc-2.0",
+						Endpoint:      "/mcp",
+					},
+					REST: &RESTBinding{
+						BaseURL: "/api/v1/subscriptions",
+						Endpoints: map[string]string{
+							"list_plans":           "GET /plans",
+							"get_plan":             "GET /plans/{id}",
+							"create_plan":          "POST /plans",
+							"update_plan":          "PUT /plans/{id}",
+							"activate_plan":        "POST /plans/{id}/activate",
+							"subscribe":            "POST /",
+							"list_user":            "GET /",
+							"get":                  "GET /{id}",
+							"cancel":               "POST /{id}/cancel",
+							"change_plan":          "POST /{id}/change-plan",
+							"activate":             "POST /{id}/activate",
+							"attach_payment_token": "POST /{id}/payment-token",
+						},
+					},
+				},
+			},
+			"dev.ucp.shopping.notifications": {
+				Version: "1.0.0",
+				Bindings: CapabilityBindings{
+					MCP: &MCPBinding{
+						Tools:         []string{"list_notifications", "mark_notification_read", "mark_all_notifications_read", "get_unread_notification_count", "get_notification_preferences", "update_notification_preferences"},
+						TransportType: "json-rpc-2.0",
+						Endpoint:      "/mcp",
+					},
+					REST: &RESTBinding{
+						BaseURL: "/api/v1/notifications",
+						Endpoints: map[string]string{
+							"list":          "GET /",
+							"unread_count":  "GET /unread-count",
+							"mark_read":     "POST /{id}/read",
+							"mark_all_read": "POST /mark-all-read",
+							"get_prefs":     "GET /preferences",
+							"update_prefs":  "PUT /preferences",
+						},
+					},
+				},
+			},
 			"dev.a2a.agent": {
 				Version: "1.0.0",
 				Bindings: CapabilityBindings{
