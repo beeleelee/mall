@@ -94,6 +94,7 @@ func TestUCPProfile_MCPToolsRegistered(t *testing.T) {
 		mcp.NewReviewMCPHandler(nil, nil),
 		mcp.NewWishlistMCPHandler(nil),
 		mcp.NewAdminMCPHandler(nil, nil, nil, nil, nil, nil),
+		mcp.NewAnalyticsMCPHandler(nil, nil),
 	}
 
 	registered := map[string]bool{}

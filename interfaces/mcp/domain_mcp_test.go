@@ -11,6 +11,7 @@ import (
 
 	"github.com/beeleelee/mall/domain/kernel"
 
+	domainAnalytics "github.com/beeleelee/mall/domain/analytics"
 	domainCart "github.com/beeleelee/mall/domain/cart"
 	domainCatalog "github.com/beeleelee/mall/domain/catalog"
 	domainCheckout "github.com/beeleelee/mall/domain/checkout"
@@ -811,6 +812,10 @@ func TestMCP_ToolsList_AllDomains(t *testing.T) {
 	notifSvc := domainNotification.NewNotificationService(fakeNotificationSender{}, fakeLoggerMCP{})
 	router.Register(NewNotificationMCPHandler(notifSvc))
 
+	analyticsRepo := newFakeAnalyticsRepoForMCP()
+	analyticsSvc := domainAnalytics.NewAnalyticsService(analyticsRepo)
+	router.Register(NewAnalyticsMCPHandler(analyticsSvc, userRepo))
+
 	// tools/list should return all tools from all providers
 	w := rpcCall(t, router, "tools/list", "", nil)
 	assertOK(t, w)
@@ -842,9 +847,11 @@ func TestMCP_ToolsList_AllDomains(t *testing.T) {
 		"list_all_orders": false, "list_users": false, "activate_user": false,
 		"list_notifications": false, "mark_notification_read": false, "mark_all_notifications_read": false,
 		"get_unread_notification_count": false, "get_notification_preferences": false, "update_notification_preferences": false,
+		"get_dashboard_overview": false, "get_revenue_analytics": false, "get_order_analytics": false,
+		"get_user_analytics": false, "get_product_analytics": false,
 	}
 
-	expectedCount := 3 + 5 + 9 + 8 + 4 + 3 + 7 + 4 + 3 + 1 + 3 + 9 + 6 // 65 with 3 duplicates
+	expectedCount := 3 + 5 + 9 + 8 + 4 + 3 + 7 + 4 + 3 + 1 + 3 + 9 + 6 + 5 // 70 with 3 duplicates
 
 	for _, tDef := range tools {
 		name := tDef.(map[string]any)["name"].(string)
@@ -1714,4 +1721,196 @@ func TestMCP_NotificationTools(t *testing.T) {
 		"user_id": 100,
 	})
 	assertOK(t, w)
+}
+
+// ---------------------------------------------------------------------------
+// Analytics fakes and tests
+// ---------------------------------------------------------------------------
+
+type fakeAnalyticsRepoForMCP struct {
+	dashboard        *domainAnalytics.DashboardOverview
+	revenueByDay     []*domainAnalytics.DailyRevenue
+	revenueByProduct []*domainAnalytics.ProductRevenue
+	revenueByCat     []*domainAnalytics.CategoryRevenue
+	avgOrderValue    int64
+	ordersPerDay     []*domainAnalytics.DailyOrderCount
+	statusBreakdown  []*domainAnalytics.StatusCount
+	cancelRate       float64
+	usersPerDay      []*domainAnalytics.DailyUserCount
+	userStatus       []*domainAnalytics.StatusCount
+	topSellers       []*domainAnalytics.ProductSales
+	prodByCat        []*domainAnalytics.CategoryCount
+	zeroOrderCount   int
+	inventorySum     *domainAnalytics.InventorySummary
+}
+
+func newFakeAnalyticsRepoForMCP() *fakeAnalyticsRepoForMCP {
+	return &fakeAnalyticsRepoForMCP{
+		dashboard: &domainAnalytics.DashboardOverview{
+			Revenue:           domainAnalytics.RevenueSummary{Today: 10000, ThisWeek: 75000, ThisMonth: 300000, AllTime: 5000000},
+			Orders:            domainAnalytics.OrderSummary{Total: 100, Confirmed: 10, Processing: 20, Shipped: 30, Delivered: 35, Returned: 3, Cancelled: 2},
+			Users:             domainAnalytics.UserSummary{Total: 50, Active: 48, Suspended: 2},
+			Products:          domainAnalytics.ProductSummary{Total: 200, Active: 180},
+			LowStockCount:     5,
+			AverageOrderValue: 5000,
+			CancellationRate:  0.02,
+		},
+		revenueByDay:     []*domainAnalytics.DailyRevenue{{Day: "2026-07-10", Revenue: 10000, OrderCount: 2}},
+		revenueByProduct: []*domainAnalytics.ProductRevenue{{ProductID: 1, Name: "Widget", Revenue: 5000, OrderCount: 1}},
+		revenueByCat:     []*domainAnalytics.CategoryRevenue{{CategoryID: 1, CategoryName: "Electronics", Revenue: 10000, ProductCount: 5}},
+		avgOrderValue:    5000,
+		ordersPerDay:     []*domainAnalytics.DailyOrderCount{{Day: "2026-07-10", Count: 2}},
+		statusBreakdown:  []*domainAnalytics.StatusCount{{Status: "delivered", Count: 35}},
+		cancelRate:       0.02,
+		usersPerDay:      []*domainAnalytics.DailyUserCount{{Day: "2026-07-10", Count: 3}},
+		userStatus:       []*domainAnalytics.StatusCount{{Status: "active", Count: 48}},
+		topSellers:       []*domainAnalytics.ProductSales{{ProductID: 1, Name: "Widget", QuantitySold: 10, Revenue: 5000, OrderCount: 1}},
+		prodByCat:        []*domainAnalytics.CategoryCount{{CategoryID: 1, CategoryName: "Electronics", ProductCount: 180}},
+		zeroOrderCount:   20,
+		inventorySum:     &domainAnalytics.InventorySummary{TotalProducts: 200, TotalStock: 5000, LowStockCount: 5, OutOfStockCount: 2},
+	}
+}
+
+func (f *fakeAnalyticsRepoForMCP) GetDashboardOverview(_ context.Context) (*domainAnalytics.DashboardOverview, error) {
+	return f.dashboard, nil
+}
+
+func (f *fakeAnalyticsRepoForMCP) GetRevenueByDay(_ context.Context, _ int) ([]*domainAnalytics.DailyRevenue, error) {
+	return f.revenueByDay, nil
+}
+
+func (f *fakeAnalyticsRepoForMCP) GetRevenueByProduct(_ context.Context, _ int) ([]*domainAnalytics.ProductRevenue, error) {
+	return f.revenueByProduct, nil
+}
+
+func (f *fakeAnalyticsRepoForMCP) GetRevenueByCategory(_ context.Context) ([]*domainAnalytics.CategoryRevenue, error) {
+	return f.revenueByCat, nil
+}
+
+func (f *fakeAnalyticsRepoForMCP) GetAverageOrderValue(_ context.Context) (int64, error) {
+	return f.avgOrderValue, nil
+}
+
+func (f *fakeAnalyticsRepoForMCP) GetOrdersPerDay(_ context.Context, _ int) ([]*domainAnalytics.DailyOrderCount, error) {
+	return f.ordersPerDay, nil
+}
+
+func (f *fakeAnalyticsRepoForMCP) GetOrderStatusBreakdown(_ context.Context) ([]*domainAnalytics.StatusCount, error) {
+	return f.statusBreakdown, nil
+}
+
+func (f *fakeAnalyticsRepoForMCP) GetCancellationRate(_ context.Context) (float64, error) {
+	return f.cancelRate, nil
+}
+
+func (f *fakeAnalyticsRepoForMCP) GetNewUsersPerDay(_ context.Context, _ int) ([]*domainAnalytics.DailyUserCount, error) {
+	return f.usersPerDay, nil
+}
+
+func (f *fakeAnalyticsRepoForMCP) GetUserStatusBreakdown(_ context.Context) ([]*domainAnalytics.StatusCount, error) {
+	return f.userStatus, nil
+}
+
+func (f *fakeAnalyticsRepoForMCP) GetTopSellers(_ context.Context, _ int) ([]*domainAnalytics.ProductSales, error) {
+	return f.topSellers, nil
+}
+
+func (f *fakeAnalyticsRepoForMCP) GetProductsByCategory(_ context.Context) ([]*domainAnalytics.CategoryCount, error) {
+	return f.prodByCat, nil
+}
+
+func (f *fakeAnalyticsRepoForMCP) GetZeroOrderProductCount(_ context.Context) (int, error) {
+	return f.zeroOrderCount, nil
+}
+
+func (f *fakeAnalyticsRepoForMCP) GetInventorySummary(_ context.Context) (*domainAnalytics.InventorySummary, error) {
+	return f.inventorySum, nil
+}
+
+func TestMCP_AnalyticsTools(t *testing.T) {
+	userRepo := newFakeUserRepoForMCP()
+	adminPw, _ := domainIdentity.NewPassword("adminpass123")
+	adminUser, err := domainIdentity.NewUser(100, "admin@example.com", "Admin", adminPw, []domainIdentity.UserRole{domainIdentity.UserRoleAdmin})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := userRepo.Save(context.Background(), adminUser); err != nil {
+		t.Fatal(err)
+	}
+
+	analyticsRepo := newFakeAnalyticsRepoForMCP()
+	analyticsSvc := domainAnalytics.NewAnalyticsService(analyticsRepo)
+
+	router := NewMCPRouter()
+	router.Register(NewAnalyticsMCPHandler(analyticsSvc, userRepo))
+
+	// get_dashboard_overview
+	w := rpcCall(t, router, "tools/call", "get_dashboard_overview", map[string]any{
+		"admin_user_id": 100,
+	})
+	assertOK(t, w)
+
+	var resp map[string]any
+	json.Unmarshal(w.Body.Bytes(), &resp)
+	content := resp["result"].(map[string]any)["content"].([]any)
+	dashText := content[0].(map[string]any)["text"].(string)
+	if !strings.Contains(dashText, `"low_stock_count":5`) {
+		t.Fatalf("expected low_stock_count 5 in dashboard, got: %v", dashText)
+	}
+
+	// get_revenue_analytics (default day grouping)
+	w = rpcCall(t, router, "tools/call", "get_revenue_analytics", map[string]any{
+		"admin_user_id": 100,
+	})
+	assertOK(t, w)
+	json.Unmarshal(w.Body.Bytes(), &resp)
+	content = resp["result"].(map[string]any)["content"].([]any)
+	revText := content[0].(map[string]any)["text"].(string)
+	if !strings.Contains(revText, `"average_order_value":5000`) {
+		t.Fatalf("expected average_order_value 5000, got: %v", revText)
+	}
+
+	// get_revenue_analytics by product
+	w = rpcCall(t, router, "tools/call", "get_revenue_analytics", map[string]any{
+		"admin_user_id": 100,
+		"group":         "product",
+	})
+	assertOK(t, w)
+
+	// get_order_analytics
+	w = rpcCall(t, router, "tools/call", "get_order_analytics", map[string]any{
+		"admin_user_id": 100,
+	})
+	assertOK(t, w)
+	json.Unmarshal(w.Body.Bytes(), &resp)
+	content = resp["result"].(map[string]any)["content"].([]any)
+	if !strings.Contains(content[0].(map[string]any)["text"].(string), `"cancellation_rate":0.02`) {
+		t.Fatalf("expected cancellation_rate 0.02, got: %v", content[0].(map[string]any)["text"])
+	}
+
+	// get_user_analytics
+	w = rpcCall(t, router, "tools/call", "get_user_analytics", map[string]any{
+		"admin_user_id": 100,
+	})
+	assertOK(t, w)
+
+	// get_product_analytics
+	w = rpcCall(t, router, "tools/call", "get_product_analytics", map[string]any{
+		"admin_user_id": 100,
+	})
+	assertOK(t, w)
+	json.Unmarshal(w.Body.Bytes(), &resp)
+	content = resp["result"].(map[string]any)["content"].([]any)
+	if !strings.Contains(content[0].(map[string]any)["text"].(string), `"zero_order_count":20`) {
+		t.Fatalf("expected zero_order_count 20, got: %v", content[0].(map[string]any)["text"])
+	}
+
+	// Non-admin should be rejected (HTTP 200 with JSON-RPC error)
+	w = rpcCall(t, router, "tools/call", "get_dashboard_overview", map[string]any{
+		"admin_user_id": 200,
+	})
+	json.Unmarshal(w.Body.Bytes(), &resp)
+	if resp["error"] == nil {
+		t.Fatalf("expected error for non-admin user, got: %v", resp)
+	}
 }

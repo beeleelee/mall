@@ -327,6 +327,11 @@ func DefaultProfile() *Profile {
 			"dev.ucp.shopping.admin.dashboard": {
 				Version: "1.0.0",
 				Bindings: CapabilityBindings{
+					MCP: &MCPBinding{
+						Tools:         []string{"get_dashboard_overview", "get_revenue_analytics", "get_order_analytics", "get_user_analytics", "get_product_analytics"},
+						TransportType: "json-rpc-2.0",
+						Endpoint:      "/mcp",
+					},
 					REST: &RESTBinding{
 						BaseURL: "/api/v1/admin",
 						Endpoints: map[string]string{

@@ -260,6 +260,7 @@ func main() {
 	categoryRepo := infraCatalog.NewPostgresCategoryRepository(db)
 	analyticsRepo := infraAnalytics.NewPostgresAnalyticsRepository(db)
 	analyticsSvc := domainAnalytics.NewAnalyticsService(analyticsRepo)
+	mcpRouter.Register(mcp.NewAnalyticsMCPHandler(analyticsSvc, userRepo))
 	reviewRepo := infraReview.NewPostgresReviewRepository(db)
 	reviewSvc := domainReview.NewReviewService(reviewRepo, logger)
 	refundRepo := infraOrder.NewPostgresRefundRepository(db)
